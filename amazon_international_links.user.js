@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     http://chocolatey.com/code/js
-// @version       0.41
+// @version       0.42
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.at/*
@@ -37,7 +37,7 @@
  *
  * GM_config
  *
- *     http://userscripts.org/groups/6://github.com/sizzlemctwizzle/GM_config/wiki
+ *     https://github.com/sizzlemctwizzle/GM_config/wiki
  *
  * sprintf() for JavaScript
  *
