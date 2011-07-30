@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     http://chocolatey.com/code/js
-// @version       0.32
+// @version       0.41
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.at/*
@@ -22,7 +22,7 @@
 // @include       https://www.amazon.co.uk/*
 // @include       https://www.amazon.de/*
 // @include       https://www.amazon.fr/*
-// @require       http://userscripts.org/scripts/version/79691/262311.user.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
 // @require       https://raw.github.com/sizzlemctwizzle/GM_config/master/gm_config.js
 // @require       https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @require       http://documentcloud.github.com/underscore/underscore-min.js
@@ -31,13 +31,13 @@
 /*
  * @requires:
  *
- * jQuery 1.4.2 for Greasemonkey
+ * jQuery 1.6.2
  *
- *     http://userscripts.org/scripts/show/79691
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
  *
  * GM_config
  *
- *     http://userscripts.org/groups/68
+ *     http://userscripts.org/groups/6://github.com/sizzlemctwizzle/GM_config/wiki
  *
  * sprintf() for JavaScript
  *
@@ -153,7 +153,7 @@ function addLinks() {
                 $html = sprintf('<strong title="amazon.%s">%s</strong>', $tld, $country);
             } else {
                 $html = sprintf(
-                    '<a href="%s//www.amazon.%s/dp/%s" class="%s" title="amazon.%2$s>%s</a>',
+                    '<a href="%s//www.amazon.%s/dp/%s" class="%s" title="amazon.%2$s">%s</a>',
                     $PROTOCOL, $tld, $ASIN, $CROSS_SITE_LINK_CLASS, $country
                 );
             }
