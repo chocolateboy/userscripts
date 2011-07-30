@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     http://chocolatey.com/code/js
-// @version       0.42
+// @version       0.43
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.at/*
@@ -22,7 +22,7 @@
 // @include       https://www.amazon.co.uk/*
 // @include       https://www.amazon.de/*
 // @include       https://www.amazon.fr/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js
 // @require       https://raw.github.com/sizzlemctwizzle/GM_config/master/gm_config.js
 // @require       https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @require       http://documentcloud.github.com/underscore/underscore-min.js
@@ -67,7 +67,7 @@ function __($obj) { return _($obj).chain() }
 
 /*********************** Functions ********************************/
 
-// lazily initialze constants - these are only assigned if the ASIN is found
+// lazily initialize constants - these are only assigned if the ASIN is found
 function initializeConstants($asin) {
     var $location = document.location;
 
