@@ -3,9 +3,9 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
-// @description   Sort last.fm tracklists by track number, duration or listeners
+// @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://*.last.fm/music/*
 // @include       http://last.fm/music/*
 // @include       http://*.lastfm.*/music/*
@@ -22,6 +22,24 @@
  *
  *     https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
  */
+
+/*
+ * key (string):
+ *
+ *     unique identifier for each column e.g. 'track', 'duration'
+ *
+ * value (triple):
+ *
+ *     0: CSS class name identifying the table header cell to attach the click event to
+ *     1: function to extract the number to sort by
+ *     2: initial sort order (1: ascending, -1: descending)
+ */
+const ASCENDING = 1, DESCENDING = -1;
+const MODEL = {
+    'track':     [ 'subjectCell',  track,     ASCENDING  ],
+    'duration':  [ 'durationCell', duration,  ASCENDING  ],
+    'listeners': [ 'reachCell',    listeners, DESCENDING ]
+};
 
 function compare(a, b, order) {
     order || (order = 1);
@@ -64,30 +82,40 @@ function stripe (i, row) {
     }
 }
 
-// declare the variables used to manage sort order
-// state private to the (enclosing scope of the)
+// declare sort-order state variables
+// private to the (enclosing scope of the)
 // function that uses them
 order = function() {
-    var memo = {}, lastCell;
+    /*
+     * This function assigns a) a sensible initial sort order (i.e ascending or descending)
+     * for each column the first time it's clicked, and b) remembers/restores the last
+     * sort order selected for each column (for as long as the page is loaded).
+     *
+     * Note: the track column is special-cased as it has effectively been "pre-clicked"
+     * to ascending order by last.fm.
+     *
+     * We use our own identifiers for each column ('track', 'duration' &c.), rather than using e.g.
+     * the header cells' text ('Track' &c.) as this allows initialisation to be performed here
+     * statically, rather than requiring the localized name for 'Track' to be passed in later.
+     */
+    var memo = { 'track': MODEL['track'][2] },
+        lastColumn = 'track';
 
-    return function (cell, orders) {
-        if (!lastCell) { // initialise (first click)
-            memo[cell] = orders[0];
-        } else if (!memo[cell]) { // initialise (after the first click)
-            memo[cell] = orders[1];
-        } else if (cell === lastCell) { // toggle
-            memo[cell] = memo[cell] * -1;
-        } // else restore memo[cell]
+    return function (column, initialSortOrder) {
+        if (!memo[column]) { // initialise
+            memo[column] = initialSortOrder;
+        } else if (column === lastColumn) { // toggle
+            memo[column] = memo[column] * -1;
+        } // else restore memo[column]
 
-        lastCell = cell;
-        return memo[cell];
+        lastColumn = column;
+        return memo[column];
     };
 }();
 
-function sortBy(container, children, extractor, orders, transform) {
+function sortBy(container, children, column, extractor, initialSortOrder, transform) {
     return function() {
-        var cell = $(this).text(); // unique identifier for the clicked header e.g. 'Track', 'Duration' &c.
-        var $order = order(cell, orders);
+        var $order = order(column, initialSortOrder);
         var sort = sorter(extractor, $order);
         var sorted = children.detach().sort(sort);
 
@@ -99,28 +127,7 @@ function sortBy(container, children, extractor, orders, transform) {
     };
 }
 
-/*
- * key (string):
- *
- *     prefix of the CSS class name identifying the header cell to attach the click event to
- *     e.g. 'reach' -> $('thead td.reachCell')
- *
- * value (pair):
- *
- *     0: function to extract the number to sort by
- *     1: pair of sort orders (1: ascending, -1: descending)
- *
- * orders (pair):
- *
- *     0: initial sort order for this column if no header has been clicked
- *     1: initial sort order for this column after a header has been clicked
- */
-const ASCENDING = 1, DESCENDING = -1;
-const map = {
-    'subject':  [ track,     [ DESCENDING, ASCENDING ] ],
-    'duration': [ duration,  [ ASCENDING,  ASCENDING ] ],
-    'reach':    [ listeners, [ DESCENDING, DESCENDING ] ]
-};
+/******************************************************************************/
 
 var table = $('table.tracklist');
 
@@ -143,9 +150,10 @@ if (table.length) {
         rows.last().addClass('last');
     };
 
-    $.each(map, function(name, pair) {
-        var cell = $('thead td.' + name + 'Cell', table);
+    $.each(MODEL, function(column, triple) {
+        var cell = $('thead td.' + triple[0], table);
         cell.css('cursor', 'pointer');
-        cell.click(sortBy(tbody, rows, pair[0], pair[1], transform));
+        // sortBy: container, children, column, extractor, initialSortOrder, transform
+        cell.click(sortBy(tbody, rows, column, triple[1], triple[2], transform));
     });
 }
