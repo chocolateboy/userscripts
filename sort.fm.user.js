@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.1.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://*.last.fm/music/*
@@ -56,10 +56,6 @@ function compare(a, b, order) {
     return ret * order;
 }
 
-function listeners(row) {
-    return $(row).find('.reachCell').text().replace(/\D+/g, '') * 1;
-}
-
 function track(row) {
     return $(row).find('.positionCell').text().replace(/\D+/g, '') * 1;
 }
@@ -67,6 +63,10 @@ function track(row) {
 function duration(row) {
     var time = $(row).find('.durationCell').text().match(/(\d+):(\d+)/);
     return time[1] * 60 + time[2] * 1;
+}
+
+function listeners(row) {
+    return $(row).find('.reachCell').text().replace(/\D+/g, '') * 1;
 }
 
 function sorter(extractor, order) {
@@ -82,9 +82,11 @@ function stripe (i, row) {
     }
 }
 
-// declare sort-order state variables
-// private to the (enclosing scope of the)
-// function that uses them
+/*
+ * this wrapper ensures that variables used to manage
+ * sort-order state are private to the
+ * (enclosing scope of the) function that uses them
+ */
 order = function() {
     /*
      * This function assigns a) a sensible initial sort order (i.e ascending or descending)
@@ -93,20 +95,16 @@ order = function() {
      *
      * Note: the track column is special-cased as it has effectively been "pre-clicked"
      * to ascending order by last.fm.
-     *
-     * We use our own identifiers for each column ('track', 'duration' &c.), rather than using e.g.
-     * the header cells' text ('Track' &c.) as this allows initialisation to be performed here
-     * statically, rather than requiring the localized name for 'Track' to be passed in later.
      */
-    var memo = { 'track': MODEL['track'][2] },
-        lastColumn = 'track';
+    var lastColumn = 'track';
+    var memo = { lastColumn: MODEL[lastColumn][2] };
 
     return function (column, initialSortOrder) {
         if (!memo[column]) { // initialise
             memo[column] = initialSortOrder;
         } else if (column === lastColumn) { // toggle
             memo[column] = memo[column] * -1;
-        } // else restore memo[column]
+        } // else restore
 
         lastColumn = column;
         return memo[column];
