@@ -96,8 +96,8 @@ order = function() {
      * Note: the track column is special-cased as it has effectively been "pre-clicked"
      * to ascending order by last.fm.
      */
-    var lastColumn = 'track';
-    var memo = { lastColumn: MODEL[lastColumn][2] };
+    var lastColumn = 'track', memo = {};
+    memo[lastColumn] = MODEL[lastColumn][2];
 
     return function (column, initialSortOrder) {
         if (!memo[column]) { // initialise
