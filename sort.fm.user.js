@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.2
+// @version       0.1.3
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://*.last.fm/music/*
@@ -23,6 +23,9 @@
  *     https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
  */
 
+const INITIAL_SORTED_COLUMN = 'track';
+const ASCENDING = 1, DESCENDING = -1;
+
 /*
  * key (string):
  *
@@ -32,9 +35,8 @@
  *
  *     0: CSS class name identifying the table header cell to attach the click event to
  *     1: function to extract the number to sort by
- *     2: initial sort order (1: ascending, -1: descending)
+ *     2: initial sort order
  */
-const ASCENDING = 1, DESCENDING = -1;
 const MODEL = {
     'track':     [ 'subjectCell',  track,     ASCENDING  ],
     'duration':  [ 'durationCell', duration,  ASCENDING  ],
@@ -93,10 +95,10 @@ order = function() {
      * for each column the first time it's clicked, and b) remembers/restores the last
      * sort order selected for each column (for as long as the page is loaded).
      *
-     * Note: the track column is special-cased as it has effectively been "pre-clicked"
-     * to ascending order by last.fm.
+     * Note: the column by which the table is initially sorted (i.e. track) is
+     * special-cased as it has effectively been "pre-clicked" to ascending order by last.fm.
      */
-    var lastColumn = 'track', memo = {};
+    var lastColumn = INITIAL_SORTED_COLUMN, memo = {};
     memo[lastColumn] = MODEL[lastColumn][2];
 
     return function (column, initialSortOrder) {
