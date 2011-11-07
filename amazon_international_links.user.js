@@ -2,7 +2,7 @@
 // @name          Amazon International Links
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @namespace     http://chocolatey.com/code/js
+// @namespace     https://github.com/chocolateboy/userscripts
 // @version       0.50
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
