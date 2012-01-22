@@ -3,7 +3,7 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Add paragraphs to Every Film in 2011/2012 &c. Reviews
 // @author      chocolateboy
-// @version     0.1.0
+// @version     0.2.0
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://everyfilmin2011.blogspot.com
 // @include     http://everyfilmin2011.blogspot.com/*
@@ -24,6 +24,10 @@
  * italics:
  *
  *   http://everyfilmin2011.blogspot.com/2011/12/588-beyond-time-william-turnbull.html
+ *
+ * trailing unicode:
+ *
+ *     http://everyfilmin2011.blogspot.com/2011/01/24-rabbit-hole.html
  */
 
 const PREFORMATTED = /^\s*(Laughs|Jumps|Tears|Vomit|Nudity)\s*:\s*\S/;
@@ -61,10 +65,16 @@ $posts.contents().filter(function () {
 // cleanup
 $posts.each(function () {
     var $this = $(this);
-    // squash 3 or more BRs down to 2
-    $this.html($this.html().replace(/(?:\s*<br\s*\/?>\s*){3,}/gi, '<br /><br />'));
+    var html = $this.html();
+
+    // remove misplaced Unicode BOM
+    html = html.replace(/\ufeff/g, '');
+    // squash 2 or more spaced BRs down to 2 clean BRs
+    html = html.replace(/(?:\s|&nbsp;)*(?:<br\s*\/?>(?:\s|&nbsp;)*){2,}/gi, '<br /><br />');
     // remove any leading BRs
-    $this.html($this.html().replace(/^(?:\s*<br\s*\/?>\s*)*/i, ''));
+    html = html.replace(/^(?:\s|&nbsp;)(?:<br\s*\/?>(?:\s|&nbsp;)*)*/i, '');
     // remove any trailing BRs
-    $this.html($this.html().replace(/(?:\s*<br\s*\/?>\s*)*$/i, ''));
+    html = html.replace(/(?:\s|&nbsp;)*(?:<br\s*\/?>(?:\s|&nbsp;)*)*$/i, '');
+
+    $this.html(html);
 });
