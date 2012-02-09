@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Every Paragraph In...
 // @namespace   https://github.com/chocolateboy/userscripts
-// @description Add paragraphs to Every Film in 2011/2012 &c. Reviews
+// @description Add paragraph breaks to reviews on everyfilmin2011.com and everyfilmin2012.com
 // @author      chocolateboy
 // @version     0.2.0
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
@@ -23,7 +23,7 @@
  *
  * italics:
  *
- *   http://everyfilmin2011.blogspot.com/2011/12/588-beyond-time-william-turnbull.html
+ *     http://everyfilmin2011.blogspot.com/2011/12/588-beyond-time-william-turnbull.html
  *
  * trailing unicode:
  *
@@ -69,11 +69,11 @@ $posts.each(function () {
 
     // remove misplaced Unicode BOM
     html = html.replace(/\ufeff/g, '');
-    // squash 2 or more spaced BRs down to 2 clean BRs
+    // squash 2 or more possibly-spaced BRs down to 2 unspaced BRs
     html = html.replace(/(?:\s|&nbsp;)*(?:<br\s*\/?>(?:\s|&nbsp;)*){2,}/gi, '<br /><br />');
-    // remove any leading BRs
+    // remove leading BRs
     html = html.replace(/^(?:\s|&nbsp;)(?:<br\s*\/?>(?:\s|&nbsp;)*)*/i, '');
-    // remove any trailing BRs
+    // remove trailing BRs
     html = html.replace(/(?:\s|&nbsp;)*(?:<br\s*\/?>(?:\s|&nbsp;)*)*$/i, '');
 
     $this.html(html);

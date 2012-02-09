@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.44
+// @version       1.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -24,7 +24,7 @@
 // @include       https://www.amazon.es/*
 // @include       https://www.amazon.fr/*
 // @include       https://www.amazon.it/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js
 // @require       https://raw.github.com/sizzlemctwizzle/GM_config/master/gm_config.js
 // @require       https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @require       http://documentcloud.github.com/underscore/underscore-min.js
@@ -33,9 +33,9 @@
 /*
  * @requires:
  *
- * jQuery 1.6.4
+ * jQuery 1.7.1
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.js
  *
  * GM_config
  *
@@ -60,27 +60,36 @@
 /*********************** Constants ********************************/
 
 // these are all initialized lazily (hence "var" instead of "const")
-// XXX this is pointless if thousands of lines of jQuery, sprintf &c. are executed for every Amazon page
-var $ASIN, $CROSS_SITE_LINK_CLASS, $CURRENT_TLD, $LINK, $LINKS, $PROTOCOL, $SEPARATOR, $SITES;
+// XXX this is a pointless optimisation if thousands of lines of jQuery, sprintf &c. are executed for every Amazon page
+var ASIN, CROSS_SITE_LINK_CLASS, CURRENT_TLD, LINKS, MODERN, PROTOCOL, SITES;
+var $CROSS_SHOP_LINKS, $LINK, $SEPARATOR; // the $ sigil denotes jQuery objects
 
 // convenience function to reduce the verbosity of Underscore.js chaining
 // see: http://github.com/documentcloud/underscore/issues/issue/37
-function __($obj) { return _($obj).chain() }
+function __(obj) { return _(obj).chain() }
 
 /*********************** Functions ********************************/
 
 // lazily initialize constants - these are only assigned if the ASIN is found
-function initializeConstants($asin) {
-    var $location = document.location;
+function initializeConstants(asin) {
+    var location = document.location;
 
-    $ASIN = $asin; // the unique Amazon identifier for this product
-    $CROSS_SITE_LINK_CLASS = 'navCrossshopYALink'; // the CSS class for cross-site links
-    $CURRENT_TLD = $location.hostname.substr('www.amazon.'.length); // one of the 8 current Amazon TLDs
-    $LINK = $('a.' + $CROSS_SITE_LINK_CLASS).eq(-2); // the penultimate Amazon cross-site link e.g. "Your Account"
-    $LINKS = []; // an array of our added elements - jQuery objects representing alternating links and separators
-    $PROTOCOL = $location.protocol; // http: or https:
-    $SEPARATOR = $LINK.next(); // a span with a spaced vertical bar
-    $SITES = { // a map from the Amazon TLD to the corresponding two-letter country code
+    $CROSS_SHOP_LINKS = $('#nav-cross-shop-links'); // the cross-site/shop links container in the "modern" design
+
+    if ($CROSS_SHOP_LINKS.length) {
+        MODERN = true;
+    } else {
+        CROSS_SITE_LINK_CLASS = 'navCrossshopYALink'; // the CSS class for cross-site links in the "classic" design
+        $LINK = $('a.' + CROSS_SITE_LINK_CLASS).eq(-2); // the penultimate Amazon cross-site link e.g. "Your Account"
+        $SEPARATOR = $LINK.next(); // a span with a spaced vertical bar
+        MODERN = false;
+    }
+
+    ASIN = asin; // the unique Amazon identifier for this product
+    CURRENT_TLD = location.hostname.substr('www.amazon.'.length); // one of the 8 current Amazon TLDs
+    LINKS = []; // an array of our added elements - jQuery objects representing alternating links and separators
+    PROTOCOL = location.protocol; // http: or https:
+    SITES = { // a map from the Amazon TLD to the corresponding two-letter country code
         'ca'    : 'CA',
         'cn'    : 'CN',
         'de'    : 'DE',
@@ -95,26 +104,26 @@ function initializeConstants($asin) {
 
 // build the underlying data model used by the GM_config utility
 function initializeConfig() {
-    var $checkboxes = __($SITES).keys().foldl(
-        function($fields, $tld) {
-            var $country = $SITES[$tld];
-            $fields[$tld] = {
+    var checkboxes = __(SITES).keys().foldl(
+        function(fields, tld) {
+            var country = SITES[tld];
+            fields[tld] = {
                 type: 'checkbox',
-                label: $country,
-                title: sprintf('amazon.%s', $tld),
-                default: ($country == 'UK' || $country == 'US')
+                label: country,
+                title: sprintf('amazon.%s', tld),
+                default: (country == 'UK' || country == 'US')
             };
-            return $fields;
+            return fields;
         },
         {}
     ).value();
 
     // re-render the links if the settings are updated
-    var $callbacks = {
+    var callbacks = {
         save: function() { removeLinks(); addLinks() }
     };
 
-    GM_config.init('Amazon International Links Settings', $checkboxes, $callbacks);
+    GM_config.init('Amazon International Links Settings', checkboxes, callbacks);
 }
 
 // display the settings manager
@@ -122,14 +131,14 @@ function showConfig() {
     GM_config.open();
 }
 
-// return the subset of the TLD -> country code map ($SITES) corresponding to the enabled sites
+// return the subset of the TLD -> country code map (SITES) corresponding to the enabled sites
 function getConfiguredSites() {
-    return __($SITES).keys().foldl(
-        function($sites, $tld) {
-            if (GM_config.get($tld)) {
-                $sites[$tld] = $SITES[$tld];
+    return __(SITES).keys().foldl(
+        function(sites, tld) {
+            if (GM_config.get(tld)) {
+                sites[tld] = SITES[tld];
             }
-            return $sites;
+            return sites;
         },
         {}
     ).value();
@@ -137,35 +146,72 @@ function getConfiguredSites() {
 
 // remove all added links from the DOM and clear the array referencing them
 function removeLinks() {
-    _($LINKS).each(function($el) { $el.remove() });
-    $LINKS.length = 0; // clear the array of links and separators
+    _(LINKS).each(function(el) { el.remove() });
+    LINKS.length = 0; // clear the array of links and separators
+}
+
+function classicAddLink(tld, country) {
+    var html;
+
+    if (tld == CURRENT_TLD) {
+        html = sprintf('<strong title="amazon.%s">%s</strong>', tld, country);
+    } else {
+        html = sprintf(
+            '<a href="%s//www.amazon.%s/dp/%s" class="%s" title="amazon.%2$s">%s</a>',
+            PROTOCOL, tld, ASIN, CROSS_SITE_LINK_CLASS, country
+        );
+    }
+
+    LINKS.push($(html), $SEPARATOR.clone());
+}
+
+function modernAddLink(tld, country) {
+    var html;
+
+    if (tld == CURRENT_TLD) {
+        html = sprintf('<li class="nav-xs-link"><strong title="amazon.%s">%s</strong></li>', tld, country);
+    } else {
+        html = sprintf(
+            '<li class="nav-xs-link"><a href="%s//www.amazon.%s/dp/%s" title="amazon.%2$s">%s</a></li>',
+            PROTOCOL, tld, ASIN, country
+        );
+    }
+
+    LINKS.push($(html));
+}
+
+// prepend the cross-site links to the "Your Account" link
+function classicDisplayLinks() {
+    $LINK.before.apply($LINK, LINKS);
+}
+
+// append the cross-site links to the body of the nav-cross-shop-links <ul> element
+function modernDisplayLinks() {
+    $CROSS_SHOP_LINKS.append.apply($CROSS_SHOP_LINKS, LINKS);
 }
 
 // populate an array of links and display them by prepending them to the body of the cross-site navigation bar
 function addLinks() {
-    var $sites = getConfiguredSites();
+    var sites = getConfiguredSites();
 
-    if (!_.isEmpty($sites)) {
-        var $tlds = __($sites).keys().sortBy(function($tld) { return $sites[$tld] }).value();
+    if (!_.isEmpty(sites)) {
+        var tlds = __(sites).keys().sortBy(function(tld) { return sites[tld] }).value();
+        var addLink, displayLinks;
 
-        _($tlds).each(function($tld) {
-            var $country = $sites[$tld];
-            var $html;
+        if (MODERN) {
+            addLink = modernAddLink;
+            displayLinks = modernDisplayLinks;
+        } else {
+            addLink = classicAddLink;
+            displayLinks = classicDisplayLinks;
+        }
 
-            if ($tld == $CURRENT_TLD) {
-                $html = sprintf('<strong title="amazon.%s">%s</strong>', $tld, $country);
-            } else {
-                $html = sprintf(
-                    '<a href="%s//www.amazon.%s/dp/%s" class="%s" title="amazon.%2$s">%s</a>',
-                    $PROTOCOL, $tld, $ASIN, $CROSS_SITE_LINK_CLASS, $country
-                );
-            }
-
-            $LINKS.push($($html), $SEPARATOR.clone());
+        _(tlds).each(function(tld) {
+            var country = sites[tld];
+            addLink(tld, country);
         });
 
-        // prepend the cross-site links to the "Your Account" link
-        $LINK.before.apply($LINK, $LINKS);
+        displayLinks();
     }
 }
 
