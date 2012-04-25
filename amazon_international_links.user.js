@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
+// @version       1.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -61,8 +61,9 @@
 
 // these are all initialized lazily (hence "var" instead of "const")
 // XXX this is a pointless optimisation if thousands of lines of jQuery, sprintf &c. are executed for every Amazon page
-var ASIN, CROSS_SITE_LINK_CLASS, CURRENT_TLD, LINKS, MODERN, PROTOCOL, SITES;
+var ASIN, CROSS_SITE_LINK_CLASS, CURRENT_TLD, LINKS, PROTOCOL, SITES;
 var $CROSS_SHOP_LINKS, $LINK, $SEPARATOR; // the $ sigil denotes jQuery objects
+var addLink, displayLinks; // functions that depend on the site design
 
 // convenience function to reduce the verbosity of Underscore.js chaining
 // see: http://github.com/documentcloud/underscore/issues/issue/37
@@ -77,17 +78,19 @@ function initializeConstants(asin) {
     $CROSS_SHOP_LINKS = $('#nav-cross-shop-links'); // the cross-site/shop links container in the "modern" design
 
     if ($CROSS_SHOP_LINKS.length) {
-        MODERN = true;
+        addLink = modernAddLink;
+        displayLinks = modernDisplayLinks;
     } else {
         CROSS_SITE_LINK_CLASS = 'navCrossshopYALink'; // the CSS class for cross-site links in the "classic" design
         $LINK = $('a.' + CROSS_SITE_LINK_CLASS).eq(-2); // the penultimate Amazon cross-site link e.g. "Your Account"
         $SEPARATOR = $LINK.next(); // a span with a spaced vertical bar
-        MODERN = false;
+        addLink = classicAddLink;
+        displayLinks = classicDisplayLinks;
     }
 
     ASIN = asin; // the unique Amazon identifier for this product
-    CURRENT_TLD = location.hostname.substr('www.amazon.'.length); // one of the 8 current Amazon TLDs
-    LINKS = []; // an array of our added elements - jQuery objects representing alternating links and separators
+    CURRENT_TLD = location.hostname.substr('www.amazon.'.length); // one of the current Amazon TLDs
+    LINKS = []; // an array of our added elements - jQuery objects representing (classic) alternating links and separators or (modern) li-wrapped links
     PROTOCOL = location.protocol; // http: or https:
     SITES = { // a map from the Amazon TLD to the corresponding two-letter country code
         'ca'    : 'CA',
@@ -150,6 +153,7 @@ function removeLinks() {
     LINKS.length = 0; // clear the array of links and separators
 }
 
+// add a link + separator to the LINKS array
 function classicAddLink(tld, country) {
     var html;
 
@@ -165,6 +169,7 @@ function classicAddLink(tld, country) {
     LINKS.push($(html), $SEPARATOR.clone());
 }
 
+// add a li-wrapped link to the LINKS array
 function modernAddLink(tld, country) {
     var html;
 
@@ -190,21 +195,13 @@ function modernDisplayLinks() {
     $CROSS_SHOP_LINKS.append.apply($CROSS_SHOP_LINKS, LINKS);
 }
 
-// populate an array of links and display them by prepending them to the body of the cross-site navigation bar
+// populate an array of links and display them by attaching them to the body of the cross-site navigation bar
 function addLinks() {
     var sites = getConfiguredSites();
 
     if (!_.isEmpty(sites)) {
         var tlds = __(sites).keys().sortBy(function(tld) { return sites[tld] }).value();
         var addLink, displayLinks;
-
-        if (MODERN) {
-            addLink = modernAddLink;
-            displayLinks = modernDisplayLinks;
-        } else {
-            addLink = classicAddLink;
-            displayLinks = classicDisplayLinks;
-        }
 
         _(tlds).each(function(tld) {
             var country = sites[tld];

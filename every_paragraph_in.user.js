@@ -3,12 +3,12 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Add paragraph breaks to reviews on everyfilmin2011.com and everyfilmin2012.com
 // @author      chocolateboy
-// @version     0.2.0
+// @version     0.2.1
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
-// @include     http://everyfilmin2011.blogspot.com
-// @include     http://everyfilmin2011.blogspot.com/*
-// @include     http://everyfilmin2012.blogspot.com
-// @include     http://everyfilmin2012.blogspot.com/*
+// @include     http://everyfilmin2011.blogspot.tld
+// @include     http://everyfilmin2011.blogspot.tld/*
+// @include     http://everyfilmin2012.blogspot.tld
+// @include     http://everyfilmin2012.blogspot.tld/*
 // @require     https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
 // ==/UserScript==
 
