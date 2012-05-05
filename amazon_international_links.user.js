@@ -174,10 +174,10 @@ function modernAddLink(tld, country) {
     var html;
 
     if (tld == CURRENT_TLD) {
-        html = sprintf('<li class="nav-xs-link"><strong title="amazon.%s">%s</strong></li>', tld, country);
+        html = sprintf('<li class="nav-xs-link"><span style="font-weight: bold" title="amazon.%s">%s</span></li>', tld, country);
     } else {
         html = sprintf(
-            '<li class="nav-xs-link"><a href="%s//www.amazon.%s/dp/%s" title="amazon.%2$s">%s</a></li>',
+            '<li class="nav-xs-link"><a class="nav_a" href="%s//www.amazon.%s/dp/%s" title="amazon.%2$s">%s</a></li>',
             PROTOCOL, tld, ASIN, country
         );
     }
@@ -201,7 +201,6 @@ function addLinks() {
 
     if (!_.isEmpty(sites)) {
         var tlds = __(sites).keys().sortBy(function(tld) { return sites[tld] }).value();
-        var addLink, displayLinks;
 
         _(tlds).each(function(tld) {
             var country = sites[tld];
