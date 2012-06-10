@@ -1,11 +1,15 @@
 // ==UserScript==
 // @name        FullTube
-// @namespace   http://www.chocolatey.com/code/js
+// @namespace   https://github.com/chocolateboy/userscripts
 // @description Adds a full-screen button to embedded YouTube videos
-// @version     0.30
+// @version     0.40
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *
+// @exclude     http://youtube.com/*
+// @exclude     http://*.youtube.com/*
+// @exclude     https://youtube.com/*
+// @exclude     https://*.youtube.com/*
 // ==/UserScript==
 
 /*
@@ -17,9 +21,12 @@
  * or <param>...</param> embeds.
  *
  * 2) Iterate over all object and/or param elements that contain at least one @movie/@src param
- *    with a YouTube link @value. These are required to have a consistent attributes and/or
+ *    with a YouTube link @value. These are required to have consistent attributes and/or
  *    child elements. Check/repair them.
- * 
+ *
+ * 3) Iterate over all YouTube iframe elements and make sure their @src attribute contains "&fs=1"
+ * (or append it if it doesn't).
+ *
  * The awkward squad (all tested and verified):
  *
  * 1) SMF 2.0 RC3 - uses SWFObject: params without name="movie" or name="src"
@@ -43,95 +50,120 @@
  *
  */
 
-const $EMBEDS = '//embed[(contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
+/*
+ *
+ * Unsupported:
+ *
+ * 1) HTML5 iframes don't support the fs parameter e.g. (with HTML video enabled on YouTube):
+ *    http://thedailywh.at/2012/05/18/morning-fluff-202/
+ *    See https://developers.google.com/youtube/player_parameters#fs
+ */
 
-const $OBJECTS = '//object[(contains(@data, "youtube.com/v/") or contains(@data, "youtube-nocookie.com/v/")) '
+const EMBEDS = '//embed[(contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
+
+const OBJECTS = '//object[(contains(@data, "youtube.com/v/") or contains(@data, "youtube-nocookie.com/v/")) '
                + 'or ./param[(@name="movie" or @name="src") '
                + 'and (contains(@value, "youtube.com/v/") '
                + 'or contains(@value, "youtube-nocookie.com/v/"))]]';
 
-function xpath($xpath, $context) {
-    var $node_list = document.evaluate($xpath, $context || document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    var $length;
+const IFRAMES = '//iframe[(contains(@src, "youtube.com/embed/") or contains(@src, "youtube-nocookie.com/embed/") '
+               + 'or contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
 
-    if ($length = $node_list.snapshotLength) {
-        $node_list.for_each = function($f) {
-            for (var $i = 0; $i < $length; ++$i) {
-                $f($node_list.snapshotItem($i));
+function xpath(xpath, context) {
+    var node_list = document.evaluate(xpath, context || document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    var length;
+
+    if (length = node_list.snapshotLength) {
+        node_list.for_each = function(f) {
+            for (var i = 0; i < length; ++i) {
+                f(node_list.snapshotItem(i));
             }
         };
-        return $node_list;
+        return node_list;
     } else {
         return null;
     }
 }
 
-function fs($uri) {
-    $uri = $uri.replace(/(?:(?:&amp;)|(?:&))+$/, ''); // remove trailing ampersand
-    $uri = $uri.replace(/(?:&amp;|&)+fs=(?:\d)*/g, ''); // remove to-be-replaced &fs=0|1
-    $uri += '&fs=1';
-    return $uri;
+function fs(url) {
+    url = unescape(url);
+    url = url.replace(/[?& ]+$/, ''); // remove trailing question marks, ampersands or spaces
+    url = url.replace(/\bfs=(\w)*/g, 'fs=1');
+
+    if (!url.match(/[&?]fs=1\b/)) {
+        url += url.match(/\?/) ? '&fs=1' : '?fs=1';
+    }
+
+    return url;
 }
 
 function full_tube() {
-    if ($embeds = xpath($EMBEDS)) {
-        $embeds.for_each(function($embed) {
-            $embed.setAttribute('src', fs($embed.getAttribute('src')));
-            $embed.setAttribute('allowFullScreen', 'true');
+    var embeds, objects, iframes;
+
+    if (embeds = xpath(EMBEDS)) {
+        embeds.for_each(function(embed) {
+            embed.setAttribute('src', fs(embed.getAttribute('src')));
+            embed.setAttribute('allowFullScreen', 'true');
         });
     }
 
-    if ($objects = xpath($OBJECTS)) {
-        var $nobjects = $objects.snapshotLength;
-        $objects.for_each(function($object) {
-            var $params, $param, $embeds, $data, $uri;
+    if (objects = xpath(OBJECTS)) {
+        var nobjects = objects.snapshotLength;
+        objects.for_each(function(object) {
+            var params, param, data, uri;
 
-            if ($params = xpath('.//param[@name="allowFullScreen"]', $object)) {
-                $params.for_each(function($param) { $param.setAttribute('value', 'true') });
+            if (params = xpath('.//param[@name="allowFullScreen"]', object)) {
+                params.for_each(function(param) { param.setAttribute('value', 'true') });
             } else {
-                $param = document.createElement('param');
-                $param.setAttribute('name', 'allowFullScreen');
-                $param.setAttribute('value', 'true');
-                $object.appendChild($param);
+                param = document.createElement('param');
+                param.setAttribute('name', 'allowFullScreen');
+                param.setAttribute('value', 'true');
+                object.appendChild(param);
             }
 
-            if ($params = xpath('.//param[@name="movie" or @name="src"]', $object)) {
-                $params.for_each(function($param) {
+            if (params = xpath('.//param[@name="movie" or @name="src"]', object)) {
+                params.for_each(function(param) {
                     // record the URI for later use
-                    $uri = fs($param.getAttribute('value'));
-                    $param.setAttribute('value', $uri);
+                    uri = fs(param.getAttribute('value'));
+                    param.setAttribute('value', uri);
                 });
             } else {
-                $uri = fs($object.getAttribute('data'));
+                uri = fs(object.getAttribute('data'));
                 /*
                  * embeds clearly work without this,
                  * but while we're at it we may as well
                  * make this conform to YouTube's own
                  * embed code
                  */
-                $param = document.createElement('param');
-                $param.setAttribute('name', 'movie');
-                $param.setAttribute('value', $uri);
-                $object.appendChild($param);
+                param = document.createElement('param');
+                param.setAttribute('name', 'movie');
+                param.setAttribute('value', uri);
+                object.appendChild(param);
             }
 
-            if ($data = $object.getAttribute('data')) {
-                $object.setAttribute('data', fs($data));
+            if (data = object.getAttribute('data')) {
+                object.setAttribute('data', fs(data));
             } else {
-                $object.setAttribute('data', $uri);
+                object.setAttribute('data', uri);
             }
 
-            if ($embeds = xpath('.//embed[@src]', $object)) {
-                $embeds.for_each(function($embed) {
-                    $embed.setAttribute('allowfullscreen', 'true');
-                    $embed.setAttribute('src', $uri);
+            if (embeds = xpath('.//embed[@src]', object)) {
+                embeds.for_each(function(embed) {
+                    embed.setAttribute('allowfullscreen', 'true');
+                    embed.setAttribute('src', uri);
                 });
             } else {
-                $embed = document.createElement('embed');
-                $embed.setAttribute('allowfullscreen', 'true');
-                $embed.setAttribute('src', $uri);
-                $object.appendChild($embed);
+                embed = document.createElement('embed');
+                embed.setAttribute('allowfullscreen', 'true');
+                embed.setAttribute('src', uri);
+                object.appendChild(embed);
             }
+        });
+    }
+
+    if (iframes = xpath(IFRAMES)) {
+        iframes.for_each(function(iframe) {
+            iframe.setAttribute('src', fs(iframe.getAttribute('src')));
         });
     }
 }
