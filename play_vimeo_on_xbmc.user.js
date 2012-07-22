@@ -3,7 +3,7 @@
 // @namespace     https://github.com/chocolateboy/userscripts
 // @description   Adds a link to play videos from Vimeo in XBMC Eden (JSONRPC v3/4)
 // @version       2012-07-22
-// @creator       Erik Træda
+// @creator       Erik Trædal
 // @maintainer    Arve Seljebu
 // @maintainer    chocolateboy
 // @include       *vimeo.com/*
