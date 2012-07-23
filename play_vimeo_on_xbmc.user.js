@@ -2,7 +2,7 @@
 // @name          Play Vimeo on XBMC
 // @namespace     https://github.com/chocolateboy/userscripts
 // @description   Adds a link to play videos from Vimeo in XBMC Eden (JSONRPC v3/4)
-// @version       2012-07-22
+// @version       2012-07-23
 // @creator       Erik Trædal
 // @maintainer    Arve Seljebu
 // @maintainer    chocolateboy
@@ -30,20 +30,17 @@ function set_xbmc_address() {
 }
 
 function play_movie() {
-    GM_log('Trying to play movie');
+    GM_log('Playing video: ' + CLIP_ID);
 
-    if (CLIP_ID) {
-        GM_log('Playing video: ' + CLIP_ID);
-        setTimeout(function() {
-            GM_xmlhttpRequest({
-                method: 'POST',
-                url: 'http://' + xbmc_address + '/jsonrpc',
-                headers: { 'Content-Type': 'application/json' },
-                data: '{"jsonrpc":"2.0", "method":"Player.Open", "params":{"item":{"file":"plugin://plugin.video.vimeo/?action=play_video&videoid=' + CLIP_ID + '" }}, "id" : 1}'
-            })
-        },
-        250);
-    }
+    setTimeout(function() {
+        GM_xmlhttpRequest({
+            method: 'POST',
+            url: 'http://' + xbmc_address + '/jsonrpc',
+            headers: { 'Content-Type': 'application/json' },
+            data: '{"jsonrpc":"2.0", "method":"Player.Open", "params":{"item":{"file":"plugin://plugin.video.vimeo/?action=play_video&videoid=' + CLIP_ID + '" }}, "id" : 1}'
+        })
+    },
+    250);
 }
 
 function pause_movie() {
