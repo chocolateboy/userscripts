@@ -1,23 +1,57 @@
 // ==UserScript==
 // @name          Play Vimeo on XBMC
 // @namespace     https://github.com/chocolateboy/userscripts
-// @description   Adds a link to play videos from Vimeo in XBMC Eden (JSONRPC v3/4)
-// @version       2012-07-23
+// @description   Launch and control Vimeo videos in XBMC (Eden)
+// @version       2012-09-03
 // @creator       Erik Trædal
 // @maintainer    Arve Seljebu
 // @maintainer    chocolateboy
 // @include       *vimeo.com/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js
 // ==/UserScript==
 
 // Send Vimeo movies to XBMC Eden.
 
 var CLIP_ID;
-var $meta = $('meta[property="og:video"][content]');
 
-if ($meta.length) {
-    var matches = $meta.attr('content').match(/\bclip_id=(\d+)/);
-    if (matches) CLIP_ID = matches[1];
+function get_static_clip_id() {
+    if (CLIP_ID) {
+        return CLIP_ID;
+    } else {
+        var clip_id, matches;
+        var $link = $('link[rel="canonical"][href]');
+
+        if ($link.length) {
+            matches = $link.attr('href').match(/(\d+)$/);
+
+            if (matches) {
+                CLIP_ID = clip_id = matches[1];
+                GM_log('Found static clip ID: ' + clip_id);
+            }
+        }
+
+        return clip_id;
+    }
+}
+
+function get_clip_id() {
+    var clip_id;
+    var $param = $('param[name="flashvars"][value]');
+
+    if ($param.length) {
+        var matches = $param.attr('value').match(/\bclip_id=(\d+)/);
+
+        if (matches) {
+            clip_id = matches[1];
+        }
+    }
+
+    if (clip_id) {
+        GM_log('Found clip ID: ' + clip_id);
+        return clip_id;
+    } else {
+        return get_static_clip_id();
+    }
 }
 
 var xbmc_address = GM_getValue('XBMC_ADDRESS');
@@ -25,19 +59,20 @@ GM_registerMenuCommand('Set the XBMC address', set_xbmc_address);
 if (xbmc_address === undefined) set_xbmc_address();
 
 function set_xbmc_address() {
-    xbmc_address = window.prompt('Enter the address for the XBMC web interface\n(username:password@address:port)', xbmc_address);
+    xbmc_address = window.prompt('Enter the address of the XBMC web interface\n(username:password@address:port)', xbmc_address);
     GM_setValue('XBMC_ADDRESS', xbmc_address);
 }
 
 function play_movie() {
-    GM_log('Playing video: ' + CLIP_ID);
+    var clip_id = get_clip_id();
+    GM_log('Playing video: ' + clip_id);
 
     setTimeout(function() {
         GM_xmlhttpRequest({
             method: 'POST',
             url: 'http://' + xbmc_address + '/jsonrpc',
             headers: { 'Content-Type': 'application/json' },
-            data: '{"jsonrpc":"2.0", "method":"Player.Open", "params":{"item":{"file":"plugin://plugin.video.vimeo/?action=play_video&videoid=' + CLIP_ID + '" }}, "id" : 1}'
+            data: '{"jsonrpc":"2.0", "method":"Player.Open", "params":{"item":{"file":"plugin://plugin.video.vimeo/?action=play_video&videoid=' + clip_id + '" }}, "id" : 1}'
         })
     },
     250);
@@ -67,8 +102,7 @@ function stop_movie() {
     250);
 }
 
-if (CLIP_ID) {
-    GM_log('Found clip: ' + CLIP_ID);
+if (get_clip_id()) { // only display the controls if the page contains a clip
     var xbmc = document.createElement('div');
     xbmc.setAttribute('id', 'xbmc');
 
