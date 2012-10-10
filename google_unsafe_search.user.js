@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.google.tld/search?*tbm=isch*
 // @include       http://images.google.tld/search?*tbm=isch*
