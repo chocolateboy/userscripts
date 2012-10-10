@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name          Google Unsafe Search
-// @description   Disable SafeSearch on Google Image searches
+// @description   Disable SafeSearch on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
