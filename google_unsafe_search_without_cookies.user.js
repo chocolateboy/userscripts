@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name          Google Unsafe Search Without Cookies
-// @description   Disable Google SafeSearch without Cookies
+// @description   Disable Google SafeSearch without cookies
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
