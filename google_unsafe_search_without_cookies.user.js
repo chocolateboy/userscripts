@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.1.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.google.tld
 // @include       http://www.google.tld/*
@@ -29,18 +29,18 @@
 //
 // This solution is good enough for now and avoids portability woes.
 //
-// See the notes in the source of Jordon Kalilich's Google Preferences Without
-// Cookies for more background: http://userscripts.org/scripts/show/64112
+// Thanks to Jordon Kalilich for devising and documenting the original fix for this
+// in Google Preferences Without Cookies: http://userscripts.org/scripts/show/64112
 
 // Images, Video, or Shopping
 const SEARCH_RE = new RegExp('\\btbm=(?:isch|vid|shop)\\b');
 
 // like params.split('&'), but return an empty array if params is empty
 function splitParams(params) {
-    if (!params) {
-        return [];
-    } else {
+    if (params) {
         return params.split("&");
+    } else {
+        return [];
     }
 }
 
