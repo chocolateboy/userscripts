@@ -2,12 +2,18 @@
 // @name          Play Vimeo on XBMC
 // @namespace     https://github.com/chocolateboy/userscripts
 // @description   Launch and control Vimeo videos in XBMC (Eden)
-// @version       2012-09-03
+// @version       2012-10-12
 // @creator       Erik Trædal
 // @maintainer    Arve Seljebu
 // @maintainer    chocolateboy
 // @include       *vimeo.com/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js
+// @grant         GM_addStyle
+// @grant         GM_getValue
+// @grant         GM_log
+// @grant         GM_registerMenuCommand
+// @grant         GM_setValue
+// @grant         GM_xmlhttpRequest
 // ==/UserScript==
 
 // Send Vimeo movies to XBMC Eden.

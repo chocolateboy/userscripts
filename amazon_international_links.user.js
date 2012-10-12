@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.1
+// @version       1.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -28,6 +28,7 @@
 // @require       https://raw.github.com/sizzlemctwizzle/GM_config/master/gm_config.js
 // @require       https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @require       http://documentcloud.github.com/underscore/underscore-min.js
+// @grant         GM_registerMenuCommand
 // ==/UserScript==
 
 /*

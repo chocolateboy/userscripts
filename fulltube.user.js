@@ -2,7 +2,7 @@
 // @name        FullTube
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Adds a full-screen button to embedded YouTube videos
-// @version     0.40
+// @version     0.50
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *
@@ -10,6 +10,7 @@
 // @exclude     http://*.youtube.com/*
 // @exclude     https://youtube.com/*
 // @exclude     https://*.youtube.com/*
+// @grant       GM_registerMenuCommand
 // ==/UserScript==
 
 /*
