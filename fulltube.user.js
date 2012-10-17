@@ -2,7 +2,7 @@
 // @name        FullTube
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Adds a full-screen button to embedded YouTube videos
-// @version     0.50
+// @version     0.70
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *
@@ -10,8 +10,22 @@
 // @exclude     http://*.youtube.com/*
 // @exclude     https://youtube.com/*
 // @exclude     https://*.youtube.com/*
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js
+// @require     https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @grant       GM_registerMenuCommand
 // ==/UserScript==
+
+/*
+ * @requires:
+ *
+ * jQuery 1.8.2
+ *
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.js
+ *
+ * sprintf() for JavaScript
+ *
+ *     http://www.diveintojavascript.com/projects/javascript-sprintf
+ */
 
 /*
  * 1) Iterate over all YouTube embed elements and make sure:
@@ -37,6 +51,12 @@
  * 2) http://www.avclub.com/articles/our-favorite-film-scenes-of-the-00s,35888/
  *    embeds without object parents (all &fs=1, though, and they work with or without FullTube)
  *
+ *    XXX Update (2012-10-17): no longer working: e.g.:
+ *
+ *        http://www.avclub.com/articles/the-mirror-has-two-faces-15-great-movie-scenes-whe,86576/
+ *
+ *    - fixed in 0.70
+ *
  * 3) Buzzfeed uses bare <embed>...</embed>s e.g. http://www.buzzfeed.com/mjs538/mom-ruins-hockey-fight e.g.
  *
  * <embed
@@ -48,6 +68,10 @@
  *     wmode="transparent"
  *     height="376"
  *     width="625">
+ *
+ * 4) Bad iframe embed URL (prevents full screen working) e.g. http://selfstarter.us/
+ * the iframe URL is fixed to conform to:
+ * https://developers.google.com/youtube/player_parameters#Embedding_a_Player
  *
  */
 
@@ -86,16 +110,27 @@ function xpath(xpath, context) {
     }
 }
 
-function fs(url) {
-    url = unescape(url);
-    url = url.replace(/[?& ]+$/, ''); // remove trailing question marks, ampersands or spaces
-    url = url.replace(/\bfs=(\w)*/g, 'fs=1');
+function fs(uri) {
+    uri = unescape(uri);
+    uri = uri.replace(/[?& ]+$/, ''); // remove trailing question marks, ampersands or spaces
+    uri = uri.replace(/\bfs=(\w)*/g, 'fs=1');
 
-    if (!url.match(/[&?]fs=1\b/)) {
-        url += url.match(/\?/) ? '&fs=1' : '?fs=1';
+    if (!uri.match(/[&?]fs=1\b/)) {
+        uri += uri.match(/\?/) ? '&fs=1' : '?fs=1';
     }
 
-    return url;
+    return uri;
+}
+
+// only set an element's src attribute (or equivalent) if the
+// supplied URI is different to the attribute's current value.
+// this reduces unnecessary reloading
+function setSrc(element, src, _name) {
+    var name = _name ? _name : 'src';
+
+    if (!element.getAttribute(name) || (element.getAttribute(name) != src)) {
+        element.setAttribute(name, src);
+    }
 }
 
 function full_tube() {
@@ -103,30 +138,44 @@ function full_tube() {
 
     if (embeds = xpath(EMBEDS)) {
         embeds.for_each(function(embed) {
-            embed.setAttribute('src', fs(embed.getAttribute('src')));
+            var src = fs(embed.getAttribute('src'));
+            setSrc(embed, src);
             embed.setAttribute('allowFullScreen', 'true');
+            // bare embeds (i.e. not wrapped by objects) no longer support
+            // full screen (in FF 16/Chromium 22), so wrap them; any remaining
+            // object requirements will be added below
+            var $embed = $(embed);
+            if (!$embed.parent('object').length) {
+                $embed.wrap(
+                    sprintf(
+                        '<object data="%s"%s%s />',
+                        src,
+                        ($embed.attr('width') ? sprintf(' width="%s"', $embed.attr('width')) : ''),
+                        ($embed.attr('height') ? sprintf(' height="%s"', $embed.attr('height')) : '')
+                    )
+                );
+            }
         });
     }
 
     if (objects = xpath(OBJECTS)) {
-        var nobjects = objects.snapshotLength;
         objects.for_each(function(object) {
-            var params, param, data, uri;
-
+            var params;
             if (params = xpath('.//param[@name="allowFullScreen"]', object)) {
                 params.for_each(function(param) { param.setAttribute('value', 'true') });
             } else {
-                param = document.createElement('param');
+                var param = document.createElement('param');
                 param.setAttribute('name', 'allowFullScreen');
                 param.setAttribute('value', 'true');
                 object.appendChild(param);
             }
 
+            var uri;
             if (params = xpath('.//param[@name="movie" or @name="src"]', object)) {
                 params.for_each(function(param) {
                     // record the URI for later use
                     uri = fs(param.getAttribute('value'));
-                    param.setAttribute('value', uri);
+                    setSrc(param, uri, 'value');
                 });
             } else {
                 uri = fs(object.getAttribute('data'));
@@ -136,27 +185,29 @@ function full_tube() {
                  * make this conform to YouTube's own
                  * embed code
                  */
-                param = document.createElement('param');
+                var param = document.createElement('param');
                 param.setAttribute('name', 'movie');
-                param.setAttribute('value', uri);
+                setSrc(param, uri, 'value');
                 object.appendChild(param);
             }
 
+            var data;
             if (data = object.getAttribute('data')) {
-                object.setAttribute('data', fs(data));
+                setSrc(object, fs(data), 'data');
             } else {
-                object.setAttribute('data', uri);
+                setSrc(object, uri, 'data');
             }
 
+            var embeds;
             if (embeds = xpath('.//embed[@src]', object)) {
                 embeds.for_each(function(embed) {
                     embed.setAttribute('allowfullscreen', 'true');
-                    embed.setAttribute('src', uri);
+                    setSrc(embed, uri);
                 });
             } else {
-                embed = document.createElement('embed');
+                var embed = document.createElement('embed');
                 embed.setAttribute('allowfullscreen', 'true');
-                embed.setAttribute('src', uri);
+                setSrc(embed, uri);
                 object.appendChild(embed);
             }
         });
@@ -164,7 +215,14 @@ function full_tube() {
 
     if (iframes = xpath(IFRAMES)) {
         iframes.for_each(function(iframe) {
-            iframe.setAttribute('src', fs(iframe.getAttribute('src')));
+            var src = fs(iframe.getAttribute('src'));
+
+            // replace youtube.com/v/xyz?foo=bar with youtube.com/embed/xyz?foo=bar
+            if (src.match(/\/v\//)) {
+                src = src.replace('/v/', '/embed/');
+            }
+
+            setSrc(iframe, src);
         });
     }
 }
