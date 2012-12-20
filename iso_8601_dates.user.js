@@ -2,7 +2,7 @@
 // @name           ISO 8601 Dates
 // @namespace      https://github.com/chocolateboy/userscripts
 // @description    Convert US dates to the ISO 8601 YYYY-MM-DD format
-// @version        1.0.1
+// @version        1.0.2
 // @author         chocolateboy
 // @license        GPL: http://www.gnu.org/copyleft/gpl.html
 // @grant          none
@@ -71,7 +71,7 @@ function fix_dates() {
 }
 
 // add a menu command for that pesky, hard-to-reach, lazily-loaded content
-GM_registerMenuCommand('US -> ISO 8601 Dates', fix_dates);
+GM_registerMenuCommand('ISO 8601 Dates', fix_dates);
 
 // run this script as late as possible to handle dynamically loaded content e.g. cracked.com
 window.addEventListener('load', fix_dates, false);
