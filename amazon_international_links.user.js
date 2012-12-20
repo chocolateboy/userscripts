@@ -196,7 +196,7 @@ function modernDisplayLinks() {
     $CROSS_SHOP_LINKS.append.apply($CROSS_SHOP_LINKS, LINKS);
 }
 
-// populate an array of links and display them by attaching them to the body of the cross-site navigation bar
+// populate the array of links and display them by attaching them to the body of the cross-site navigation bar
 function addLinks() {
     var sites = getConfiguredSites();
 
@@ -214,10 +214,10 @@ function addLinks() {
 
 /*********************** Main ********************************/
 
-var $temp = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]');
+var $asin = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]');
 
-if ($temp.length) {
-    initializeConstants($temp.val());
+if ($asin.length) {
+    initializeConstants($asin.val());
     initializeConfig();
     GM_registerMenuCommand('Configure Amazon International Links', showConfig);
     addLinks();
