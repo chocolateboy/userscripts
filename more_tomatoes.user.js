@@ -23,5 +23,5 @@ function expand_synopsis() {
     $('#showMoreSynopsis').get(0).click();
 }
 
-// run this script as late as possible to handle dynamically loaded content e.g. cracked.com
+// execute as late as possible - needed for the latest version of the site
 window.addEventListener('load', expand_synopsis, false);
