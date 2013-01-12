@@ -3,19 +3,25 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
 // @author      chocolateboy
-// @version     0.1.0
+// @version     0.2.0
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://rottentomatoes.com/m/*
 // @include     http://*.rottentomatoes.com/m/*
 // @include     https://rottentomatoes.com/m/*
 // @include     https://*.rottentomatoes.com/m/*
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.js
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js
+// @grant       none
 // ==/UserScript==
 
 /*
- * jQuery 1.7.1
+ * jQuery 1.8.3
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js
  */
 
-$('#showMoreSynopsis').get(0).click();
+function expand_synopsis() {
+    $('#showMoreSynopsis').get(0).click();
+}
+
+// run this script as late as possible to handle dynamically loaded content e.g. cracked.com
+window.addEventListener('load', expand_synopsis, false);
