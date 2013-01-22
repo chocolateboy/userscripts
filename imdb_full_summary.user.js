@@ -3,22 +3,21 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Automatically show the full plot summary on IMDb
 // @author      chocolateboy
-// @version     0.0.1
+// @version     0.1.0
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
-// @include     http://*.imdb.com/title/*/
-// @include     http://*.imdb.de/title/*/
-// @include     http://*.imdb.es/title/*/
-// @include     http://*.imdb.fr/title/*/
-// @include     http://*.imdb.it/title/*/
-// @include     http://*.imdb.pt/title/*/
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.js
+// @include     http://*.imdb.tld/title/*/
+// @include     http://*.imdb.tld/title/*/?*
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js
 // @require     https://raw.github.com/documentcloud/underscore/master/underscore-min.js
 // ==/UserScript==
 
 /*
- * jQuery 1.6.4
+ * jQuery 1.8.3
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js
+ *
+ *  XXX note: there is an issue ("Syntax error, unrecognized expression")
+ *  with 1.9.0 when parsing HTML with: $data = $(data)
  *
  * Underscore.js utility library
  *
@@ -32,6 +31,7 @@
  * http://www.imdb.com/title/tt0062474/
  * http://www.imdb.fr/title/tt0111161/
  * http://www.imdb.de/title/tt0111161/
+ * http://www.imdb.com/title/tt1776222/?ref_=fn_tt_tt_1
  */
 
 var $summary = _.find( // i.e. find first result with length > 0
@@ -55,7 +55,9 @@ if ($summary && $summary.clone().children().remove().end().text().match(/\S/)) {
     if (path[0] == '/') { // absolute path
         url = location.protocol + '//' + location.host + path;
     } else { // relative path
-        url = location.href.replace(/(?:\/)*$/, '/' + path);
+        // the canonical link is the old, sane URL e.g.:
+        // http://www.imdb.com/title/tt1776222/?ref_=fn_tt_tt_1 -> http://www.imdb.com/title/tt1776222/
+        url = $('link[rel=canonical]').attr('href') + path;
     }
 
     // need to use get() rather than load() because we're modifying the result
