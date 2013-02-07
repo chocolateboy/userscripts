@@ -40,7 +40,8 @@ const ASCENDING = 1, DESCENDING = -1;
 const MODEL = {
     'track':     [ 'subjectCell',  track,     ASCENDING  ],
     'duration':  [ 'durationCell', duration,  ASCENDING  ],
-    'listeners': [ 'reachCell',    listeners, DESCENDING ]
+    'listeners': [ 'reachCell',    listeners, DESCENDING ],
+    'plays':     [ 'playCount',    plays,     DESCENDING ]
 };
 
 function compare(a, b, order) {
@@ -69,6 +70,10 @@ function duration(row) {
 
 function listeners(row) {
     return $(row).find('.reachCell').text().replace(/\D+/g, '') * 1;
+}
+
+function plays(row) {
+    return $(row).find('.playCount').text().replace(/\D+/g, '') * 1;
 }
 
 function sorter(extractor, order) {
@@ -139,6 +144,28 @@ if (table.length) {
     });
 } else {
     table = $('table#albumTracklist');
+}
+
+if (!table.length) {
+    table = $("#trackChart table");
+
+    table.prepend('<thead><tr>' +
+                  '<td class="positionCell">&nbsp;</td>' +
+                  '<td class="playbuttonCell">&nbsp;</td>' +
+                  '<td class="subjectCell">Track</td>' +
+                  '<td class="lovedCell">&nbsp;</td>' +
+                  '<td class="multibuttonCell">&nbsp;</td>' +
+                  '<td class="reachCell">Listeners</td>' +
+                  '<td class="playCount">Scrobbles</td>' +
+                  '</tr></thead>');
+
+    // load scrobbles
+    $("tbody tr", table).each(function() {
+        var cell = $('<td class="playCount">');
+        var url = $(this).find(".subjectCell a").attr("href");
+        $(this).append(cell);
+        cell.load(url + " .scrobbles b");
+    });
 }
 
 if (table.length) {
