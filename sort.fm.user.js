@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
+// @version       1.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://*.last.fm/music/*
@@ -136,8 +136,8 @@ if ($table.length) {
     var $tbody = $('tbody', $table);
 
     $.each(MODEL, function(column, data) {
-        var cell = $('thead td.' + data[0], $table);
-        cell.css('cursor', 'pointer');
-        cell.click(makeSortBy($tbody, column));
+        var $cell = $('thead td.' + data[0], $table);
+        $cell.css('cursor', 'pointer');
+        $cell.click(makeSortBy($tbody, column));
     });
 }
