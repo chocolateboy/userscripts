@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.3
+// @version       1.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://*.last.fm/music/*
@@ -12,15 +12,16 @@
 // @include       http://lastfm.*/music/*
 // @include       http://*.lastfm.com.*/music/*
 // @include       http://lastfm.com.*/music/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js
+// @grant         none
 // ==/UserScript==
 
 /*
  * @requires:
  *
- * jQuery 1.6.2
+ * jQuery 1.9.1
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js
  */
 
 const INITIAL_SORTED_COLUMN = 'track';
@@ -29,81 +30,66 @@ const ASCENDING = 1, DESCENDING = -1;
 /*
  * key (string):
  *
- *     unique identifier for each column e.g. 'track', 'duration'
+ *     internal identifier for each column e.g. 'track', 'duration'
  *
  * value (triple):
  *
- *     0: CSS class name identifying the table header cell to attach the click event to
- *     1: function to extract the number to sort by
+ *     0: CSS class name identifying the table header cell (THEAD > TD) to attach the click event to
+ *     1: extractor function that takes a row and returns the value of its corresponding column as a sortable number
  *     2: initial sort order
  */
 const MODEL = {
-    'track':     [ 'subjectCell',  track,     ASCENDING  ],
-    'duration':  [ 'durationCell', duration,  ASCENDING  ],
-    'listeners': [ 'reachCell',    listeners, DESCENDING ]
+    'track':     [ 'subjectCell',  extract_track,     ASCENDING  ],
+    'duration':  [ 'durationCell', extract_duration,  ASCENDING  ],
+    'listeners': [ 'reachCell',    extract_listeners, DESCENDING ]
 };
 
-function compare(a, b, order) {
-    order || (order = 1);
-    var ret;
+// --------------------------- extractors ------------------------------
 
-    if (a < b) {
-        ret = -1;
-    } else if (a > b) {
-        ret = 1;
-    } else {
-        ret = 0;
-    }
-
-    return ret * order;
-}
-
-function track(row) {
+function extract_track(row) {
     return $(row).find('.positionCell').text().replace(/\D+/g, '') * 1;
 }
 
-function duration(row) {
-    var time = $(row).find('.durationCell').text().match(/(\d+):(\d+)/);
-    return time[1] * 60 + time[2] * 1;
+function extract_duration(row) {
+    var duration = $(row).find('.durationCell').text().match(/(\d+):(\d+)/);
+    return duration[1] * 60 + duration[2] * 1;
 }
 
-function listeners(row) {
+function extract_listeners(row) {
     return $(row).find('.reachCell').text().replace(/\D+/g, '') * 1;
 }
 
-function sorter(extractor, order) {
+// ------------------------------ helpers -------------------------------
+
+function makeCompare(extractor, order) {
     return function(a, b) {
-        return compare(extractor(a), extractor(b), order);
+        return (extractor(a) - extractor(b)) * order;
     };
 }
 
 function stripe (i, row) {
     $(row).removeClass('first last odd');
+
     if ((i + 1) % 2) { // 0-based
         $(row).addClass('odd');
     }
 }
 
 /*
- * this wrapper ensures that variables used to manage
- * sort-order state are private to the
- * (enclosing scope of the) function that uses them
+ * This function assigns a) a sensible initial sort order (i.e ascending or descending)
+ * for each column the first time it's clicked, and b) remembers/restores the last
+ * sort order selected for each column (for as long as the page is loaded).
+ *
+ * Note: the column by which the table is initially sorted (i.e. track) is
+ * special-cased as it has effectively been "pre-clicked" to ascending order by last.fm.
  */
-order = function() {
-    /*
-     * This function assigns a) a sensible initial sort order (i.e ascending or descending)
-     * for each column the first time it's clicked, and b) remembers/restores the last
-     * sort order selected for each column (for as long as the page is loaded).
-     *
-     * Note: the column by which the table is initially sorted (i.e. track) is
-     * special-cased as it has effectively been "pre-clicked" to ascending order by last.fm.
-     */
+sortOrder = function() { // create a scope for variables that are local (i.e. private) to this function
     var lastColumn = INITIAL_SORTED_COLUMN, memo = {};
     memo[lastColumn] = MODEL[lastColumn][2];
 
-    return function (column, initialSortOrder) {
+    return function (column) {
         if (!memo[column]) { // initialise
-            memo[column] = initialSortOrder;
+            memo[column] = MODEL[column][2]; // initial sort order
         } else if (column === lastColumn) { // toggle
             memo[column] = memo[column] * -1;
         } // else restore
@@ -113,47 +99,45 @@ order = function() {
     };
 }();
 
-function sortBy(container, children, column, extractor, initialSortOrder, transform) {
+function makeSortBy($rowContainer, column) {
+    var extractor = MODEL[column][1];
+
     return function() {
-        var $order = order(column, initialSortOrder);
-        var sort = sorter(extractor, $order);
-        var sorted = children.detach().sort(sort);
+        var $rows = $rowContainer.children('tr');
+        var order = sortOrder(column); // ascending (1) or descending (-1)
+        var compare = makeCompare(extractor, order); // compare(a, b) function which honours the specified order
+        var $sortedRows = $rows.detach().sort(compare);
 
-        if (transform) {
-            transform(sorted);
-        }
+        // fix up the stripes
+        $sortedRows.each(stripe);
+        $sortedRows.first().addClass('first');
+        $sortedRows.last().addClass('last');
 
-        sorted.appendTo(container);
+        // attach the sorted rows (TR) to the row container (TBODY)
+        $sortedRows.appendTo($rowContainer);
     };
 }
 
 /******************************************************************************/
 
-var table = $('table.tracklist');
+var $table = $('table.tracklist');
 
-if (table.length) {
-    var rows = $('tbody', table).children('tr');
-    rows.prepend(function (index, html) {
+if ($table.length) {
+    var $rows = $('tbody', $table).children('tr');
+    $rows.prepend(function (index, html) {
         var position = index + 1;
         return '<span class="positionCell" style="display: none">' + position + '</span>';
     });
 } else {
-    table = $('table#albumTracklist');
+    $table = $('table#albumTracklist');
 }
 
-if (table.length) {
-    var tbody = $('tbody', table);
-    var rows = tbody.children('tr');
-    var transform = function(rows) {
-        rows.each(stripe);
-        rows.first().addClass('first');
-        rows.last().addClass('last');
-    };
+if ($table.length) {
+    var $tbody = $('tbody', $table);
 
-    $.each(MODEL, function(column, triple) {
-        var cell = $('thead td.' + triple[0], table);
+    $.each(MODEL, function(column, data) {
+        var cell = $('thead td.' + data[0], $table);
         cell.css('cursor', 'pointer');
-        // sortBy: container, children, column, extractor, initialSortOrder, transform
-        cell.click(sortBy(tbody, rows, column, triple[1], triple[2], transform));
+        cell.click(makeSortBy($tbody, column));
     });
 }
