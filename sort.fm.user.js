@@ -38,7 +38,7 @@ const ASCENDING = 1, DESCENDING = -1;
  *     1: extractor function that takes a row and returns the value of its designated column as a sortable number
  *     2: initial sort order
  */
-const MODEL = {
+const COLUMN_CONFIG = {
     'track':     [ 'subjectCell',  extract_track,     ASCENDING  ],
     'duration':  [ 'durationCell', extract_duration,  ASCENDING  ],
     'listeners': [ 'reachCell',    extract_listeners, DESCENDING ]
@@ -85,11 +85,11 @@ function stripe (i, row) {
  */
 sortOrder = function() { // create a scope for variables that are local (i.e. private) to this function
     var lastColumn = INITIAL_SORTED_COLUMN, memo = {};
-    memo[lastColumn] = MODEL[lastColumn][2];
+    memo[lastColumn] = COLUMN_CONFIG[lastColumn][2];
 
     return function (column) {
         if (!memo[column]) { // initialise
-            memo[column] = MODEL[column][2]; // initial sort order
+            memo[column] = COLUMN_CONFIG[column][2]; // initial sort order
         } else if (column === lastColumn) { // toggle
             memo[column] = memo[column] * -1;
         } // else restore
@@ -100,7 +100,7 @@ sortOrder = function() { // create a scope for variables that are local (i.e. pr
 }();
 
 function makeSortBy($rowContainer, column) {
-    var extractor = MODEL[column][1];
+    var extractor = COLUMN_CONFIG[column][1];
 
     return function() {
         var $rows = $rowContainer.children('tr');
@@ -135,7 +135,7 @@ if ($table.length) {
 if ($table.length) {
     var $tbody = $('tbody', $table);
 
-    $.each(MODEL, function(column, data) {
+    $.each(COLUMN_CONFIG, function(column, data) {
         var $cell = $('thead td.' + data[0], $table);
         $cell.css('cursor', 'pointer');
         $cell.click(makeSortBy($tbody, column));
