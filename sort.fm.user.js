@@ -35,7 +35,7 @@ const ASCENDING = 1, DESCENDING = -1;
  * value (triple):
  *
  *     0: CSS class name identifying the table header cell to attach the click event to
- *     1: extractor function that takes a row and returns the value of its corresponding column as a sortable number
+ *     1: extractor function that takes a row and returns the value of its designated column as a sortable number
  *     2: initial sort order
  */
 const MODEL = {
