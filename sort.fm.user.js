@@ -67,10 +67,10 @@ function makeCompare(extractor, order) {
     };
 }
 
-function stripe (i, row) {
+function stripe (index, row) {
     $(row).removeClass('first last odd');
 
-    if ((i + 1) % 2) { // 0-based
+    if ((index + 1) % 2) { // index is 0-based, so index == 0 is the first row (odd) &c.
         $(row).addClass('odd');
     }
 }
@@ -108,12 +108,12 @@ function makeSortBy($rowContainer, column) {
         var compare = makeCompare(extractor, order); // compare(a, b) function which honours the specified order
         var $sortedRows = $rows.detach().sort(compare);
 
-        // fix up the stripes
+        // fix up the CSS
         $sortedRows.each(stripe);
         $sortedRows.first().addClass('first');
         $sortedRows.last().addClass('last');
 
-        // attach the sorted rows (TR) to the row container (TBODY)
+        // attach the sorted rows (TRs) to the row container (TBODY)
         $sortedRows.appendTo($rowContainer);
     };
 }
@@ -123,7 +123,11 @@ function makeSortBy($rowContainer, column) {
 var $table = $('table.tracklist');
 
 if ($table.length) {
+    // prepend a hidden track-number cell to each row so that the original sort order
+    // can be reversed/restored by clicking the "Track" header (or its localized equivalent)
+    // note: these cells already exist (and are visible) on album tracklists (below)
     var $rows = $('tbody', $table).children('tr');
+
     $rows.prepend(function (index, html) {
         var position = index + 1;
         return '<span class="positionCell" style="display: none">' + position + '</span>';
@@ -136,8 +140,8 @@ if ($table.length) {
     var $tbody = $('tbody', $table);
 
     $.each(COLUMN_CONFIG, function(column, data) {
-        var $cell = $('thead td.' + data[0], $table);
-        $cell.css('cursor', 'pointer');
-        $cell.click(makeSortBy($tbody, column));
+        var $header = $('thead td.' + data[0], $table);
+        $header.css('cursor', 'pointer');
+        $header.click(makeSortBy($tbody, column));
     });
 }
