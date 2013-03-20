@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.1
+// @version       1.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://*.last.fm/music/*
@@ -76,29 +76,28 @@ function stripe (index, row) {
 }
 
 /*
- * This function assigns a) a sensible initial sort order (i.e ascending or descending)
- * for each column the first time it's clicked, and b) remembers/restores the last
- * sort order selected for each column (for as long as the page is loaded).
+ * Initialize, toggle or restore the sort order for the supplied column.
  *
  * Note: the column by which the table is initially sorted (i.e. track) is
  * special-cased as it has effectively been "pre-clicked" to ascending order by last.fm.
  */
 sortOrder = function() { // create a scope for variables that are local (i.e. private) to this function
-    var lastColumn = INITIAL_SORTED_COLUMN, memo = {};
-    memo[lastColumn] = COLUMN_CONFIG[lastColumn][2];
+    var lastSelectedColumn = INITIAL_SORTED_COLUMN, sort_order = {};
+    sort_order[lastSelectedColumn] = COLUMN_CONFIG[lastSelectedColumn][2];
 
     return function (column) {
-        if (!memo[column]) { // initialise
-            memo[column] = COLUMN_CONFIG[column][2]; // initial sort order
-        } else if (column === lastColumn) { // toggle
-            memo[column] = memo[column] * -1;
+        if (!sort_order[column]) { // initialize
+            sort_order[column] = COLUMN_CONFIG[column][2]; // initial sort order
+        } else if (column === lastSelectedColumn) { // toggle
+            sort_order[column] = sort_order[column] * -1;
         } // else restore
 
-        lastColumn = column;
-        return memo[column];
+        lastSelectedColumn = column;
+        return sort_order[column];
     };
 }();
 
+// returns a function that sorts the table rows by the specified column
 function makeSortBy($rowContainer, column) {
     var extractor = COLUMN_CONFIG[column][1];
 
@@ -123,13 +122,13 @@ function makeSortBy($rowContainer, column) {
 var $table = $('table.tracklist');
 
 if ($table.length) {
+    var $rows = $('tbody', $table).children('tr');
+
     // prepend a hidden track-number cell to each row so that the original sort order
     // can be reversed/restored by clicking the "Track" header (or its localized equivalent)
     // note: these cells already exist (and are visible) on album tracklists (below)
-    var $rows = $('tbody', $table).children('tr');
-
     $rows.prepend(function (index, html) {
-        var position = index + 1;
+        var position = index + 1; // index is 0-based
         return '<span class="positionCell" style="display: none">' + position + '</span>';
     });
 } else {
