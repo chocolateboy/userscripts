@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.2
+// @version       0.0.3
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.reddit.com/
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
@@ -21,9 +21,10 @@
  */
 
 const HIGHLIGHT_COLOR = '#FFFF00';
+const KEY = 'Reddit_Front_Page';
 
 var old_array = [], new_array = [];
-var old_string = GM_getValue('Reddit_homepage', '');
+var old_string = GM_getValue(KEY, '');
 
 if (old_string.indexOf(',') != -1) {
     old_array = old_string.split(',');
@@ -40,4 +41,4 @@ $('div.thing').each(function() {
 });
 
 var new_string = new_array.join(',');
-GM_setValue('Reddit_homepage', new_string);
+GM_setValue(KEY, new_string);
