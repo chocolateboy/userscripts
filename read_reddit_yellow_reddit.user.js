@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.2.0
+// @version       0.2.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.reddit.com/
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
@@ -22,7 +22,7 @@
  */
 
 const DAYS = 3;
-const HIGHLIGHT_COLOR = '#FFFF00';
+const HIGHLIGHT_COLOR = '#FFFD66';
 const KEY = 'cache';
 const NOW = new Date().getTime();
 const OLD_KEYS = [ 'Reddit_homepage', 'Reddit_Front_Page', 'article_ids' ];
