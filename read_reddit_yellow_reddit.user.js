@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.4
+// @version       0.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.reddit.com/
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
@@ -20,25 +20,42 @@
  *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
  */
 
+const DAYS = 3;
 const HIGHLIGHT_COLOR = '#FFFF00';
-const KEY = 'article_ids';
+const KEY = 'cache';
+const NOW = new Date().getTime();
+const TTL = 1000 * 60 * 60 * 24 * DAYS; // time-to-live: length of time (in milliseconds) to cache IDs for
 
-var old_array = [], new_array = [];
-var old_string = GM_getValue(KEY, '');
-
-if (old_string.indexOf(',') != -1) {
-    old_array = old_string.split(',');
+// remove obsolete keys
+if (GM_getValue('Reddit_homepage')) {
+    GM_deleteValue('Reddit_homepage');
 }
 
-$('div.thing[data-fullname]').each(function() {
+if (GM_getValue('Reddit_Front_Page')) {
+    GM_deleteValue('Reddit_Front_Page');
+}
+
+if (GM_getValue('article_ids')) {
+    GM_deleteValue('article_ids');
+}
+
+// Reddit article ID -> cache expiry timestamp (epoch milliseconds)
+var cache = JSON.parse(GM_getValue(KEY, '{}'));
+
+// purge expired IDs
+for (var id in cache) {
+    if (cache[id] < NOW) {
+        delete cache[id];
+    }
+}
+
+$('div#siteTable div.thing[data-fullname]').each(function() {
     var id = $(this).attr('data-fullname');
 
-    if ($.inArray(id, old_array) == -1) {
+    if (!cache[id]) {
         $('a.title', this).css('background-color', HIGHLIGHT_COLOR);
+        cache[id] = NOW + TTL;
     }
-
-    new_array.push(id);
 });
 
-var new_string = new_array.join(',');
-GM_setValue(KEY, new_string);
+GM_setValue(KEY, JSON.stringify(cache));
