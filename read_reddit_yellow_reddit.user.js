@@ -4,10 +4,11 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.1.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.reddit.com/
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
+// @grant         GM_deleteValue
 // @grant         GM_getValue
 // @grant         GM_setValue
 // ==/UserScript==
