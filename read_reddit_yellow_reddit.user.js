@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.1
+// @version       0.1.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.reddit.com/
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
@@ -25,20 +25,15 @@ const DAYS = 3;
 const HIGHLIGHT_COLOR = '#FFFF00';
 const KEY = 'cache';
 const NOW = new Date().getTime();
-const TTL = 1000 * 60 * 60 * 24 * DAYS; // time-to-live: length of time (in milliseconds) to cache IDs for
+const OLD_KEYS = [ 'Reddit_homepage', 'Reddit_Front_Page', 'article_ids' ];
+const TTL = 1000 * 60 * 60 * 24 * DAYS; // time-to-live: how long (in milliseconds) to cache IDs for
 
 // remove obsolete keys
-if (GM_getValue('Reddit_homepage')) {
-    GM_deleteValue('Reddit_homepage');
-}
-
-if (GM_getValue('Reddit_Front_Page')) {
-    GM_deleteValue('Reddit_Front_Page');
-}
-
-if (GM_getValue('article_ids')) {
-    GM_deleteValue('article_ids');
-}
+$.each(OLD_KEYS, function(index, value) {
+    if (GM_getValue(value)) {
+        GM_deleteValue(value);
+    }
+});
 
 // Reddit article ID -> cache expiry timestamp (epoch milliseconds)
 var cache = JSON.parse(GM_getValue(KEY, '{}'));
