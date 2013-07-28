@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.0
+// @version       1.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -24,7 +24,7 @@
 // @include       https://www.amazon.es/*
 // @include       https://www.amazon.fr/*
 // @include       https://www.amazon.it/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js
 // @require       https://raw.github.com/sizzlemctwizzle/GM_config/master/gm_config.js
 // @require       https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @require       http://documentcloud.github.com/underscore/underscore-min.js
@@ -34,9 +34,9 @@
 /*
  * @requires:
  *
- * jQuery 1.7.1
+ * jQuery 2.0.3
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
  *
  * GM_config
  *
@@ -45,6 +45,7 @@
  * sprintf() for JavaScript
  *
  *     http://www.diveintojavascript.com/projects/javascript-sprintf
+ *     https://github.com/alexei/sprintf.js
  *
  * Underscore.js utility library
  *
@@ -101,7 +102,7 @@ function initializeConstants(asin) {
         'fr'    : 'FR',
         'it'    : 'IT',
         'co.jp' : 'JP',
-        'co.uk' : 'UK', // technically (shmecnically), this should be GB: http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+        'co.uk' : 'UK', // technically (shmechnically), this should be GB: http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
         'com'   : 'US'
     };
 }
@@ -214,10 +215,23 @@ function addLinks() {
 
 /*********************** Main ********************************/
 
+var asin;
 var $asin = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]');
 
 if ($asin.length) {
-    initializeConstants($asin.val());
+    asin = $asin.val();
+} else { // if there's a canonical link, try to retrieve the ASIN from the URI
+    // <link rel="canonical" href="http://www.amazon.com/The-Frozen-Lake-ebook/dp/B005O53TPE" />
+    var canonical = $('link[rel="canonical"][href]').attr('href');
+    var match;
+
+    if (canonical && (match = canonical.match('/dp/(\\w+)$'))) {
+        asin = match[1];
+    }
+}
+
+if (asin) {
+    initializeConstants(asin);
     initializeConfig();
     GM_registerMenuCommand('Configure Amazon International Links', showConfig);
     addLinks();
