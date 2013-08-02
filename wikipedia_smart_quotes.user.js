@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
+// @version       1.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.wikipedia.org/*
 // @include       https://*.wikipedia.org/*
