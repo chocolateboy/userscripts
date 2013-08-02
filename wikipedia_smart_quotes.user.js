@@ -27,9 +27,7 @@ var toggleQM = {
 };
 
 var replacements = [
-    [ /\.\.\./g, "\u2026" ],  // Horizontal ellipsis
-    [ /--/g,     "\u2014" ],  // Em dash
-    [ /-/g,      "\u2013" ]   // En dash
+    [ /\.\.\./g, "\u2026" ] // Horizontal ellipsis
 ];
 
 var textnodes = document.evaluate(
