@@ -3,25 +3,22 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.2
+// @version       1.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
-// @include       http://*.last.fm/music/*
-// @include       http://last.fm/music/*
-// @include       http://*.lastfm.*/music/*
-// @include       http://lastfm.*/music/*
-// @include       http://*.lastfm.com.*/music/*
-// @include       http://lastfm.com.*/music/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js
+// @include       http://www.last.fm/music/*
+// @include       http://cn.last.fm/music/*
+// @include       http://www.lastfm.tld/music/*
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
 // @grant         none
 // ==/UserScript==
 
 /*
  * @requires:
  *
- * jQuery 1.9.1
+ * jQuery 2.0.3
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
  */
 
 const INITIAL_SORTED_COLUMN = 'track';
