@@ -75,7 +75,7 @@
 //
 // Note: we set a flag on the original link after it has been split.
 // This is checked for before each split is performed, which
-// ensures navigating back to previously-viewed pages in the
+// ensures that navigating back to previously-viewed pages in the
 // library view doesn't re-split (and therefore break) already-split
 // links
 
