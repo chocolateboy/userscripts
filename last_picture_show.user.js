@@ -73,30 +73,38 @@
 //     1) image        -> image page
 //     2) artist name  -> artist page
 //
-// Note: we set a flag on the original link after it has been split.
-// This is checked for before each split is performed, which
-// ensures that navigating back to previously-viewed pages in the
+// Note: we set a flag on the UL element after its children have been processed.
+// This is checked for before any splits are performed, which
+// ensures that navigating back to previously-viewed (PJAX) pages in the
 // library view doesn't re-split (and therefore break) already-split
 // links
+//
+// TODO add support for Similar Artists pages e.g.: http://www.last.fm/music/The+Beatles/+similar
+
+const SPLIT_LINKS = 'split_links';
 
 function split_links() {
-    $('ul.libraryItems li a:first-child').each(
-        function() {
-            var $original_link = $(this);
+    var $ul = $('ul.libraryItems');
+    var seen = $ul.data(SPLIT_LINKS);
 
-            if (!$original_link.data('split')) {
+    if (!seen) {
+        $ul.find('li a:first-child').each(
+            function() {
+                var $original_link = $(this);
                 var $artist_name = $original_link.find('.name').detach();
                 var $new_link = $('<a/>');
                 var artist_page = $original_link.attr('href');
                 var image_id = $original_link.find('img').attr('src').match(/(\d+)\.\w+$/)[1];
                 var image_page = artist_page + '/+images/' + image_id;
 
-                $original_link.attr('href', image_page).data('split', true);
+                $original_link.attr('href', image_page);
                 $new_link.attr('href', artist_page).append($artist_name).insertAfter($original_link);
             }
-        }
-    );
+        );
+
+        $ul.data(SPLIT_LINKS, true);
+    }
 }
 
-window.addEventListener('hashchange', split_links); // deal with PJAX on the library page
+$(window).on('hashchange', split_links); // deal with PJAX on the library page
 split_links();
