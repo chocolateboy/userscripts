@@ -8,7 +8,6 @@
 // @include     http://*.imdb.tld/title/*/
 // @include     http://*.imdb.tld/title/*/?*
 // @require     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
-// @require     https://raw.github.com/documentcloud/underscore/master/underscore-min.js
 // @grant       none
 // ==/UserScript==
 
