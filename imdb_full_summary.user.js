@@ -3,79 +3,37 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Automatically show the full plot summary on IMDb
 // @author      chocolateboy
-// @version     0.2.0
+// @version     1.0.0
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://*.imdb.tld/title/*/
 // @include     http://*.imdb.tld/title/*/?*
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
 // @require     https://raw.github.com/documentcloud/underscore/master/underscore-min.js
 // @grant       none
 // ==/UserScript==
 
 /*
- * jQuery 1.8.3
+ * jQuery 2.0.3
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js
- *
- *  XXX note: there is an issue ("Syntax error, unrecognized expression")
- *  with 1.9.0 when parsing HTML with: $data = $(data)
- *
- * Underscore.js utility library
- *
- *     http://documentcloud.github.com/underscore/
+ *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
  */
 
 /*
- * Test
+ * Tests
  *
- * http://www.imdb.com/title/tt0109374/
- * http://www.imdb.com/title/tt0062474/
- * http://www.imdb.fr/title/tt0111161/
- * http://www.imdb.de/title/tt0111161/
- * http://www.imdb.com/title/tt1776222/?ref_=fn_tt_tt_1
+ *     abbreviated:     http://www.imdb.com/title/tt0109374/
+ *     not abbreviated: http://www.imdb.com/title/tt0062474/
+ *     no summary:      http://www.imdb.com/title/tt0162757/
+ *     refspam URL:     http://www.imdb.com/title/tt1776222/?ref_=fn_tt_tt_1
  */
 
-var $summary = _.find( // i.e. find first result with length > 0
-    [
-        $('p[itemprop=description]').has('a[href*="/plotsummary"], a[href*="/synopsis"]'),
-        $('div.info-content').has('a[href*="/plotsummary"]')
-    ],
-    function (it) { return it.length }
-);
+// the truncated summary
+var $summary = $('p[itemprop=description]').has('a[href*="/plotsummary"]');
 
-if ($summary && $summary.clone().children().remove().end().text().match(/\S/)) {
-    $.ajaxSetup({
-        beforeSend: function(xhr) {
-            xhr.overrideMimeType('text/html; charset=ISO-8859-1');
-        },
-    });
-
-    var path = $summary.find('a:last').attr('href');
-    var url;
-
-    if (path[0] == '/') { // absolute path
-        url = location.protocol + '//' + location.host + path;
-    } else { // relative path
-        // the canonical link is the old, sane URL e.g.:
-        // http://www.imdb.com/title/tt1776222/?ref_=fn_tt_tt_1 -> http://www.imdb.com/title/tt1776222/
-        url = $('link[rel=canonical]').attr('href') + path;
+if ($summary.length && $summary.clone().children().remove().end().text().match(/\S/)) {
+    // the full summary (usually)
+    var $storyline = $('div[itemprop="description"]');
+    if ($storyline.length) {
+        $summary.html($storyline.clone().find('em.nobr').remove().end());
     }
-
-    // need to use get() rather than load() because we're modifying the result
-    // XXX: unlike load() this doesn't remove scripts from data, which may cause issues with IE
-    // XXX: unfortunately, jQuery doesn't expose the sanitization (regex)
-    $.get(url, function(data) {
-        var $data = $(data);
-        var $plotpar = $data.find('.plotpar:first');
-
-        if ($plotpar.length) {
-            $summary.html($plotpar.find('i:last').remove().end());
-        } else {
-            var $swiki = $data.find('#swiki\\.2\\.1');
-
-            if ($swiki.length) {
-                $summary.html($swiki);
-            }
-        }
-    });
 }
