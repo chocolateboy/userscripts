@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name          YouTube Sidebar: Hide Recommended Videos
-// @description   Remove "Recommended for you" videos from the YouTube video sidebar
+// @description   Remove "Recommended for you" videos from the sidebar on YouTube video pages
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.youtube.com/watch*
 // @include       http://youtube.com/watch*
@@ -37,5 +37,10 @@
 //     http://userscripts.org/scripts/show/154755
 //     http://userscripts.org/topics/123693
 
-// remove each a.related-video that contains a 2nd (:eq is 0-based) span.attribution
-$('a.related-video').has('span.attribution:eq(1)').hide();
+function hide_recommended() {
+    // remove each a.related-video that contains a 2nd (:eq is 0-based) span.attribution
+    $('a.related-video').has('span.attribution:eq(1)').hide();
+}
+
+// execute as late as possible
+window.addEventListener('load', hide_recommended, false);
