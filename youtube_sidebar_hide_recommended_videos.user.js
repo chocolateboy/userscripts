@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
+// @version       1.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.youtube.com/watch*
 // @include       http://youtube.com/watch*
@@ -48,11 +48,23 @@ $(window).on('load', function() {
     // handle AJAX page loads by wrapping the callback
     // the SPF (single page framework?) module fires after
     // the content for a new page has been retrieved and processed
-    var spf_config = unsafeWindow._spf_state.config;
+    var spf_config = (unsafeWindow || window)._spf_state.config;
     var old_callback = spf_config[NAVIGATE_PROCESSED];
 
     spf_config[NAVIGATE_PROCESSED] = function() {
-        if (old_callback) old_callback.apply(null, arguments);
+        var rv;
+
+        if (old_callback) {
+            try {
+                rv = old_callback.apply(null, arguments);
+            } catch (e) {
+                rv = e;
+            }
+        }
+
         hide_recommended();
+
+        // the return value isn't currently used, but it may be in future
+        return rv;
     };
 });
