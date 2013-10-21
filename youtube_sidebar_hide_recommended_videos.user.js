@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.0
+// @version       1.1.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.youtube.com/watch*
 // @include       http://youtube.com/watch*
@@ -25,7 +25,7 @@
 var NAVIGATE_PROCESSED = 'navigate-processed-callback';
 
 /* recommended videos can be distinguished by the fact that
- * they have two attribution spans, rather than the usual one
+ * they have two attribution spans, rather than the usual one:
  *
  *     <li class="related-list-item">
  *         <a href="/watch?v=1234xyz" class="spf-link">
@@ -48,7 +48,12 @@ $(window).on('load', function() {
     // handle AJAX page loads by wrapping the callback
     // the SPF (single page framework?) module fires after
     // the content for a new page has been retrieved and processed
-    var spf_config = (unsafeWindow || window)._spf_state.config;
+
+    // XXX "@grant none" should allow us to use window (and disable
+    // unsafeWindow), but Scriptish 0.1.11 doesn't seem to have got
+    // the memo: http://wiki.greasespot.net/@grant
+    var w = typeof(unsafeWindow) == 'undefined' ? window : unsafeWindow;
+    var spf_config = w._spf_state.config;
     var old_callback = spf_config[NAVIGATE_PROCESSED];
 
     spf_config[NAVIGATE_PROCESSED] = function() {
