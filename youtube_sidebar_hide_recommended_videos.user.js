@@ -52,12 +52,12 @@ $(window).on('load', function() {
     // XXX "@grant none" should allow us to use window (and disable
     // unsafeWindow), but Scriptish 0.1.11 doesn't seem to have got
     // the memo: http://wiki.greasespot.net/@grant
-    var w = typeof(unsafeWindow) == 'undefined' ? window : unsafeWindow;
-    var spf_config = w._spf_state.config;
+    var win = typeof(unsafeWindow) == 'undefined' ? window : unsafeWindow;
+    var spf_config = win._spf_state.config;
     var old_callback = spf_config[NAVIGATE_PROCESSED];
 
     spf_config[NAVIGATE_PROCESSED] = function() {
-        // apparently, try/finally (without a catch) doesn't work in IE7;
+        // apparently, try/finally (without a catch block) doesn't work in IE7.
         // solution: don't use IE7!
         try {
             if (old_callback) {
