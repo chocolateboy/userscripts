@@ -4,11 +4,11 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.1
+// @version       1.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
-// @include       http://www.youtube.com/watch*
+// @include       http://*.youtube.com/watch*
 // @include       http://youtube.com/watch*
-// @include       https://www.youtube.com/watch*
+// @include       https://*.youtube.com/watch*
 // @include       https://youtube.com/watch*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
 // @grant         none
@@ -57,19 +57,15 @@ $(window).on('load', function() {
     var old_callback = spf_config[NAVIGATE_PROCESSED];
 
     spf_config[NAVIGATE_PROCESSED] = function() {
-        var rv;
-
-        if (old_callback) {
-            try {
-                rv = old_callback.apply(null, arguments);
-            } catch (e) {
-                rv = e;
+        // apparently, try/finally (without a catch) doesn't work in IE7;
+        // solution: don't use IE7!
+        try {
+            if (old_callback) {
+                // the return value isn't currently used, but it may be in future
+                return old_callback.apply(null, arguments);
             }
+        } finally {
+            hide_recommended();
         }
-
-        hide_recommended();
-
-        // the return value isn't currently used, but it may be in future
-        return rv;
     };
 });
