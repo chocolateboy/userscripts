@@ -1,13 +1,16 @@
 // ==UserScript==
-// @name          Read Reddit, Yellow Reddit
-// @description   Highlight new stories on the Reddit front page
+// @name          Highlight new stories on the Reddit front page
+// @description   Highlight stories promoted to the Reddit front page since the last visit
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.2.1
+// @version       0.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @include       http://reddit.com/
+// @include       https://reddit.com/
 // @include       http://*.reddit.com/
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
+// @include       https://*.reddit.com/
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
 // @grant         GM_deleteValue
 // @grant         GM_getValue
 // @grant         GM_setValue
@@ -16,9 +19,9 @@
 /*
  * @requires:
  *
- * jQuery 2.0.2
+ * jQuery 2.0.3
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
  */
 
 const DAYS = 3;
