@@ -43,7 +43,7 @@ var cache = JSON.parse(GM_getValue(KEY, '{}'));
 
 // purge expired IDs
 for (var id in cache) {
-    if (cache[id] < NOW) {
+    if (NOW > cache[id]) {
         delete cache[id];
     }
 }
