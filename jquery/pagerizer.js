@@ -1,5 +1,5 @@
 // helper library for userscripts that mark up pages so that they can be navigated by keyboard
-// e.g. with pentadactyl's "[[" (<previous-page>) and "]]" (<next-page>) keys
+// e.g. with Pentadactyl's "[[" (<previous-page>) and "]]" (<next-page>) keys
 
 jQuery.pagerizer = {
     getLinks: function(_document) {
