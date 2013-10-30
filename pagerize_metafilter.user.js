@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name          Pagerize MetaFilter
-// @description   Mark up MetaFilter with Pager Metadata
+// @description   Mark up MetaFilter with pager metadata
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts

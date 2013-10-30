@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name          Pagerize Ars Technica
-// @description   Mark up Ars Technica with Pager Metadata
+// @description   Mark up Ars Technica with pager metadata
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
