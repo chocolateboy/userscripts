@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://arstechnica.com/*
 // @include       http://*.arstechnica.com/*
@@ -40,27 +40,9 @@
     </nav>
 */
 
-function getPageLinks($navbar) {
-    var $previousLink, $nextLink;
-    var $pageNumber = $navbar.contents().filter(function() {
-        return this.nodeType == 3 && $.trim(this.nodeValue).match(/^\d+$/)
-    });
-
-    $previousLink = $pageNumber.prev();
-    $nextLink = $pageNumber.next();
-
-    return [ $previousLink, $nextLink ];
-}
-
 var $navbar = $('nav.page-numbers span.numbers');
-var pageLinks = getPageLinks($navbar);
-var $previousPageLink = pageLinks[0];
-var $nextPageLink = pageLinks[1];
-
-if ($previousPageLink.length) {
-    $previousPageLink.addRel('prev');
-}
-
-if ($nextPageLink.length) {
-    $nextPageLink.addRel('next');
-}
+var $pageNumber = $navbar.contents().filter(function() {
+    return this.nodeType == 3 && $.trim(this.nodeValue).match(/^\d+$/)
+});
+$pageNumber.prev().addRel('prev');
+$pageNumber.next().addRel('next');

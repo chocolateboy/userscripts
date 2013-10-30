@@ -10,7 +10,7 @@ jQuery.pagerizer = {
         var seen = {}, urls = [];
         var d = _document || document;
 
-        if (rel == 'next' || rel =='prev') {
+        if (rel == 'next' || rel == 'prev') {
             [ 'link', 'a' ].forEach(function(tag) {
                 $(tag + '[rel~="' + rel + '"][href]', d).each(function() {
                     var url = jQuery.trim($(this).attr('href'));
