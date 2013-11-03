@@ -10,7 +10,7 @@
 // @exclude     http://*.youtube.com/*
 // @exclude     https://youtube.com/*
 // @exclude     https://*.youtube.com/*
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js
 // @require     https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @grant       GM_registerMenuCommand
 // ==/UserScript==
@@ -18,9 +18,9 @@
 /*
  * @requires:
  *
- * jQuery 1.8.2
+ * jQuery 2.0.3
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
  *
  * sprintf() for JavaScript
  *
