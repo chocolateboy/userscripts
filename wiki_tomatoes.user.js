@@ -2,7 +2,7 @@
 // @name        Wiki Tomatoes
 // @namespace   http://www.chocolatey.com/code/js
 // @description Adds a Rotten Tomatoes link to Wikipedia film articles that contain an IMDb link
-// @version     0.4.0
+// @version     0.40.0
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *.wikipedia.org/wiki/*
