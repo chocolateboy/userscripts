@@ -30,7 +30,7 @@
  *     http://everyfilmin2011.blogspot.com/2011/01/24-rabbit-hole.html
  */
 
-const PREFORMATTED = /^\s*(Laughs|Jumps|Tears|Vomit|Nudity)\s*:\s*\S/;
+var PREFORMATTED = /^\s*(Laughs|Jumps|Tears|Vomit|Nudity)\s*:\s*\S/;
 var $posts = $('div.post-body');
 
 /*

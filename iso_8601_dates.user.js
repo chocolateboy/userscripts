@@ -2,14 +2,14 @@
 // @name           ISO 8601 Dates
 // @namespace      https://github.com/chocolateboy/userscripts
 // @description    Convert US dates to the ISO 8601 YYYY-MM-DD format
-// @version        1.0.2
+// @version        1.1.0
 // @author         chocolateboy
 // @license        GPL: http://www.gnu.org/copyleft/gpl.html
-// @grant          none
+// @grant          GM_registerMenuCommand
 // ==/UserScript==
 
-const XPATH = '//body//text()';
-const DATE  = new RegExp(
+var XPATH = '//body//text()';
+var DATE  = new RegExp(
       '(?:\\b(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])-(\\d{4}|\\d{2})\\b(?!-))'
     + '|'
     + '(?:\\b(0[1-9]|1[0-2])/(0[1-9]|[12][0-9]|3[01])/(\\d{4}|\\d{2})\\b(?!/))',
@@ -17,7 +17,7 @@ const DATE  = new RegExp(
 );
 
 //             Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
-const days = [ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
+var days = [ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
 
 function leap_year (year) {
     if ((year % 400) == 0) {           // multiples of 400 are leap years

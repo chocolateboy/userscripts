@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.3.0
+// @version       0.4.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/
 // @include       https://reddit.com/
@@ -24,12 +24,12 @@
  *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
  */
 
-const DAYS = 3;
-const HIGHLIGHT_COLOR = '#FFFD66';
-const KEY = 'cache';
-const NOW = new Date().getTime();
-const OLD_KEYS = [ 'Reddit_homepage', 'Reddit_Front_Page', 'article_ids' ];
-const TTL = 1000 * 60 * 60 * 24 * DAYS; // time-to-live: how long (in milliseconds) to cache IDs for
+var DAYS = 3;
+var HIGHLIGHT_COLOR = '#FFFD66';
+var KEY = 'cache';
+var NOW = new Date().getTime();
+var OLD_KEYS = [ 'Reddit_homepage', 'Reddit_Front_Page', 'article_ids' ];
+var TTL = 1000 * 60 * 60 * 24 * DAYS; // time-to-live: how long (in milliseconds) to cache IDs for
 
 // remove obsolete keys
 $.each(OLD_KEYS, function(index, value) {

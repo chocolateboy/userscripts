@@ -2,18 +2,19 @@
 // @name        Wiki Tomatoes
 // @namespace   http://www.chocolatey.com/code/js
 // @description Adds a Rotten Tomatoes link to Wikipedia film articles that contain an IMDb link
-// @version     0.32
+// @version     0.4.0
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *.wikipedia.org/wiki/*
 // @include     https://secure.wikimedia.org/wikipedia/*/wiki/*
+// @grant       none
 // ==/UserScript==
 
-const $ATTRS = 'href="$HREF" class="external text" title="$TITLE - Rotten Tomatoes" rel="nofollow"';
-const $RT = '<a href="/wiki/Rotten_Tomatoes" title="Rotten Tomatoes">Rotten Tomatoes</a>';
-const $RT_BASE_URI = 'http://www.rottentomatoes.com/alias?type=imdbid&s=';
+var $ATTRS = 'href="$HREF" class="external text" title="$TITLE - Rotten Tomatoes" rel="nofollow"';
+var $RT = '<a href="/wiki/Rotten_Tomatoes" title="Rotten Tomatoes">Rotten Tomatoes</a>';
+var $RT_BASE_URI = 'http://www.rottentomatoes.com/alias?type=imdbid&s=';
 
-const $LOCALES = {
+var $LOCALES = {
     de: [ '<a $ATTRS>Kritiken</a> zu <i>$TITLE</i> auf $RT (englisch)', extract_german_title ],
     en: '<a $ATTRS><i>$TITLE</i></a> at $RT',
     es: '<a $ATTRS><i>$TITLE</i></a> en $RT (en inglés)',
@@ -48,7 +49,7 @@ const $LOCALES = {
  * &c.
  */
 
-const $XPATH = '//ul' + 
+var $XPATH = '//ul' + 
    '[count(li//a[contains(@class, "external") and contains(@href, "rottentomatoes.com/")])=0]' +
    '[li//a[contains(@class, "external") and contains(@href, "imdb.") and contains(@href, "/title/tt")]]' +
    '[position()=last()]' +

@@ -5,9 +5,10 @@
 // @author         chocolateboy <chocolate@cpan.org>
 // @include        http://www.filmaffinity.com/*
 // @version        0.1 (2006-11-26)
+// @grant          none
 // ==/UserScript==
 
-const xpath = '//select[starts-with(@id, "rate")]';
+var xpath = '//select[starts-with(@id, "rate")]';
 var selects = document.evaluate(xpath, document, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
 
 var map = {

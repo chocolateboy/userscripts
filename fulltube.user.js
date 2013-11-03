@@ -2,7 +2,7 @@
 // @name        FullTube
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Adds a full-screen button to embedded YouTube videos
-// @version     0.70
+// @version     0.80.0
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *
@@ -84,14 +84,14 @@
  *    See https://developers.google.com/youtube/player_parameters#fs
  */
 
-const EMBEDS = '//embed[(contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
+var EMBEDS = '//embed[(contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
 
-const OBJECTS = '//object[(contains(@data, "youtube.com/v/") or contains(@data, "youtube-nocookie.com/v/")) '
+var OBJECTS = '//object[(contains(@data, "youtube.com/v/") or contains(@data, "youtube-nocookie.com/v/")) '
                + 'or ./param[(@name="movie" or @name="src") '
                + 'and (contains(@value, "youtube.com/v/") '
                + 'or contains(@value, "youtube-nocookie.com/v/"))]]';
 
-const IFRAMES = '//iframe[(contains(@src, "youtube.com/embed/") or contains(@src, "youtube-nocookie.com/embed/") '
+var IFRAMES = '//iframe[(contains(@src, "youtube.com/embed/") or contains(@src, "youtube-nocookie.com/embed/") '
                + 'or contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
 
 function xpath(xpath, context) {

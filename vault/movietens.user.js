@@ -7,6 +7,7 @@
 // @include        http://movielens.umn.edu/*
 // @include        http://www.movielens.org/*
 // @include        http://movielens.org/*
+// @grant          none
 // ==/UserScript==
 
 /*
@@ -15,7 +16,7 @@
  * 0.1 (2006-05-29) initial version
 */
 
-const $xpath = '//select[starts-with(@name, "rate")]';
+var $xpath = '//select[starts-with(@name, "rate")]';
 var $selects = document.evaluate($xpath, document, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
 
 var $map = {

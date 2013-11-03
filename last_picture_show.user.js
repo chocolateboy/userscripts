@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.last.fm/*
 // @include       http://cn.last.fm/*
@@ -81,7 +81,7 @@
 //
 // TODO add support for Similar Artists pages e.g.: http://www.last.fm/music/The+Beatles/+similar
 
-const SPLIT_LINKS = 'split_links';
+var SPLIT_LINKS = 'split_links';
 
 function split_links() {
     var $ul = $('ul.libraryItems');

@@ -5,10 +5,11 @@
 // @author         chocolateboy <chocolate@cpan.org>
 // @include        http://www.tinlizzie.org/ometa-js/*
 // @include        http:/tinlizzie.org/ometa-js/*
-// @version        0.01 (2009-01-22)
+// @version        0.2.0
+// @grant          none
 // ==/UserScript==
 
-const $xpath = '//textarea[@cols="132"]';
+var $xpath = '//textarea[@cols="132"]';
 var $textareas = document.evaluate($xpath, document, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
 
 for (var $i = 0; $i < $textareas.snapshotLength; ++$i) {

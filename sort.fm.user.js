@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.0
+// @version       1.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://www.last.fm/music/*
@@ -21,8 +21,8 @@
  *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
  */
 
-const INITIAL_SORTED_COLUMN = 'track';
-const ASCENDING = 1, DESCENDING = -1;
+var INITIAL_SORTED_COLUMN = 'track';
+var ASCENDING = 1, DESCENDING = -1;
 
 /*
  * key (string):
@@ -35,7 +35,7 @@ const ASCENDING = 1, DESCENDING = -1;
  *     1: extractor function that takes a row and returns the value of its designated column as a sortable number
  *     2: initial sort order
  */
-const COLUMN_CONFIG = {
+var COLUMN_CONFIG = {
     'track':     [ 'subjectCell',  extract_track,     ASCENDING  ],
     'duration':  [ 'durationCell', extract_duration,  ASCENDING  ],
     'listeners': [ 'reachCell',    extract_listeners, DESCENDING ]

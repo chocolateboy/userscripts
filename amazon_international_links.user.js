@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.2.0
+// @version       1.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -61,8 +61,6 @@
 
 /*********************** Constants ********************************/
 
-// these are all initialized lazily (hence "var" instead of "const")
-// XXX this is a pointless optimisation if thousands of lines of jQuery, sprintf &c. are executed for every Amazon page
 var ASIN, CROSS_SITE_LINK_CLASS, CURRENT_TLD, LINKS, PROTOCOL, SITES;
 var $CROSS_SHOP_LINKS, $LINK, $SEPARATOR; // the $ sigil denotes jQuery objects
 var addLink, displayLinks; // functions that depend on the site design

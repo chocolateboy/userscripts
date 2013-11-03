@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.1
+// @version       0.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.google.tld
 // @include       http://www.google.tld/*
@@ -13,6 +13,7 @@
 // @include       http://images.google.tld
 // @include       http://images.google.tld/*
 // @run-at        document-start
+// @grant         none
 // ==/UserScript==
 
 // Google's use of AJAX to load results without reloading the page makes things interesting...
@@ -33,7 +34,7 @@
 // in Google Preferences Without Cookies: http://userscripts.org/scripts/show/64112
 
 // Images, Video, or Shopping
-const SEARCH_RE = new RegExp('\\btbm=(?:isch|vid|shop)\\b');
+var SEARCH_RE = new RegExp('\\btbm=(?:isch|vid|shop)\\b');
 
 // like params.split('&'), but return an empty array if params is empty
 function splitParams(params) {
