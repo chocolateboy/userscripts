@@ -12,18 +12,12 @@
 // ==/UserScript==
 
 /*
- * jQuery 2.0.3
- *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
- */
-
-/*
  * Tests
  *
- *     abbreviated:     http://www.imdb.com/title/tt0109374/
- *     not abbreviated: http://www.imdb.com/title/tt0062474/
- *     no summary:      http://www.imdb.com/title/tt0162757/
- *     refspam URL:     http://www.imdb.com/title/tt1776222/?ref_=fn_tt_tt_1
+ *     truncated:     http://www.imdb.com/title/tt0109374/
+ *     not truncated: http://www.imdb.com/title/tt0062474/
+ *     no summary:    http://www.imdb.com/title/tt0162757/
+ *     refspam URL:   http://www.imdb.com/title/tt1776222/?ref_=fn_tt_tt_1
  */
 
 // the truncated summary
