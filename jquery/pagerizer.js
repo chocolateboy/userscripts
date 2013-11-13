@@ -10,9 +10,10 @@ jQuery.pagerizer = {
         var seen = {}, urls = [];
         var d = _document || document;
 
-        if (rel == 'next' || rel == 'prev') {
+        if (rel) {
             [ 'link', 'a' ].forEach(function(tag) {
-                $(tag + '[rel~="' + rel + '"][href]', d).each(function() {
+                var selector = tag + '[rel~="' + rel + '"][href]';
+                $(selector, d).each(function() {
                     var url = jQuery.trim($(this).attr('href'));
 
                     if ((url != '') && (!seen[url])) {
@@ -34,9 +35,7 @@ jQuery.pagerizer = {
         return this.getRelLinks('prev', _document);
     },
 
-    // convert the list of rels to a lookup table:
-    // [ "foo", "Bar", "BAZ" ] -> [ "foo": "foo", "bar": "Bar", "baz": "BAZ" ]
-    getStringListAsMap: function (stringList) {
+    getStringListAsArray: function(stringList) {
         var array;
 
         if (jQuery.isArray(stringList)) {
@@ -50,25 +49,20 @@ jQuery.pagerizer = {
             }
         }
 
-        var map = {};
-        array.forEach(function(it) { map[it.toLowerCase()] = it });
-
-        return map;
+        return array;
     },
 
-    getStringListAsArray: function (stringList) {
-        var map = this.getStringListAsMap(stringList);
-        var array = [];
-        jQuery.each(map, function(key, value) { array.push(value) });
-        return array;
+    // convert the list of rels to a lookup table with lower-case keys:
+    // [ "foo", "Bar", "BAZ" ] -> [ "foo": "foo", "bar": "Bar", "baz": "BAZ" ]
+    getStringListAsMap: function(stringList) {
+        var array = this.getStringListAsArray(stringList);
+        var map = {};
+        array.forEach(function(it) { map[it.toLowerCase()] = it });
+        return map;
     }
 };
 
-jQuery.fn.setStringList = function (attr, stringList, removeIfEmpty) {
-    if (arguments.length < 3) {
-        removeIfEmpty = true;
-    }
-
+jQuery.fn.setStringList = function(attr, stringList, removeIfEmpty) {
     var array = jQuery.pagerizer.getStringListAsArray(stringList);
 
     if (array.length) {
@@ -83,9 +77,7 @@ jQuery.fn.setStringList = function (attr, stringList, removeIfEmpty) {
 jQuery.fn.addRel = function() {
     var oldRels = jQuery.pagerizer.getStringListAsArray(this.attr('rel'));
     var newRels = jQuery.makeArray(arguments);
-
     this.setStringList('rel', oldRels.concat(newRels));
-
     return this;
 };
 
@@ -98,6 +90,5 @@ jQuery.fn.removeRel = function() {
     }
 
     this.setStringList('rel', rels);
-
     return this;
 };
