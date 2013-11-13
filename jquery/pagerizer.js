@@ -35,7 +35,9 @@ jQuery.pagerizer = {
         return this.getRelLinks('prev', _document);
     },
 
-    getStringListAsArray: function(stringList) {
+    // convert the list of rels to a lookup table:
+    // [ "foo", "Bar", "BAZ" ] -> [ "foo": "foo", "bar": "Bar", "baz": "BAZ" ]
+    getStringListAsMap: function(stringList) {
         var array;
 
         if (jQuery.isArray(stringList)) {
@@ -49,16 +51,16 @@ jQuery.pagerizer = {
             }
         }
 
-        return array;
-    },
-
-    // convert the list of rels to a lookup table with lower-case keys:
-    // [ "foo", "Bar", "BAZ" ] -> [ "foo": "foo", "bar": "Bar", "baz": "BAZ" ]
-    getStringListAsMap: function(stringList) {
-        var array = this.getStringListAsArray(stringList);
         var map = {};
         array.forEach(function(it) { map[it.toLowerCase()] = it });
         return map;
+    },
+
+    // note: this is based on getStringListAsMap to ensure that
+    // duplicates are removed
+    getStringListAsArray: function(stringList) {
+        var map = this.getStringListAsMap(stringList);
+        return $.map(map, function(key, value) { return value });
     }
 };
 
