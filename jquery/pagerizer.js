@@ -2,46 +2,13 @@
 // e.g. with Pentadactyl's "[[" (<previous-page>) and "]]" (<next-page>) keys
 
 jQuery.pagerizer = {
-    getLinks: function(_document) {
-        return [ this.getPrevLinks(_document), this.getNextLinks(_document) ];
-    },
-
-    getRelLinks: function(rel, _document) {
-        var seen = {}, urls = [];
-        var d = _document || document;
-
-        if (rel) {
-            [ 'link', 'a' ].forEach(function(tag) {
-                var selector = tag + '[rel~="' + rel + '"][href]';
-                $(selector, d).each(function() {
-                    var url = jQuery.trim($(this).attr('href'));
-
-                    if ((url != '') && (!seen[url])) {
-                        urls.push(url);
-                        seen[url] = true;
-                    }
-                });
-            });
-        }
-
-        return urls;
-    },
-
-    getNextLinks: function(_document) {
-        return this.getRelLinks('next', _document);
-    },
-
-    getPrevLinks: function(_document) {
-        return this.getRelLinks('prev', _document);
-    },
-
-    // convert the list of rels to a lookup table:
+    // convert the list of strings to a lookup table:
     // [ "foo", "Bar", "BAZ" ] -> [ "foo": "foo", "bar": "Bar", "baz": "BAZ" ]
     getStringListAsMap: function(stringList) {
         var array;
 
         if (jQuery.isArray(stringList)) {
-            array = stringList;
+            array = stringList.forEach ? stringList : jQuery.makeArray(stringList);
         } else if (typeof(stringList) === 'string') {
             array = jQuery.trim(stringList).split(/\s+/);
         } else { // extract the map's values
@@ -74,6 +41,17 @@ jQuery.fn.setStringList = function(attr, stringList, removeIfEmpty) {
     }
 
     return this;
+};
+
+// return all A and LINK elements which have rel attributes that
+// include any of the supplied values. If no values are supplied,
+// default to [ 'prev', 'next' ]
+jQuery.fn.findRelLinks = function() {
+    var rels = arguments.length ? jQuery.makeArray(arguments).map(function(it) { return jQuery.trim(it) }) : [ 'prev', 'next' ];
+    var pattern = '\\b(?:' + rels.join('|') + ')\\b';
+    return this.find('a[rel], link[rel]').filter(function() {
+        return $(this).attr('rel').match(pattern);
+    });
 };
 
 jQuery.fn.addRel = function() {
