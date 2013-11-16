@@ -47,11 +47,9 @@ jQuery.fn.setStringList = function(attr, stringList, removeIfEmpty) {
 // include any of the supplied values. If no values are supplied,
 // default to [ 'prev', 'next' ]
 jQuery.fn.findRelLinks = function() {
-    var rels = arguments.length ? jQuery.makeArray(arguments).map(function(it) { return jQuery.trim(it) }) : [ 'prev', 'next' ];
-    var pattern = '\\b(?:' + rels.join('|') + ')\\b';
-    return this.find('a[rel], link[rel]').filter(function() {
-        return $(this).attr('rel').match(pattern);
-    });
+    var rels = arguments.length ? jQuery.makeArray(arguments).map(function(arg) { return jQuery.trim(arg) }) : [ 'prev', 'next' ];
+    var selector = rels.map(function(rel) { return 'a[rel~="%"], link[rel~="%"]'.replace(/%/g, rel) }).join(', ');
+    return this.find(selector);
 };
 
 jQuery.fn.addRel = function() {
