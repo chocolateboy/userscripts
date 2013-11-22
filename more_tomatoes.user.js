@@ -13,7 +13,7 @@
 // @grant       GM_log
 // ==/UserScript==
 
-// XXX note: the unused grant is a workaround for a GreaseMonkey bug:
+// XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
 function expand_synopsis() {
