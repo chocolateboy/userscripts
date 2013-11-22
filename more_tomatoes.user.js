@@ -3,7 +3,7 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
 // @author      chocolateboy
-// @version     0.3.0
+// @version     0.3.1
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://rottentomatoes.com/m/*
 // @include     http://*.rottentomatoes.com/m/*
