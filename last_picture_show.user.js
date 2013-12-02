@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.last.fm/*
 // @include       http://cn.last.fm/*
 // @include       http://www.lastfm.tld/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
-// @grant         none
+// @grant         GM_log
 // ==/UserScript==
 
 /*
