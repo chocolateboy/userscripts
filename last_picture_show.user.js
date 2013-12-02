@@ -13,13 +13,8 @@
 // @grant         GM_log
 // ==/UserScript==
 
-/*
- * @requires:
- *
- * jQuery 2.0.3
- *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
- */
+// XXX note: the unused grant is a workaround for a Greasemonkey bug:
+// https://github.com/greasemonkey/greasemonkey/issues/1614
 
 /*
     Thumbnail:    http://userserve-ak.last.fm/serve/xyz/{image_id}.png
