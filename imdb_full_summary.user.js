@@ -3,13 +3,16 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Automatically show the full plot summary on IMDb
 // @author      chocolateboy
-// @version     1.0.0
+// @version     1.1.0
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://*.imdb.tld/title/*/
 // @include     http://*.imdb.tld/title/*/?*
 // @require     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
-// @grant       none
+// @grant       GM_log
 // ==/UserScript==
+
+// XXX note: the unused grant is a workaround for a Greasemonkey bug:
+// https://github.com/greasemonkey/greasemonkey/issues/1614
 
 /*
  * Tests
