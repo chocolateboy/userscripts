@@ -3,23 +3,18 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.2.0
+// @version       1.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, duration or number of listeners
 // @include       http://www.last.fm/music/*
 // @include       http://cn.last.fm/music/*
 // @include       http://www.lastfm.tld/music/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
-// @grant         none
+// @grant         GM_log
 // ==/UserScript==
 
-/*
- * @requires:
- *
- * jQuery 2.0.3
- *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
- */
+// XXX note: the unused grant is a workaround for a Greasemonkey bug:
+// https://github.com/greasemonkey/greasemonkey/issues/1614
 
 var INITIAL_SORTED_COLUMN = 'track';
 var ASCENDING = 1, DESCENDING = -1;
