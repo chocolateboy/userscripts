@@ -5,10 +5,12 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://news.ycombinator.com/
+// @include       http://news.ycombinator.com/news
 // @include       https://news.ycombinator.com/
+// @include       https://news.ycombinator.com/news
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
 // @grant         GM_getValue
 // @grant         GM_setValue
