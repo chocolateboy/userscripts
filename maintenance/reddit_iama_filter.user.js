@@ -4,7 +4,7 @@
 // @run-at         document-start
 // @author         DEADBEEF.
 // @maintainer     chocolateboy
-// @version        1.0.0
+// @version        1.1.0
 // ==/UserScript==
 
 // original: http://userscripts.org/scripts/show/125260
@@ -13,7 +13,7 @@ function iamafilter() {
     if ((!reddit.post_site || !$('body.comments-page').length || !document.title.match(/\b(i?ama|ilivein)\b/i) || document.title.match(/'\bi?ama request\b/i)) && reddit.post_site != 'redditoroftheday') return;
 
     // Get OP
-    var OP = $('#siteTable .author').text();
+    var OP = $('#siteTable .author').first().text();
     if (reddit.post_site == 'redditoroftheday') {
         OP = $('.linklisting .md a[href*="/user/"]:first').text();
         $('.thing a.author[href$="' + OP + '"]').css({
