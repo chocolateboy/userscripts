@@ -3,12 +3,12 @@
 // @description    Enable/disable subreddit-specific CSS, flair and thumbnails
 // @author         DEADBEEF.
 // @maintainer     chocolateboy
-// @namespace      https://github.com/chocolateboy/userscript
+// @namespace      https://github.com/chocolateboy/userscripts
 // @include        http://reddit.com/r/*
 // @include        https://reddit.com/r/*
 // @include        http://*.reddit.com/r/*
 // @include        https://*.reddit.com/r/*
-// @version        1.1.0
+// @version        1.1.1
 // @run-at         document-start
 // @grant          none
 // ==/UserScript==
