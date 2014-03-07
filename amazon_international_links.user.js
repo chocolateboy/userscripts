@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.2.0
+// @version       1.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -182,7 +182,16 @@ function modernAddLink(tld, country) {
         );
     }
 
-    LINKS.push($(html));
+    var $link = $(html);
+
+    // 2014-03-07: Amazon appear to be testing a new design
+    // in which these links are no longer enclosed by <li>
+    // elements
+    if (!$CROSS_SHOP_LINKS.children('li').length) {
+        $link = $link.children(); // remove the <li> wrapper
+    }
+
+    LINKS.push($link);
 }
 
 // prepend the cross-site links to the "Your Account" link
