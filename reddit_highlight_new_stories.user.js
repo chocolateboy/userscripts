@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.4.0
+// @version       0.4.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/
 // @include       https://reddit.com/
@@ -16,19 +16,11 @@
 // @grant         GM_setValue
 // ==/UserScript==
 
-/*
- * @requires:
- *
- * jQuery 2.0.3
- *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
- */
-
 var DAYS = 3;
 var HIGHLIGHT_COLOR = '#FFFD66';
-var KEY = 'cache';
+var KEY = 'seen';
 var NOW = new Date().getTime();
-var OLD_KEYS = [ 'Reddit_homepage', 'Reddit_Front_Page', 'article_ids' ];
+var OLD_KEYS = [ 'Reddit_homepage', 'Reddit_Front_Page', 'article_ids', 'cache' ];
 var TTL = 1000 * 60 * 60 * 24 * DAYS; // time-to-live: how long (in milliseconds) to cache IDs for
 
 // remove obsolete keys
@@ -39,22 +31,22 @@ $.each(OLD_KEYS, function(index, value) {
 });
 
 // Reddit article ID -> cache expiry timestamp (epoch milliseconds)
-var cache = JSON.parse(GM_getValue(KEY, '{}'));
+var seen = JSON.parse(GM_getValue(KEY, '{}'));
 
 // purge expired IDs
-for (var id in cache) {
-    if (NOW > cache[id]) {
-        delete cache[id];
+for (var id in seen) {
+    if (NOW > seen[id]) {
+        delete seen[id];
     }
 }
 
 $('div#siteTable div.thing[data-fullname]').each(function() {
     var id = $(this).attr('data-fullname');
 
-    if (!cache[id]) {
+    if (!seen[id]) {
         $('a.title', this).css('background-color', HIGHLIGHT_COLOR);
-        cache[id] = NOW + TTL;
+        seen[id] = NOW + TTL;
     }
 });
 
-GM_setValue(KEY, JSON.stringify(cache));
+GM_setValue(KEY, JSON.stringify(seen));
