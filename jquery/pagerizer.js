@@ -27,7 +27,7 @@ jQuery.pagerizer = {
     // duplicates are removed
     getStringListAsArray: function(stringList) {
         var map = this.getStringListAsMap(stringList);
-        return $.map(map, function(key, value) { return value });
+        return jQuery.map(map, function(key, value) { return value });
     }
 };
 
