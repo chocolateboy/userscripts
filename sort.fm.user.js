@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.2
+// @version       2.0.3
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, track name, duration or number of listeners
 // @include       http://www.last.fm/music/*
@@ -19,6 +19,7 @@
 var INITIAL_SORTED_COLUMN = 'position';
 var ASCENDING = 1, DESCENDING = -1;
 var LEXICOGRAPHICAL = 1, NUMERIC = 2;
+var CELL = 0, EXTRACTOR = 1, SORT_ORDER = 2, SORT_TYPE = 3;
 
 /*
  * key (string):
@@ -71,9 +72,9 @@ function extractListeners(row, selector) {
 // of the rows: < 0 if a should precede b, 0 if they're equal, and > 0 if a
 // should follow b.
 function makeCompare(config, order) {
-    var extract = config[1];
-    var selector = '.' + config[0];
-    var sortType = config[3];
+    var extract = config[EXTRACTOR];
+    var selector = '.' + config[CELL];
+    var sortType = config[SORT_TYPE];
 
     if (sortType == LEXICOGRAPHICAL) {
         return function(a, b) {
@@ -96,11 +97,11 @@ sortOrder = function() { // create a scope for variables that are persistent but
     var lastSelectedColumn = INITIAL_SORTED_COLUMN;
     var cache = {};
 
-    cache[lastSelectedColumn] = COLUMN_CONFIG[lastSelectedColumn][2];
+    cache[lastSelectedColumn] = COLUMN_CONFIG[lastSelectedColumn][SORT_ORDER];
 
-    return function (column) {
+    return function (column, config) {
         if (!cache[column]) { // initialize
-            cache[column] = COLUMN_CONFIG[column][2]; // initial sort order
+            cache[column] = config[SORT_ORDER]; // initial sort order
         } else if (column === lastSelectedColumn) { // toggle
             cache[column] = cache[column] * -1;
         } // else restore
@@ -116,7 +117,7 @@ function makeSortBy($rowContainer, column, config) {
         var $rows = $rowContainer.children('tr');
 
         // ascending (1) or descending (-1)
-        var order = sortOrder(column);
+        var order = sortOrder(column, config);
 
         // compare(a, b) function (where a and b are rows) which honours
         // the specified order (ascending or descending)
@@ -165,7 +166,7 @@ if ($table.length) {
     }
 
     $.each(COLUMN_CONFIG, function(column, config) {
-        var $header = $thead.find('td.' + config[0]);
+        var $header = $thead.find('td.' + config[CELL]);
 
         if ($header.length) {
             $header.css('cursor', 'pointer');
