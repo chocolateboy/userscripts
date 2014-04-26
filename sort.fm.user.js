@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.1
+// @version       2.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, track name, duration or number of listeners
 // @include       http://www.last.fm/music/*
@@ -25,7 +25,7 @@ var LEXICOGRAPHICAL = 1, NUMERIC = 2;
  *
  *     internal identifier for each column e.g. 'track', 'duration'
  *
- * value:
+ * value (tuple):
  *
  *     0: CSS class name identifying the table header cell to attach the click event to and table body cell to sort by
  *     1: extractor function that takes a row and returns a sortable value from its designated field
@@ -68,7 +68,7 @@ function extractListeners(row, selector) {
 // take a column spec and an order (ascending or descending) and return a
 // function which takes two rows (a and b), extracts the values from the
 // specified column, and returns an integer which represents the ordering
-// of the rows: -1 if a should precede b, 0 if they're equal, and 1 if a
+// of the rows: < 0 if a should precede b, 0 if they're equal, and > 0 if a
 // should follow b.
 function makeCompare(config, order) {
     var extract = config[1];
@@ -77,17 +77,7 @@ function makeCompare(config, order) {
 
     if (sortType == LEXICOGRAPHICAL) {
         return function(a, b) {
-            var cmp;
-            var aValue = extract(a, selector);
-            var bValue = extract(b, selector);
-
-            if (aValue == bValue) {
-                cmp = 0;
-            } else {
-                cmp = aValue < bValue ? -1 : 1;
-            }
-
-            return cmp * order;
+            return extract(a, selector).localeCompare(extract(b, selector)) * order;
         };
     } else { // numeric
         return function(a, b) {
