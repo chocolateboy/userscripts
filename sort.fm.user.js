@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.0
+// @version       2.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, track name, duration or number of listeners
 // @include       http://www.last.fm/music/*
@@ -153,28 +153,29 @@ function makeSortBy($rowContainer, column, config) {
 var $table = $('table.chart, table.tracklist').has('thead');
 
 if ($table.length) {
+    var $thead = $table.find('thead');
+    var $tbody = $table.find('tbody');
+
     // add/populate position cells so we can reverse/restore the original sort order
     if ($table.is('.tracklist')) {
-        $('thead tr', $table).prepend('<td class="positionCell">#</td>');
-        $('tbody tr', $table).prepend(function (index, oldHtml) {
+        $thead.find('tr').prepend('<td class="positionCell">#</td>');
+        $tbody.find('tr').prepend(function (index, oldHtml) {
             return '<td class="positionCell">' + (index + 1) + '</td>'
         });
     } else { // .chart: position cells already exist but may be empty
         // the header cell is always empty (&nbsp;)
-        $('thead td.positionCell', $table).text('#');
+        $thead.find('td.positionCell').text('#');
 
         // the body cells are already correctly populated for album tracklists
         if (!$table.is('#albumTracklist')) {
-            $('tbody td.positionCell', $table).text(function (index, oldText) {
+            $tbody.find('td.positionCell').text(function (index, oldText) {
                 return index + 1;
             });
         }
     }
 
-    var $tbody = $('tbody', $table);
-
     $.each(COLUMN_CONFIG, function(column, config) {
-        var $header = $('thead td.' + config[0], $table);
+        var $header = $thead.find('td.' + config[0]);
 
         if ($header.length) {
             $header.css('cursor', 'pointer');
