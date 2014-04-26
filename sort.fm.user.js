@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.3
+// @version       2.0.4
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, track name, duration or number of listeners
 // @include       http://www.last.fm/music/*
@@ -76,7 +76,7 @@ function makeCompare(config, order) {
     var selector = '.' + config[CELL];
     var sortType = config[SORT_TYPE];
 
-    if (sortType == LEXICOGRAPHICAL) {
+    if (sortType === LEXICOGRAPHICAL) {
         return function(a, b) {
             return extract(a, selector).localeCompare(extract(b, selector)) * order;
         };
