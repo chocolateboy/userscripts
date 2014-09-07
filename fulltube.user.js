@@ -137,7 +137,7 @@ function addFullScreenParam(uri, paramName) {
 function setSrc(element, src, name) {
     name || (name = 'src');
 
-    if (!element.getAttribute(name) || (element.getAttribute(name) != src)) {
+    if (!element.getAttribute(name) || (element.getAttribute(name) !== src)) {
         element.setAttribute(name, src);
     }
 }
