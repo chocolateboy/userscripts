@@ -2,7 +2,7 @@
 // @name        FullTube
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Adds a full-screen button to embedded YouTube videos
-// @version     0.80.0
+// @version     1.0.0
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *
@@ -10,7 +10,7 @@
 // @exclude     http://*.youtube.com/*
 // @exclude     https://youtube.com/*
 // @exclude     https://*.youtube.com/*
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js
 // @require     https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @grant       GM_registerMenuCommand
 // ==/UserScript==
@@ -18,9 +18,9 @@
 /*
  * @requires:
  *
- * jQuery 2.0.3
+ * jQuery 1.11.1 (for oldIE compatibility)
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.js
  *
  * sprintf() for JavaScript
  *
@@ -29,18 +29,19 @@
 
 /*
  * 1) Iterate over all YouTube embed elements and make sure:
- *    a) their @src attribute contains "&fs=1" (or append it if it doesn't).
+ *    a) their @src attribute contains "&fs=1" (or append it if it doesn't)
  *    b) the @allowFullScreen attribute is set to "true"
  *
- * This handles minimal, <embed>...</embed>-only embeds and does no harm to <object>...</object>
- * or <param>...</param> embeds.
+ *    This handles minimal, <embed>...</embed>-only embeds and does no harm to <object>...</object>
+ *    or <param>...</param> embeds.
  *
  * 2) Iterate over all object and/or param elements that contain at least one @movie/@src param
  *    with a YouTube link @value. These are required to have consistent attributes and/or
  *    child elements. Check/repair them.
  *
- * 3) Iterate over all YouTube iframe elements and make sure their @src attribute contains "&fs=1"
- * (or append it if it doesn't).
+ * 3) Iterate over all YouTube iframe elements and make sure their @src attribute contains
+ *    "&allowfullscreen=1" (or append it if it doesn't). Also add `allowfullscreen="true"`
+ *    (and its vendor-specific variants) to the iframe element.
  *
  * The awkward squad (all tested and verified):
  *
@@ -70,18 +71,17 @@
  *     width="625">
  *
  * 4) Bad iframe embed URL (prevents full screen working) e.g. http://selfstarter.us/
- * the iframe URL is fixed to conform to:
- * https://developers.google.com/youtube/player_parameters#Embedding_a_Player
+ *    the iframe URL is fixed to conform to:
+ *    https://developers.google.com/youtube/player_parameters#Embedding_a_Player
  *
- */
-
-/*
+ * 5) iframes with HTML5 video enabled on YouTube [1] e.g.:
+ *    http://stadt-bremerhaven.de/samsung-galaxy-note4-informationen/
  *
- * Unsupported:
+ *    needs the `allowfullscreen` attribute (and its vendor-specific variants for older browsers) set on the iframe
+ *    and the undocumented [2] `allowfullscreen` param set in the URL. See also: http://www.allowfullscreen.com/iframe/
  *
- * 1) HTML5 iframes don't support the fs parameter e.g. (with HTML video enabled on YouTube):
- *    http://thedailywh.at/2012/05/18/morning-fluff-202/
- *    See https://developers.google.com/youtube/player_parameters#fs
+ *    [1] http://www.youtube.com/html5
+ *    [2] https://developers.google.com/youtube/player_parameters
  */
 
 var EMBEDS = '//embed[(contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
@@ -94,29 +94,38 @@ var OBJECTS = '//object[(contains(@data, "youtube.com/v/") or contains(@data, "y
 var IFRAMES = '//iframe[(contains(@src, "youtube.com/embed/") or contains(@src, "youtube-nocookie.com/embed/") '
                + 'or contains(@src, "youtube.com/v/") or contains(@src, "youtube-nocookie.com/v/"))]';
 
-function xpath(xpath, context) {
-    var node_list = document.evaluate(xpath, context || document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-    var length;
+var ALLOW_FULL_SCREEN = [ 'allowfullscreen', 'mozallowfullscreen', 'webkitallowfullscreen' ];
 
-    if (length = node_list.snapshotLength) {
-        node_list.for_each = function(f) {
+function xpath(xpath, context) {
+    var nodeList = document.evaluate(xpath, context || document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    var length = nodeList.snapshotLength;
+
+    if (length) {
+        nodeList.each = function(fn) {
             for (var i = 0; i < length; ++i) {
-                f(node_list.snapshotItem(i));
+                fn(nodeList.snapshotItem(i));
             }
         };
-        return node_list;
+        return nodeList;
     } else {
         return null;
     }
 }
 
-function fs(uri) {
-    uri = unescape(uri);
-    uri = uri.replace(/[?& ]+$/, ''); // remove trailing question marks, ampersands or spaces
-    uri = uri.replace(/\bfs=(\w)*/g, 'fs=1');
+function addFullScreenParam(uri, paramName) {
+    var param, paramSet, paramAny;
 
-    if (!uri.match(/[&?]fs=1\b/)) {
-        uri += uri.match(/\?/) ? '&fs=1' : '?fs=1';
+    paramName || (paramName = 'fs');
+    param = sprintf('%s=1', paramName);
+    paramSet = new RegExp(sprintf('[&?]%s\\b', param));
+    paramAny = new RegExp(sprintf('\\b%s=(?:\\w*)', paramName), 'g');
+
+    uri = unescape(uri);
+    uri = uri.replace(/(?:[?&]|\s)+$/, ''); // remove trailing question marks, ampersands or spaces
+    uri = uri.replace(paramAny, param); // set any existing params to true
+
+    if (!uri.match(paramSet)) { // if the param doesn't exist, append it
+        uri += sprintf('%s%s', (uri.match(/\?/) ? '&' : '?'), param);
     }
 
     return uri;
@@ -125,26 +134,29 @@ function fs(uri) {
 // only set an element's src attribute (or equivalent) if the
 // supplied URI is different to the attribute's current value.
 // this reduces unnecessary reloading
-function setSrc(element, src, _name) {
-    var name = _name ? _name : 'src';
+function setSrc(element, src, name) {
+    name || (name = 'src');
 
     if (!element.getAttribute(name) || (element.getAttribute(name) != src)) {
         element.setAttribute(name, src);
     }
 }
 
-function full_tube() {
+function fullTube() {
     var embeds, objects, iframes;
 
     if (embeds = xpath(EMBEDS)) {
-        embeds.for_each(function(embed) {
-            var src = fs(embed.getAttribute('src'));
+        embeds.each(function(embed) {
+            var src = addFullScreenParam(embed.getAttribute('src'));
+            var $embed;
+
             setSrc(embed, src);
             embed.setAttribute('allowFullScreen', 'true');
+
             // bare embeds (i.e. not wrapped by objects) no longer support
             // full screen (in FF 16/Chromium 22), so wrap them; any remaining
-            // object requirements will be added below
-            var $embed = $(embed);
+            // object requirements will be handled below
+            $embed = $(embed);
             if (!$embed.parent('object').length) {
                 $embed.wrap(
                     sprintf(
@@ -159,53 +171,51 @@ function full_tube() {
     }
 
     if (objects = xpath(OBJECTS)) {
-        objects.for_each(function(object) {
-            var params;
+        objects.each(function(object) {
+            var params, uri, data, embeds, param, embed;
+
             if (params = xpath('.//param[@name="allowFullScreen"]', object)) {
-                params.for_each(function(param) { param.setAttribute('value', 'true') });
+                params.each(function(param) { param.setAttribute('value', 'true') });
             } else {
-                var param = document.createElement('param');
+                param = document.createElement('param');
                 param.setAttribute('name', 'allowFullScreen');
                 param.setAttribute('value', 'true');
                 object.appendChild(param);
             }
 
-            var uri;
             if (params = xpath('.//param[@name="movie" or @name="src"]', object)) {
-                params.for_each(function(param) {
+                params.each(function(param) {
                     // record the URI for later use
-                    uri = fs(param.getAttribute('value'));
+                    uri = addFullScreenParam(param.getAttribute('value'));
                     setSrc(param, uri, 'value');
                 });
             } else {
-                uri = fs(object.getAttribute('data'));
+                uri = addFullScreenParam(object.getAttribute('data'));
                 /*
                  * embeds clearly work without this,
                  * but while we're at it we may as well
                  * make this conform to YouTube's own
                  * embed code
                  */
-                var param = document.createElement('param');
+                param = document.createElement('param');
                 param.setAttribute('name', 'movie');
                 setSrc(param, uri, 'value');
                 object.appendChild(param);
             }
 
-            var data;
             if (data = object.getAttribute('data')) {
-                setSrc(object, fs(data), 'data');
+                setSrc(object, addFullScreenParam(data), 'data');
             } else {
                 setSrc(object, uri, 'data');
             }
 
-            var embeds;
             if (embeds = xpath('.//embed[@src]', object)) {
-                embeds.for_each(function(embed) {
+                embeds.each(function(embed) {
                     embed.setAttribute('allowfullscreen', 'true');
                     setSrc(embed, uri);
                 });
             } else {
-                var embed = document.createElement('embed');
+                embed = document.createElement('embed');
                 embed.setAttribute('allowfullscreen', 'true');
                 setSrc(embed, uri);
                 object.appendChild(embed);
@@ -214,8 +224,8 @@ function full_tube() {
     }
 
     if (iframes = xpath(IFRAMES)) {
-        iframes.for_each(function(iframe) {
-            var src = fs(iframe.getAttribute('src'));
+        iframes.each(function(iframe) {
+            var src = addFullScreenParam(iframe.getAttribute('src'), 'allowfullscreen');
 
             // replace youtube.com/v/xyz?foo=bar with youtube.com/embed/xyz?foo=bar
             if (src.match(/\/v\//)) {
@@ -223,9 +233,13 @@ function full_tube() {
             }
 
             setSrc(iframe, src);
+
+            ALLOW_FULL_SCREEN.forEach(function(name) {
+                iframe.setAttribute(name, 'true');
+            });
         });
     }
 }
 
-GM_registerMenuCommand('FullTube', full_tube);
-window.addEventListener('load', full_tube, false);
+GM_registerMenuCommand('FullTube', fullTube);
+window.addEventListener('load', fullTube, false);
