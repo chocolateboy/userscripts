@@ -4,15 +4,14 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.5.0
+// @version       0.5.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/
 // @include       https://reddit.com/
 // @include       http://*.reddit.com/
 // @include       https://*.reddit.com/
-// @include       /^http(s)?:\/\/([^.]+\.)?reddit\.com\/r\/[^\/]+\/$/
+// @include       /^http(s)?:\/\/([^.]+\.)?reddit\.com\/r\/[^\/]+\/?$/
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.js
-// @grant         GM_deleteValue
 // @grant         GM_getValue
 // @grant         GM_setValue
 // ==/UserScript==
