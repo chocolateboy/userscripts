@@ -2,8 +2,8 @@
 // optional: GM_registerMenuCommand
 
 jQuery.highlight = (function ($) {
-    var DEFAULT_ID = function($item) { return $item.attr('id') };
-    var DEFAULT_TARGET = function($item) { return $item };
+    var DEFAULT_ID = function ($item) { return $item.attr('id') };
+    var DEFAULT_TARGET = function ($item) { return $item };
     var DEFAULT_TTL = { days: 7 };
     var HIGHLIGHT_COLOR = '#FFFD66';
     var KEY = 'seen';
@@ -60,23 +60,28 @@ jQuery.highlight = (function ($) {
             return;
         }
 
-        items.each(function() {
+        var targetSelector = options.target || DEFAULT_TARGET;
+        var idSelector = options.id || DEFAULT_ID;
+
+        var getId = (typeof(idSelector) === 'function') ?
+            function (idArgs) { return select(idSelector, idArgs) },
+            function (idArgs) { return idArgs[1].attr(idSelector) };
+
+        items.each(function () {
             var $item = $(this);
-            var targetSelector = options.target || DEFAULT_TARGET;
             var targetArgs = [ this, $item ];
             var $target = select(targetSelector, targetArgs);
 
             if (!$target) {
-                console.warn('bad target: selector: %s, args: %s', targetSelector, targetArgs);
+                console.warn('bad target: selector: %s, args: %o', targetSelector, targetArgs);
                 return;
             }
 
-            var idSelector = options.id || DEFAULT_ID;
             var idArgs = [ this, $item, $target ];
-            var id = select(idSelector, idArgs);
+            var id = getId(idArgs);
 
             if (!id) {
-                console.warn('bad id: selector: %s, args: %s', idSelector, idArgs);
+                console.warn('bad id: selector: %s, args: %o', idSelector, idArgs);
                 return;
             }
 
@@ -90,7 +95,7 @@ jQuery.highlight = (function ($) {
 
         if (options.site) {
             var commandName = options.site + ' Highlighter: clear data';
-            GM_registerMenuCommand(commandName, function() { GM_deleteValue(KEY) });
+            GM_registerMenuCommand(commandName, function () { GM_deleteValue(KEY) });
         }
     }
 

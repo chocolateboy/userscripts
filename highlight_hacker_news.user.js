@@ -21,9 +21,8 @@
 
 $.highlight({
     ttl:    { days: 3 },
-    color:  '#FFFF00',
     item:   'span[id^=down_]',
-    target: function($item) { return $item.parent().parent().next() },
-    id:     function($item) { return $item.attr('id').replace('^down_', '') },
+    target: function ($item) { return $item.parent().parent().next() },
+    id:     function ($item) { return $item.attr('id').replace('^down_', '') },
     site:   'Hacker News'
 });

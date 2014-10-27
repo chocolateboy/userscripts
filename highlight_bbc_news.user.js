@@ -19,7 +19,7 @@ var WHITE = 'rgb(255, 255, 255)';
 
 function links() {
     return $('a.story, a.headline-anchor').not(
-        function() { return $(this).css('color') === WHITE }
+        function () { return $(this).css('color') === WHITE }
     );
 }
 
