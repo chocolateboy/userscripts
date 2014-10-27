@@ -64,7 +64,7 @@ jQuery.highlight = (function ($) {
         var idSelector = options.id || DEFAULT_ID;
 
         var getId = (typeof(idSelector) === 'function') ?
-            function (idArgs) { return select(idSelector, idArgs) },
+            function (idArgs) { return select(idSelector, idArgs) } :
             function (idArgs) { return idArgs[1].attr(idSelector) };
 
         items.each(function () {
