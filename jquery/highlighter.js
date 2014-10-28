@@ -13,6 +13,10 @@ jQuery.highlight = (function ($) {
         seconds: 1000
     };
 
+    // register this early so data can be cleared even if there's an error
+    var commandName = GM_info.script.name + ': clear data';
+    GM_registerMenuCommand(commandName, function () { GM_deleteValue(KEY) });
+
     function ttlToMilliseconds(ttl) {
         var ms = 0;
 
@@ -92,9 +96,6 @@ jQuery.highlight = (function ($) {
         });
 
         GM_setValue(KEY, JSON.stringify(seen));
-
-        var commandName = GM_info.script.name + ': clear data';
-        GM_registerMenuCommand(commandName, function () { GM_deleteValue(KEY) });
     }
 
     return highlight;
