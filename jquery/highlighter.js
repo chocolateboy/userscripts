@@ -1,5 +1,4 @@
-// required: jQuery, GM_deleteValue, GM_getValue, GM_setValue
-// optional: GM_registerMenuCommand
+// required: jQuery, GM_deleteValue, GM_getValue, GM_registerMenuCommand, GM_setValue
 
 jQuery.highlight = (function ($) {
     var DEFAULT_ID = function ($item) { return $item.attr('id') };
@@ -53,9 +52,9 @@ jQuery.highlight = (function ($) {
             }
         }
 
-        var items = select(options.item);
+        var $items = select(options.item);
 
-        if (!items) {
+        if (!$items) {
             console.warn('bad item: selector: %s', options.item);
             return;
         }
@@ -67,8 +66,9 @@ jQuery.highlight = (function ($) {
             function (idArgs) { return select(idSelector, idArgs) } :
             function (idArgs) { return idArgs[1].attr(idSelector) };
 
-        items.each(function () {
+        $items.each(function () {
             var $item = $(this);
+
             var targetArgs = [ this, $item ];
             var $target = select(targetSelector, targetArgs);
 
@@ -93,11 +93,9 @@ jQuery.highlight = (function ($) {
 
         GM_setValue(KEY, JSON.stringify(seen));
 
-        if (options.site) {
-            var commandName = options.site + ' Highlighter: clear data';
-            GM_registerMenuCommand(commandName, function () { GM_deleteValue(KEY) });
-        }
+        var commandName = GM_info.script.name + ': clear data';
+        GM_registerMenuCommand(commandName, function () { GM_deleteValue(KEY) });
     }
 
     return highlight;
-})(jQuery);
+}(jQuery));

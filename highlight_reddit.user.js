@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.7.0
+// @version       0.8.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/
 // @include       https://reddit.com/
@@ -25,6 +25,5 @@
 $.highlight({
     item:   'div#siteTable div.thing[data-fullname]',
     target: 'a.title',
-    id:     'data-fullname',
-    site:   'Reddit'
+    id:     'data-fullname'
 });

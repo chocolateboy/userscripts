@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news/
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.js
@@ -25,6 +25,5 @@ function links() {
 
 $.highlight({
     item: links,
-    id:   function ($item) { return $item.attr('href').replace(/\/+$/, '').split('/').pop() },
-    site: 'BBC News'
+    id:   function ($item) { return $item.attr('href').replace(/\/+$/, '').split('/').pop() }
 });

@@ -5,7 +5,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.3.0
+// @version       0.4.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://news.ycombinator.com/
 // @include       http://news.ycombinator.com/news
@@ -23,6 +23,5 @@ $.highlight({
     ttl:    { days: 3 },
     item:   'span[id^=down_]',
     target: function ($item) { return $item.parent().parent().next() },
-    id:     function ($item) { return $item.attr('id').replace('^down_', '') },
-    site:   'Hacker News'
+    id:     function ($item) { return $item.attr('id').replace('^down_', '') }
 });

@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://digg.com/
 // @include       https://digg.com/
@@ -20,6 +20,5 @@ $.highlight({
     ttl:    { days: 4 },
     item:   'article[data-content-id]',
     target: 'a.story-link',
-    id:     'data-content-id',
-    site:   'Digg'
+    id:     'data-content-id'
 });
