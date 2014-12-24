@@ -1,10 +1,12 @@
 // helper library for userscripts that mark up pages so that they can be navigated by keyboard
-// e.g. with Pentadactyl's "[[" (<previous-page>) and "]]" (<next-page>) keys
+// e.g. with Vimperator/Pentadactyl's "[[" (<previous-page>) and "]]" (<next-page>) keys
+//
+// rel porn: http://blog.unto.net/a-survey-of-rel-values-on-the-web.html
 
 jQuery.pagerizer = {
     // convert the list of strings to a lookup table:
     // [ "foo", "Bar", "BAZ" ] -> [ "foo": "foo", "bar": "Bar", "baz": "BAZ" ]
-    getStringListAsMap: function(stringList) {
+    getStringListAsMap: function (stringList) {
         var array;
 
         if (jQuery.isArray(stringList)) {
@@ -14,30 +16,37 @@ jQuery.pagerizer = {
         } else { // extract the map's values
             array = [];
             if (stringList) { // watch out for null/undefined
-                jQuery.each(stringList, function(key, value) { array.push(value) });
+                jQuery.each(stringList, function (key, value) { array.push(value) });
             }
         }
 
         var map = {};
-        array.forEach(function(it) { map[it.toLowerCase()] = it });
+        array.forEach(function (string) { map[string.toLowerCase()] = string });
         return map;
     },
 
     // note: this is based on getStringListAsMap to ensure that
     // duplicates are removed
-    getStringListAsArray: function(stringList) {
+    getStringListAsArray: function (stringList) {
         var map = this.getStringListAsMap(stringList);
-        return jQuery.map(map, function(key, value) { return value });
+        return jQuery.map(map, function (key, value) { return value });
     }
 };
 
-jQuery.fn.setStringList = function(attr, stringList, removeIfEmpty) {
+jQuery.fn.setStringList = function (attr, stringList, removeIfEmpty) {
     var array = jQuery.pagerizer.getStringListAsArray(stringList);
 
-    if (array.length) {
+    if (array.length === 0) {
+        // a non-empty rel in a link is invalid: remove the element
+        // https://squizlabs.github.io/HTML_CodeSniffer/Standards/WCAG2/Examples/H59.2a.Fail.html
+        // http://www.w3.org/TR/WCAG20-TECHS/H59
+        if (this.is('link')) {
+            this.remove();
+        } else if (removeIfEmpty) {
+            this.removeAttr(attr);
+        }
+    } else {
         this.attr(attr, array.join(' '));
-    } else if (removeIfEmpty) {
-        this.removeAttr(attr);
     }
 
     return this;
@@ -46,28 +55,39 @@ jQuery.fn.setStringList = function(attr, stringList, removeIfEmpty) {
 // return all A and LINK elements which have rel attributes that
 // include any of the supplied values. If no values are supplied,
 // default to: findRelLinks('prev', 'next')
+jQuery.fn.findRelLinks = function () {
+    var rels = arguments.length ?
+        jQuery.makeArray(arguments).map(function (rel) { return jQuery.trim(rel) }) :
+        [ 'prev', 'next' ];
 
-jQuery.fn.findRelLinks = function() {
-    var rels = arguments.length ? jQuery.makeArray(arguments).map(function(arg) { return jQuery.trim(arg) }) : [ 'prev', 'next' ];
-    var selector = rels.map(function(rel) { return 'a[rel~="%"], link[rel~="%"]'.replace(/%/g, rel) }).join(', ');
+    var selector = rels.map(function (rel) {
+        return 'a[rel~="%"], link[rel~="%"]'.replace(/%/g, rel)
+    }).join(', ');
+
     return this.find(selector);
 };
 
-jQuery.fn.addRel = function() {
-    var oldRels = jQuery.pagerizer.getStringListAsArray(this.attr('rel'));
+jQuery.fn.addRel = function () {
     var newRels = jQuery.makeArray(arguments);
-    this.setStringList('rel', oldRels.concat(newRels));
-    return this;
+
+    return this.each(function () {
+        var $this = $(this);
+        var oldRels = jQuery.pagerizer.getStringListAsArray($this.attr('rel'));
+        $this.setStringList('rel', oldRels.concat(newRels));
+    });
 };
 
-jQuery.fn.removeRel = function() {
-    var rels = jQuery.pagerizer.getStringListAsMap(this.attr('rel'));
+jQuery.fn.removeRel = function () {
+    var removeRels = jQuery.makeArray(arguments).map(function (rel) { return rel.toLowerCase() });
 
-    for (var i = 0; i < arguments.length; ++i) {
-        var canonicalRel = arguments[i].toLowerCase();
-        delete rels[canonicalRel];
-    }
+    return this.each(function () {
+        var $this = $(this);
+        var rels = jQuery.pagerizer.getStringListAsMap($this.attr('rel'));
 
-    this.setStringList('rel', rels);
-    return this;
+        for (var i = 0; i < removeRels.length; ++i) {
+            delete rels[removeRels[i]];
+        }
+
+        $this.setStringList('rel', rels, true);
+    });
 };
