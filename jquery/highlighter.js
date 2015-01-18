@@ -19,7 +19,7 @@ jQuery.highlight = (function ($) {
     var commandName = GM_info.script.name + ': clear data';
     GM_registerMenuCommand(commandName, function () { GM_deleteValue(KEY) });
 
-    function ttlToMilliseconds(ttl) {
+    function ttlToMilliseconds (ttl) {
         var ms = 0, key;
 
         for (key in ttl) {
@@ -29,15 +29,15 @@ jQuery.highlight = (function ($) {
         return ms;
     }
 
-    function select(selector, args) {
-        if (typeof(selector) === 'function') {
+    function select (selector, args) {
+        if (typeof selector === 'function') {
             return args ? selector.apply(args.shift(), args) : selector();
         } else {
             return args ? $(selector, args.shift()) : $(selector);
         }
     }
 
-    function highlight(options) {
+    function highlight (options) {
         // article ID -> cache expiry timestamp (epoch milliseconds)
         var seen = JSON.parse(GM_getValue(KEY, '{}'));
         // time-to-live: how long (in milliseconds) to cache IDs for
