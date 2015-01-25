@@ -19,5 +19,6 @@ $.highlight({
     item:   'article[data-news-id]',
     target: 'h2 a',
     id:     'data-news-id',
-    color:  '#FEFEE6'
+    color:  '#FFFFAB',
+    ttl:    { days: 14 }
 });
