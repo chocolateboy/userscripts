@@ -1,8 +1,8 @@
 // required: jQuery, GM_deleteValue, GM_getValue, GM_registerMenuCommand, GM_setValue
 
 jQuery.highlight = (function ($) {
-    var DEFAULT_ID     = function ($item) { return $item.attr('id') };
-    var DEFAULT_TARGET = function ($item) { return $item };
+    var DEFAULT_ID     = 'id';
+    var DEFAULT_TARGET = function () { return $(this) }; // i.e. $item
     var DEFAULT_TTL    = { days: 7 };
     var DEFAULT_COLOR  = '#FFFD66';
     var KEY            = 'seen';
@@ -17,6 +17,7 @@ jQuery.highlight = (function ($) {
 
     // register this early so data can be cleared even if there's an error
     var commandName = GM_info.script.name + ': clear data';
+
     GM_registerMenuCommand(commandName, function () { GM_deleteValue(KEY) });
 
     function ttlToMilliseconds (ttl) {
@@ -29,11 +30,15 @@ jQuery.highlight = (function ($) {
         return ms;
     }
 
-    function select (selector, args) {
-        if (typeof selector === 'function') {
-            return args ? selector.apply(args.shift(), args) : selector();
+    function select (name, selector, $this, args) {
+        var type = typeof selector;
+
+        if (type === 'function') {
+            return selector.apply($this, args || []);
+        } else if (type === 'string') {
+            return $(selector);
         } else {
-            return args ? $(selector, args.shift()) : $(selector);
+            throw new TypeError('invalid ' + name + ' selector: expected string or function, got: ' + type);
         }
     }
 
@@ -54,38 +59,18 @@ jQuery.highlight = (function ($) {
             }
         }
 
-        var $items = select(options.item);
-
-        if (!$items) {
-            console.warn('bad item: selector: %s', options.item);
-            return;
-        }
-
         var targetSelector = options.target || DEFAULT_TARGET;
         var idSelector = options.id || DEFAULT_ID;
 
         var getId = (typeof(idSelector) === 'function') ?
-            function (idArgs) { return select(idSelector, idArgs) } :
-            function (idArgs) { return idArgs[1].attr(idSelector) };
+            function (item, args) { return select('id', idSelector, item, args) } :
+            function (item) { return $(item).attr(idSelector) };
+
+        var $items = select('item', options.item);
 
         $items.each(function () {
-            var $item = $(this);
-
-            var targetArgs = [ this, $item ];
-            var $target = select(targetSelector, targetArgs);
-
-            if (!$target) {
-                console.warn('bad target: selector: %s, args: %o', targetSelector, targetArgs);
-                return;
-            }
-
-            var idArgs = [ this, $item, $target ];
-            var id = getId(idArgs);
-
-            if (!id) {
-                console.warn('bad id: selector: %s, args: %o', idSelector, idArgs);
-                return;
-            }
+            var $target = select('target', targetSelector, this);
+            var id = getId(this, [ $target ]);
 
             if (!seen[id]) {
                 $target.css('background-color', color);
