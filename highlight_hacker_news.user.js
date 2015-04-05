@@ -5,13 +5,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.4.0
+// @version       0.5.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://news.ycombinator.com/
 // @include       http://news.ycombinator.com/news
 // @include       https://news.ycombinator.com/
 // @include       https://news.ycombinator.com/news
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
 // @require       https://raw.github.com/chocolateboy/userscripts/master/jquery/highlighter.js
 // @grant         GM_deleteValue
 // @grant         GM_getValue
@@ -21,7 +21,7 @@
 
 $.highlight({
     ttl:    { days: 3 },
-    item:   'span[id^=down_]',
-    target: function ($item) { return $item.parent().parent().next() },
-    id:     function ($item) { return $item.attr('id').replace('^down_', '') }
+    item:   function () { return $('td a[id^=up_]').closest('tr') },
+    target: 'td.title a[href]',
+    id:     function () { return $(this).find('td a[id^=up_]').attr('id').replace('up_', '') }
 });
