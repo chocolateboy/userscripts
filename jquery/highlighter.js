@@ -36,7 +36,7 @@ jQuery.highlight = (function ($) {
         if (type === 'function') {
             return selector.apply($this, args || []);
         } else if (type === 'string') {
-            return $(selector);
+            return $(selector, $this || document);
         } else {
             throw new TypeError('invalid ' + name + ' selector: expected string or function, got: ' + type);
         }
