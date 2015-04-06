@@ -30,13 +30,14 @@ jQuery.highlight = (function ($) {
         return ms;
     }
 
-    function select (name, selector, $this, args) {
+    function select (name, selector, _context, args) {
+        var context = _context || document;
         var type = typeof selector;
 
         if (type === 'function') {
-            return selector.apply($this, args || []);
+            return selector.apply(context, args || []);
         } else if (type === 'string') {
-            return $(selector, $this || document);
+            return $(selector, context);
         } else {
             throw new TypeError('invalid ' + name + ' selector: expected string or function, got: ' + type);
         }
@@ -62,7 +63,7 @@ jQuery.highlight = (function ($) {
         var targetSelector = options.target || DEFAULT_TARGET;
         var idSelector = options.id || DEFAULT_ID;
 
-        var getId = (typeof(idSelector) === 'function') ?
+        var getId = (typeof idSelector === 'function') ?
             function (item, args) { return select('id', idSelector, item, args) } :
             function (item) { return $(item).attr(idSelector) };
 
