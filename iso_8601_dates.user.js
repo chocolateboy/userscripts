@@ -2,7 +2,7 @@
 // @name           ISO 8601 Dates
 // @namespace      https://github.com/chocolateboy/userscripts
 // @description    Convert US dates to the ISO 8601 YYYY-MM-DD format
-// @version        1.1.0
+// @version        1.1.1
 // @author         chocolateboy
 // @license        GPL: http://www.gnu.org/copyleft/gpl.html
 // @grant          GM_registerMenuCommand
@@ -40,6 +40,7 @@ function replace (match, m1, d1, y1, m2, d2, y2, offset, string) {
     // manual negative look-behind: see: http://blog.stevenlevithan.com/archives/mimic-lookbehind-javascript
     if (offset > 0) {
         var prefix = string[offset - 1];
+
         if ((prefix == '-') || (prefix == '/')) {
             return match;
         }
@@ -61,7 +62,7 @@ function replace (match, m1, d1, y1, m2, d2, y2, offset, string) {
     return year + '-' + month + '-' + day;
 }
 
-function fix_dates() {
+function fix_dates () {
     var nodes = document.evaluate(XPATH, document, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
 
     for (var i = 0; i < nodes.snapshotLength; ++i) {

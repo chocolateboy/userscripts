@@ -4,12 +4,12 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.2.0
+// @version       0.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.last.fm/*
 // @include       http://cn.last.fm/*
 // @include       http://www.lastfm.tld/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
 // @grant         GM_log
 // ==/UserScript==
 
@@ -27,13 +27,15 @@
                 <a href="/music/Artist+Name">
                     <span class="pictureFrame">
                         <span class="image">
-                            <img alt="" src="http://userserve-ak.last.fm/serve/xyz/{image_id}.png" height="126" width="126">
+                            <img alt="" src="http://userserve-ak.last.fm/serve/xyz/{image_id}.png"
+                                height="126" width="126">
                         </span>
                         <span class="overlay"></span>
                     </span>
                     <strong class="name">Artist Name</strong>
                 </a>
-                <a href="/user/username/library/music/Artist+Name?from=timestamp&amp;rangetype=range" class="plays" rel="nofollow">
+                <a href="/user/username/library/music/Artist+Name?from=timestamp&amp;rangetype=range"
+                    class="plays" rel="nofollow">
                     <span dir="ltr">(123&nbsp;plays)</span>
                 </a>
             </li>
@@ -47,7 +49,8 @@
                 <a href="/music/Artist+Name/+images/{image_id}">
                     <span class="pictureFrame">
                         <span class="image">
-                            <img alt="" src="http://userserve-ak.last.fm/serve/xyz/{image_id}.png" height="126" width="126">
+                            <img alt="" src="http://userserve-ak.last.fm/serve/xyz/{image_id}.png"
+                                height="126" width="126">
                         </span>
                         <span class="overlay"></span>
                     </span>
@@ -55,7 +58,8 @@
                 <a href="/music/Artist+Name">
                     <strong class="name">Artist Name</strong>
                 </a>
-                <a href="/user/username/library/music/Artist+Name?from=timestamp&amp;rangetype=range" class="plays" rel="nofollow">
+                <a href="/user/username/library/music/Artist+Name?from=timestamp&amp;rangetype=range"
+                    class="plays" rel="nofollow">
                     <span dir="ltr">(123&nbsp;plays)</span>
                 </a>
             </li>
@@ -78,13 +82,13 @@
 
 var SPLIT_LINKS = 'split_links';
 
-function split_links() {
+function split_links () {
     var $ul = $('ul.libraryItems');
     var seen = $ul.data(SPLIT_LINKS);
 
     if (!seen) {
         $ul.find('li a:first-child').each(
-            function() {
+            function () {
                 var $original_link = $(this);
                 var $artist_name = $original_link.find('.name').detach();
                 var $new_link = $('<a/>');

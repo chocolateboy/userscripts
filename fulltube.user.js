@@ -2,7 +2,7 @@
 // @name        FullTube
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Adds a full-screen button to embedded YouTube videos
-// @version     1.0.0
+// @version     1.1.0
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *
@@ -10,7 +10,7 @@
 // @exclude     http://*.youtube.com/*
 // @exclude     https://youtube.com/*
 // @exclude     https://*.youtube.com/*
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js
 // @require     https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
 // @grant       GM_registerMenuCommand
 // ==/UserScript==
@@ -18,9 +18,9 @@
 /*
  * @requires:
  *
- * jQuery 1.11.1 (for oldIE compatibility)
+ * jQuery 1.11.2 (for oldIE compatibility)
  *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.js
+ *     https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.js
  *
  * sprintf() for JavaScript
  *
@@ -96,12 +96,12 @@ var IFRAMES = '//iframe[(contains(@src, "youtube.com/embed/") or contains(@src, 
 
 var ALLOW_FULL_SCREEN = [ 'allowfullscreen', 'mozallowfullscreen', 'webkitallowfullscreen' ];
 
-function xpath(xpath, context) {
+function xpath (xpath, context) {
     var nodeList = document.evaluate(xpath, context || document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
     var length = nodeList.snapshotLength;
 
     if (length) {
-        nodeList.each = function(fn) {
+        nodeList.each = function (fn) {
             for (var i = 0; i < length; ++i) {
                 fn(nodeList.snapshotItem(i));
             }
@@ -112,7 +112,7 @@ function xpath(xpath, context) {
     }
 }
 
-function addFullScreenParam(uri, paramName) {
+function addFullScreenParam (uri, paramName) {
     var param, paramSet, paramAny;
 
     paramName || (paramName = 'fs');
@@ -134,7 +134,7 @@ function addFullScreenParam(uri, paramName) {
 // only set an element's src attribute (or equivalent) if the
 // supplied URI is different to the attribute's current value.
 // this reduces unnecessary reloading
-function setSrc(element, src, name) {
+function setSrc (element, src, name) {
     name || (name = 'src');
 
     if (!element.getAttribute(name) || (element.getAttribute(name) !== src)) {
@@ -142,11 +142,11 @@ function setSrc(element, src, name) {
     }
 }
 
-function fullTube() {
+function fullTube () {
     var embeds, objects, iframes;
 
     if (embeds = xpath(EMBEDS)) {
-        embeds.each(function(embed) {
+        embeds.each(function (embed) {
             var src = addFullScreenParam(embed.getAttribute('src'));
             var $embed;
 
@@ -157,6 +157,7 @@ function fullTube() {
             // full screen (in FF 16/Chromium 22), so wrap them; any remaining
             // object requirements will be handled below
             $embed = $(embed);
+
             if (!$embed.parent('object').length) {
                 $embed.wrap(
                     sprintf(
@@ -171,11 +172,11 @@ function fullTube() {
     }
 
     if (objects = xpath(OBJECTS)) {
-        objects.each(function(object) {
+        objects.each(function (object) {
             var params, uri, data, embeds, param, embed;
 
             if (params = xpath('.//param[@name="allowFullScreen"]', object)) {
-                params.each(function(param) { param.setAttribute('value', 'true') });
+                params.each(function (param) { param.setAttribute('value', 'true') });
             } else {
                 param = document.createElement('param');
                 param.setAttribute('name', 'allowFullScreen');
@@ -184,7 +185,7 @@ function fullTube() {
             }
 
             if (params = xpath('.//param[@name="movie" or @name="src"]', object)) {
-                params.each(function(param) {
+                params.each(function (param) {
                     // record the URI for later use
                     uri = addFullScreenParam(param.getAttribute('value'));
                     setSrc(param, uri, 'value');
@@ -210,7 +211,7 @@ function fullTube() {
             }
 
             if (embeds = xpath('.//embed[@src]', object)) {
-                embeds.each(function(embed) {
+                embeds.each(function (embed) {
                     embed.setAttribute('allowfullscreen', 'true');
                     setSrc(embed, uri);
                 });
@@ -224,7 +225,7 @@ function fullTube() {
     }
 
     if (iframes = xpath(IFRAMES)) {
-        iframes.each(function(iframe) {
+        iframes.each(function (iframe) {
             var src = addFullScreenParam(iframe.getAttribute('src'), 'allowfullscreen');
 
             // replace youtube.com/v/xyz?foo=bar with youtube.com/embed/xyz?foo=bar
@@ -234,7 +235,7 @@ function fullTube() {
 
             setSrc(iframe, src);
 
-            ALLOW_FULL_SCREEN.forEach(function(name) {
+            ALLOW_FULL_SCREEN.forEach(function (name) {
                 iframe.setAttribute(name, 'true');
             });
         });

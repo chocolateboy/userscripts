@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.2.0
+// @version       0.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://arstechnica.com/*
 // @include       http://*.arstechnica.com/*
 // @include       https://arstechnica.com/*
 // @include       https://*.arstechnica.com/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
 // @require       https://raw.github.com/chocolateboy/userscripts/master/jquery/pagerizer.js
 // @grant         none
 // ==/UserScript==
@@ -41,7 +41,7 @@
 */
 
 var $navbar = $('nav.page-numbers span.numbers');
-var $pageNumber = $navbar.contents().filter(function() {
+var $pageNumber = $navbar.contents().filter(function () {
     return this.nodeType == 3 && $.trim(this.nodeValue).match(/^\d+$/)
 });
 $pageNumber.prev().addRel('prev');

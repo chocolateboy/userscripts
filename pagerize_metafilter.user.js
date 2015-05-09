@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.metafilter.com/*
 // @include       http://metafilter.com/*
 // @include       https://*.metafilter.com/*
 // @include       https://metafilter.com/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
 // @require       https://raw.github.com/chocolateboy/userscripts/master/jquery/pagerizer.js
 // @grant         none
 // ==/UserScript==
@@ -27,12 +27,19 @@
 
    Top level:
 
-       <p class="copy">« <a href="/index.cfm?page=3" target="_self">Older posts</a> | <a href="/index.cfm?page=1" target="_self">Newer posts</a> »</p>
+       <p class="copy">
+           «
+           <a href="/index.cfm?page=3" target="_self">Older posts</a>
+               |
+           <a href="/index.cfm?page=1" target="_self">Newer posts</a>
+           »
+       </p>
 
    Article (these already work (with Pentadactyl)):
 
         <p class="copy whitesmallcopy" style="font-size:11px;">
-            <a href="/124972/Im-in-love-with-Massachusetts-And-the-neon-when-its-cold-outside" target="_self">« Older</a>
+            <a href="/124972/Im-in-love-with-Massachusetts-And-the-neon-when-its-cold-outside"
+                target="_self">« Older</a>
             A bill to declare "Roadrunner" the official rock s...&nbsp;&nbsp;
             |
             &nbsp;&nbsp;What does ONE BILLION look lik...

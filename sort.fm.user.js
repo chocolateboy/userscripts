@@ -3,13 +3,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.4
+// @version       2.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Sort last.fm tracklists by track number, track name, duration or number of listeners
 // @include       http://www.last.fm/music/*
 // @include       http://cn.last.fm/music/*
 // @include       http://www.lastfm.tld/music/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.js
+// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
 // @grant         GM_log
 // ==/UserScript==
 
@@ -31,36 +31,36 @@ var CELL = 0, EXTRACTOR = 1, SORT_ORDER = 2, SORT_TYPE = 3;
  *     0: CSS class name identifying the table header cell to attach the click event to and table body cell to sort by
  *     1: extractor function that takes a row and returns a sortable value from its designated field
  *     2: initial sort order i.e. the sort order we should use the first time we sort the column
- *     3: sort type: how the value extracted from a particular column is sorted: lexicographical for strings (e.g. track name),
- *        numeric for numbers (e.g. listeners)
+ *     3: sort type: how the value extracted from a particular column is sorted: lexicographical
+ *        for strings (e.g. track name), numeric for numbers (e.g. listeners)
  */
 var COLUMN_CONFIG = {
-    'position':  [ 'positionCell', extractPosition,  ASCENDING,  NUMERIC         ],
-    'track':     [ 'subjectCell',  extractTrack,     ASCENDING,  LEXICOGRAPHICAL ],
-    'duration':  [ 'durationCell', extractDuration,  ASCENDING,  NUMERIC         ],
-    'listeners': [ 'reachCell',    extractListeners, DESCENDING, NUMERIC         ]
+    position:  [ 'positionCell', extractPosition,  ASCENDING,  NUMERIC         ],
+    track:     [ 'subjectCell',  extractTrack,     ASCENDING,  LEXICOGRAPHICAL ],
+    duration:  [ 'durationCell', extractDuration,  ASCENDING,  NUMERIC         ],
+    listeners: [ 'reachCell',    extractListeners, DESCENDING, NUMERIC         ]
 };
 
 // --------------------------- extractors ------------------------------
 
 // extract the track position from a row
-function extractPosition(row, selector) {
+function extractPosition (row, selector) {
     return $.trim($(row).find(selector).text()) * 1;
 }
 
 // extract the track name from a row
-function extractTrack(row, selector) {
+function extractTrack (row, selector) {
     return $.trim($(row).find(selector).text());
 }
 
 // extract the track length from a row
-function extractDuration(row, selector) {
+function extractDuration (row, selector) {
     var duration = $(row).find(selector).text().match(/(\d+):(\d+)/);
     return duration[1] * 60 + duration[2] * 1;
 }
 
 // extract the number of listeners from a row
-function extractListeners(row, selector) {
+function extractListeners (row, selector) {
     return $(row).find(selector).text().replace(/\D+/g, '') * 1;
 }
 
@@ -71,17 +71,17 @@ function extractListeners(row, selector) {
 // specified column, and returns an integer which represents the ordering
 // of the rows: < 0 if a should precede b, 0 if they're equal, and > 0 if a
 // should follow b.
-function makeCompare(config, order) {
+function makeCompare (config, order) {
     var extract = config[EXTRACTOR];
     var selector = '.' + config[CELL];
     var sortType = config[SORT_TYPE];
 
     if (sortType === LEXICOGRAPHICAL) {
-        return function(a, b) {
+        return function (a, b) {
             return extract(a, selector).localeCompare(extract(b, selector)) * order;
         };
     } else { // numeric
-        return function(a, b) {
+        return function (a, b) {
             return (extract(a, selector) - extract(b, selector)) * order;
         };
     }
@@ -93,7 +93,7 @@ function makeCompare(config, order) {
  * Note: the column by which the table is initially sorted (i.e. position) is
  * special-cased as it has effectively been "pre-clicked" to ascending order by last.fm.
  */
-sortOrder = function() { // create a scope for variables that are persistent but local to this function
+sortOrder = function () { // create a scope for variables that are persistent but local to this function
     var lastSelectedColumn = INITIAL_SORTED_COLUMN;
     var cache = {};
 
@@ -112,8 +112,8 @@ sortOrder = function() { // create a scope for variables that are persistent but
 }();
 
 // return a function that sorts rows in the supplied container by the specified column
-function makeSortBy($rowContainer, column, config) {
-    return function() {
+function makeSortBy ($rowContainer, column, config) {
+    return function () {
         var $rows = $rowContainer.children('tr');
 
         // ascending (1) or descending (-1)
@@ -165,7 +165,7 @@ if ($table.length) {
         }
     }
 
-    $.each(COLUMN_CONFIG, function(column, config) {
+    $.each(COLUMN_CONFIG, function (column, config) {
         var $header = $thead.find('td.' + config[CELL]);
 
         if ($header.length) {

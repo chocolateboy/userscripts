@@ -3,11 +3,11 @@
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Automatically show the full plot summary on IMDb
 // @author      chocolateboy
-// @version     1.1.0
+// @version     1.2.0
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://*.imdb.tld/title/*/
 // @include     http://*.imdb.tld/title/*/?*
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
+// @require     https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
 // @grant       GM_log
 // ==/UserScript==
 
@@ -29,6 +29,7 @@ var $summary = $('p[itemprop=description]').has('a[href*="/plotsummary"]');
 if ($summary.length && $summary.clone().children().remove().end().text().match(/\S/)) {
     // the full summary (usually)
     var $storyline = $('div[itemprop="description"]');
+
     if ($storyline.length) {
         $summary.html($storyline.clone().find('em.nobr').remove().end());
     }
