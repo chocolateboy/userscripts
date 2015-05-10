@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.1
+// @version       2.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -79,11 +79,6 @@ var $CROSS_SHOP_LINKS, $LINK, $SEPARATOR; // the $ sigil denotes jQuery objects
 var addLink, displayLinks; // functions that depend on the site design
 
 /*********************** Functions ********************************/
-
-// dump an exception + stacktrace to the browser console
-function logError (e) {
-    GM_log(e + ': ' + e.stack);
-}
 
 // convenience function to reduce the verbosity of underscore.js chaining
 // see: http://github.com/documentcloud/underscore/issues/issue/37
@@ -168,22 +163,12 @@ function initializeConfig () {
         save: function () { removeLinks(); addLinks() }
     };
 
-    // guard against a GM_config bug
-    try {
-        GM_config.init('Amazon International Links Settings', checkboxes, callbacks);
-    } catch (e) {
-        logError(e);
-    }
+    GM_config.init('Amazon International Links Settings', checkboxes, callbacks);
 }
 
 // display the settings manager
 function showConfig () {
-    // guard against a GM_config bug
-    try {
-        GM_config.open();
-    } catch (e) {
-        logError(e);
-    }
+    GM_config.open();
 }
 
 // return the subset of the TLD -> country code map (SITES)
@@ -191,16 +176,7 @@ function showConfig () {
 function getConfiguredSites () {
     return __(SITES).keys().foldl(
         function (sites, tld) {
-            var enabled;
-
-            // guard against a GM_config bug
-            try {
-                enabled = GM_config.get(tld);
-            } catch (e) {
-                logError(e);
-            }
-
-            if (enabled) {
+            if (GM_config.get(tld)) {
                 sites[tld] = SITES[tld];
             }
 
