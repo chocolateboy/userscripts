@@ -4,9 +4,10 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.2.0
+// @version       0.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
+// @include       http://www.bbc.com/news
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
 // @require       https://raw.github.com/chocolateboy/userscripts/master/jquery/highlighter.js
 // @grant         GM_deleteValue
