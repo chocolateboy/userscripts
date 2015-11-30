@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/*/*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js
@@ -15,14 +15,15 @@
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
 function addLink () {
-    var latestCommit = $('div.commit-tease > span.right');
+    var $latestCommit = $('div.commit-tease.js-details-container > span.right')
+        .not(':has(#first-commit)')
 
-    if (latestCommit.length) {
+    if ($latestCommit.length) {
         var repo = $('title').text();
         var href = 'http://first-commit.com/' + repo;
 
-        latestCommit.prepend(
-            '<span>' +
+        $latestCommit.prepend(
+            '<span id="first-commit">' +
                 '<a class="message" href="' + href + '">First commit</a>' +
                 '&nbsp;|' +
             '</span>'
