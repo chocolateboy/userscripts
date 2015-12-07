@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name          GitHub First Commit
-// @description   Find a GitHub repo's first commit via http://first-commit.com
+// @description   Add a link to a GitHub repo's first commit via http://first-commit.com
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts

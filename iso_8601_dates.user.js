@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name           ISO 8601 Dates
 // @namespace      https://github.com/chocolateboy/userscripts
-// @description    Convert US dates to the ISO 8601 YYYY-MM-DD format
+// @description    Display US dates in the ISO 8601 YYYY-MM-DD format
 // @version        1.1.1
 // @author         chocolateboy
 // @license        GPL: http://www.gnu.org/copyleft/gpl.html
