@@ -19,7 +19,8 @@
 // adds the first-commit link to these pages as well:
 // var LATEST_COMMIT_SELECTOR = 'div.commit-tease > span.right';
 
-// this selector restricts the first-commit link to the repo's front page
+// this selector restricts the first-commit link to pages
+// with a latest-commit link
 var LATEST_COMMIT_SELECTOR = 'div.commit-tease.js-details-container > span.right';
 
 function addLink ($latestCommit) {
