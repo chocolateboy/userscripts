@@ -57,4 +57,4 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ## See Also
 
-* [USO Mirror](http://userscripts.org/users/3169/scripts)
+* [USO Mirror](http://userscripts-mirror.org/users/3169/scripts)
