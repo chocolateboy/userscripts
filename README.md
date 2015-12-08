@@ -64,10 +64,10 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 * [USO Mirror](http://userscripts-mirror.org/users/3169/scripts)
 
-## AUTHOR
+## Author
 
 [chocolateboy](mailto:chocolate@cpan.org)
 
-## LICENSE
+## License
 
 [GPL](http://www.gnu.org/copyleft/gpl.html)
