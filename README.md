@@ -42,7 +42,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### IMDb
 
-[IMDb Full Summary](https://github.com/chocolateboy/userscripts/raw/master/imdb_full_summary.user.js) - automatically show the full plot summary on IMDb
+* [IMDb Full Summary](https://github.com/chocolateboy/userscripts/raw/master/imdb_full_summary.user.js) - automatically show the full plot summary on IMDb
 
 ### Rotten Tomatoes
 
