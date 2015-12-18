@@ -4,10 +4,12 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
+// @include       http://*.imdb.tld/*/title/tt*
 // @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.js
+// @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getValue
 // @grant         GM_listValues
@@ -16,7 +18,24 @@
 // @grant         GM_xmlhttpRequest
 // ==/UserScript==
 
+/*
+ * OK:
+ *
+ * http://www.imdb.com/title/tt0309698/ - 4 items
+ * http://www.imdb.com/title/tt0086312/ - 3 items
+ * http://www.imdb.com/title/tt0037638/ - 2 items
+ *
+ * Fixed:
+ *
+ * http://www.imdb.com/title/tt0162346/ - 4 items
+ * http://www.imdb.com/title/tt0159097/ - 4 items
+ *
+ * Not aliased (yet):
+ *
+ * http://www.imdb.com/awards-central/title/tt2402927/
+ */
 const COMMAND_NAME    = GM_info.script.name + ': clear data'
+const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
 const CURRENT_YEAR    = new Date().getFullYear()
 const NOW             = Date.now()
 const ONE_HOUR        = 1000 * 60 * 60
@@ -39,6 +58,47 @@ function render ($target, { url, status, score }) {
     let style = STATUS_TO_STYLE[status]
 
     if ($target.hasClass('titleReviewBar')) {
+        // reduce the amount of space taken up by the Metacritic item
+        // and make it consistent with our style (i.e. site name rather
+        // than domain name)
+        $target.find('a[href="http://www.metacritic.com"]').text('Metacritic')
+
+        // 4 review items is too many for the "compact" layout (e.g.
+        // a poster but no trailer). it's designed for a maximum of 3.
+        // to work around this, we hoist the review bar out of the
+        // movie-info block (plot_summary_wrapper) and float it left
+        // beneath the poster e.g.:
+        //
+        // before:
+        //
+        // [  [        ] [                   ] ]
+        // [  [        ] [                   ] ]
+        // [  [ Poster ] [        Info       ] ]
+        // [  [        ] [                   ] ]
+        // [  [        ] [ [MC] [IMDb] [&c.] ] ]
+        //
+        // after:
+        //
+        // [  [        ] [                   ] ]
+        // [  [        ] [                   ] ]
+        // [  [ Poster ] [        Info       ] ]
+        // [  [        ] [                   ] ]
+        // [  [        ] [                   ] ]
+        // [                                   ]
+        // [  [RT] [MC] [IMDb] [&c.]           ]
+
+        if ($(COMPACT_LAYOUT).length && $target.find('.titleReviewBarItem').length > 2) {
+            let $clear = $('<div class="clear">&nbsp;</div>')
+
+            $('.plot_summary_wrapper').after($target.remove())
+
+            $target.before($clear).after($clear).css({
+                'float':          'left',
+                'padding-top':    '11px',
+                'padding-bottom': '0px'
+            })
+        }
+
         let rating = score === -1 ? 'N/A' : score
 
         let html = `
@@ -51,7 +111,7 @@ function render ($target, { url, status, score }) {
                    </div>
                    <div>
                        <span class="subText">
-                           From <a href="http://www.rottentomatoes.com" target="_blank">rottentomatoes.com</a>
+                           From <a href="http://www.rottentomatoes.com" target="_blank">Rotten Tomatoes</a>
                        </span>
                    </div>
                 </div>
@@ -73,22 +133,26 @@ function render ($target, { url, status, score }) {
 // register this first so data can be cleared even if there's an error
 GM_registerMenuCommand(COMMAND_NAME, function () { purgeCached(-1) })
 
+// make the background color more legible (darker) if the score is N/A
+GM_addStyle('.score_tbd { background-color: #D9D9D9 }')
+
 let $type = $('meta[property="og:type"')
-let $titleReviewBar = $('.titleReviewBar');
-let $starBox = $('.star-box-details');
+let $titleReviewBar = $('.titleReviewBar')
+let $starBox = $('.star-box-details')
 let $target = ($titleReviewBar.length && $titleReviewBar) || ($starBox.length && $starBox)
 
-if ($target && $type.length && $type.attr('content') === 'video.movie') {
+if ($target && $type.attr('content') === 'video.movie') {
     let $url = $('link[rel=canonical]')
 
     if ($url.length) {
         purgeCached(NOW)
 
-        let imdbId = $url.attr('href').match(/\/title\/tt(\d{7})\//)[1];
-        let cached = GM_getValue(imdbId);
+        let imdbId = $url.attr('href').match(/\/title\/tt(\d{7})\//)[1]
+        let cached = GM_getValue(imdbId)
 
         if (cached) {
-            if (!cached.error) render($target, JSON.parse(cached).data)
+            let rt = JSON.parse(cached)
+            if (!rt.error) render($target, rt.data)
         } else {
             let callback = (error, data, year) => {
                 if (error) {
