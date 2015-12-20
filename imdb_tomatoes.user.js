@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.0
+// @version       0.1.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -148,11 +148,10 @@ if ($target && $type.attr('content') === 'video.movie') {
         purgeCached(NOW)
 
         let imdbId = $url.attr('href').match(/\/title\/tt(\d{7})\//)[1]
-        let cached = GM_getValue(imdbId)
+        let cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
         if (cached) {
-            let rt = JSON.parse(cached)
-            if (!rt.error) render($target, rt.data)
+            if (!cached.error) render($target, cached.data)
         } else {
             let callback = (error, data, year) => {
                 if (error) {
