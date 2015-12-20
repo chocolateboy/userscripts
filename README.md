@@ -7,7 +7,6 @@
     - [GitHub](#github)
     - [IMDb](#imdb)
     - [Rotten Tomatoes](#rotten-tomatoes)
-    - [Wikipedia](#wikipedia)
     - [YouTube](#youtube)
 - [Misc](#misc)
 - [See Also](#see-also)
@@ -49,10 +48,6 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 ### Rotten Tomatoes
 
 * [More Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/more_tomatoes.user.js) - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
-
-### Wikipedia
-
-* [Wiki Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/wiki_tomatoes.user.js) - adds a Rotten Tomatoes link to Wikipedia film articles that contain an IMDb link
 
 ### YouTube
 
