@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.1
+// @version       0.1.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -34,6 +34,9 @@
  *
  * http://www.imdb.com/awards-central/title/tt2402927/
  */
+
+'use strict';
+
 const COMMAND_NAME    = GM_info.script.name + ': clear data'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
 const CURRENT_YEAR    = new Date().getFullYear()
