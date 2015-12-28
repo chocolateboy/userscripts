@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.1.2
+// @version       1.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -21,52 +21,101 @@
 /*
  * OK:
  *
- * http://www.imdb.com/title/tt0309698/ - 4 items
- * http://www.imdb.com/title/tt0086312/ - 3 items
- * http://www.imdb.com/title/tt0037638/ - 2 items
+ *     http://www.imdb.com/title/tt0309698/ - 4 widgets
+ *     http://www.imdb.com/title/tt0086312/ - 3 widgets
+ *     http://www.imdb.com/title/tt0037638/ - 2 widgets
  *
  * Fixed:
  *
- * http://www.imdb.com/title/tt0162346/ - 4 items
- * http://www.imdb.com/title/tt0159097/ - 4 items
+ *     Layout:
  *
- * Not aliased (yet):
+ *         http://www.imdb.com/title/tt0162346/ - 4 widgets
+ *         http://www.imdb.com/title/tt0159097/ - 4 widgets
  *
- * http://www.imdb.com/awards-central/title/tt2402927/
+ *     Fallback (RT doesn't have an alias, or has the wrong alias):
+ *
+ *         http://www.imdb.com/awards-central/title/tt2402927/ - Carol
+ *
+ *         http://www.imdb.com/title/tt0066921/ - A Clockwork Orange
+ *         http://www.imdb.com/title/tt0104070/ - Death Becomes Her
+ *         http://www.imdb.com/title/tt0363163/ - Downfall
+ *         http://www.imdb.com/title/tt0057115/ - The Great Escape
+ *         http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
+ *         http://www.imdb.com/title/tt0120768/ - The Negotiator
+ *         http://www.imdb.com/title/tt0910936/ - Pineapple Express
+ *         http://www.imdb.com/title/tt0145487/ - Spider Man
+ *         http://www.imdb.com/title/tt0120915/ - Star Wars: Episode I - The Phantom Menace
+ *         http://www.imdb.com/title/tt0448134/ - Sunshine
+ *         http://www.imdb.com/title/tt0129387/ - There's Something About Mary
+ *         http://www.imdb.com/title/tt0418279/ - Transformers
+ *
+ *    Diacritics:
+ *
+ *        http://www.imdb.com/title/tt0211915/ - Amélie
+ *
+ * Broken:
+ *
+ *     http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
  */
+
+// XXX unaliased and incorrectly aliased titles are common:
+// http://developer.rottentomatoes.com/forum/read/110751/2
 
 'use strict';
 
-const COMMAND_NAME    = GM_info.script.name + ': clear data'
+const COMMAND_NAME    = GM_info.script.name + ': clear cache'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
 const CURRENT_YEAR    = new Date().getFullYear()
+const NO_CONSENSUS    = /^The latest critic and user reviews, photos and cast info for\s+.+$/
 const NOW             = Date.now()
-const ONE_HOUR        = 1000 * 60 * 60
-const ONE_DAY         = ONE_HOUR * 24
+const ONE_DAY         = 1000 * 60 * 60 * 24
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
+
+// promisified cross-origin HTTP requests
+function get (url) {
+    return new Promise ((resolve, reject) => {
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url,
+            onload: function (res) { resolve(res.responseText) },
+            onerror: function (res) { reject(`error loading ${url}:`, res) },
+        })
+    })
+}
 
 // purge expired entries
 function purgeCached (date) {
     for (let key of GM_listValues()) {
         let entry = JSON.parse(GM_getValue(key))
-
-        if (date === -1 || date > entry.expires) {
-            GM_deleteValue(key)
-        }
+        if (date === -1 || date > entry.expires) GM_deleteValue(key)
     }
 }
 
-// prepend an item to the review bar or append a link to the star box
-function render ($target, { url, status, score }) {
+// prepend a widget to the review bar or append a link to the star box
+function render ($target, { consensus, score, url }) {
+    let status
+
+    if (score === -1) {
+        status = 'N/A'
+    } else if (score < 60) {
+        status = 'Rotten'
+    } else {
+        status = 'Fresh'
+    }
+
+    let altText = (consensus && consensus.length && !NO_CONSENSUS.test(consensus))
+        ? consensus.replace(/--/g, '—')
+        : status
+
     let style = STATUS_TO_STYLE[status]
 
     if ($target.hasClass('titleReviewBar')) {
-        // reduce the amount of space taken up by the Metacritic item
+        // reduce the amount of space taken up by the Metacritic widget
         // and make it consistent with our style (i.e. site name rather
         // than domain name)
         $target.find('a[href="http://www.metacritic.com"]').text('Metacritic')
 
-        // 4 review items is too many for the "compact" layout (e.g.
+        // 4 review widgets is too many for the "compact" layout (e.g.
         // a poster but no trailer). it's designed for a maximum of 3.
         // to work around this, we hoist the review bar out of the
         // movie-info block (plot_summary_wrapper) and float it left
@@ -106,7 +155,7 @@ function render ($target, { url, status, score }) {
 
         let html = `
             <div class="titleReviewBarItem">
-                <a href="${url}" title="${status}"><div
+                <a href="${url}" title="${altText}"><div
                     class="metacriticScore score_${style} titleReviewBarSubItem"><span>${rating}</span></div></a>
                <div class="titleReviewBarSubItem">
                    <div>
@@ -127,7 +176,7 @@ function render ($target, { url, status, score }) {
 
         let html = `
             <span class="ghost">|</span>
-            Rotten Tomatoes:&nbsp;<a href="${url}" title="${status}">${rating}</a>
+            Rotten Tomatoes:&nbsp;<a href="${url}" title="${altText}">${rating}</a>
         `
         $target.append(html)
     }
@@ -156,52 +205,106 @@ if ($target && $type.attr('content') === 'video.movie') {
         if (cached) {
             if (!cached.error) render($target, cached.data)
         } else {
-            let callback = (error, data, year) => {
-                if (error) {
-                    console.warn(error)
-                    let json = JSON.stringify({ expires: NOW + ONE_DAY, error })
-                    GM_setValue(imdbId, json)
-                } else {
-                    let expires = (year && year >= CURRENT_YEAR) ? NOW + ONE_HOUR : NOW + ONE_DAY
-                    let json = JSON.stringify({ expires, data })
+            let title = $('meta[property="og:title"]').attr('content').match(/^(.+?)\s+\(\d{4}\)$/)[1]
+            let imdb = { id: imdbId, title }
+            let url = `http://api.rottentomatoes.com/api/public/v1.0/movie_alias.json?id=${imdbId}&type=imdb`
+
+            get(url)
+                .then(json => processJSON(json, imdb))
+                .then(data => {
+                    let json = JSON.stringify({ expires: NOW + ONE_DAY, data })
                     GM_setValue(imdbId, json)
                     render($target, data)
-                }
-            }
-
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: `http://api.rottentomatoes.com/api/public/v1.0/movie_alias.json?type=imdb&id=${imdbId}`,
-                onload: function (response) { extractData(response, callback) },
-            })
+                })
+                .catch(error => {
+                    console.error(error)
+                    let json = JSON.stringify({ expires: NOW + ONE_DAY, error })
+                    GM_setValue(imdbId, json)
+                })
         }
     }
 }
 
-// process the RT response and call a callback with the extracted data
-// and the film's year. returning data rather than HTML allows the same
-// (cached) data to be rendered in the two targets (one of which — the
+// compare two film titles; return true if they're "equal" (disregarding case,
+// punctuation and diacritics); otherwise return false
+function matchTitle ($t1, $t2) {
+    let t1 = $t1.trim()
+    let t2 = $t2.trim()
+    let compare = t1.localeCompare(t2, [], { sensitivity: 'base', ignorePunctuation: true })
+
+    return compare === 0
+}
+
+// process RT's JSON response. returning data rather than HTML allows the
+// same (cached) data to be rendered in the two targets (one of which — the
 // review bar — is only visible to logged-in users)
-function extractData (response, callback) {
-    let rt = JSON.parse(response.responseText)
+function processJSON (json, imdb) {
+    let rt = JSON.parse(json)
+    let error
 
     if (rt.error) {
-        callback(rt.error)
-        return
+        error = `error retrieving JSON for tt${imdb.id} from RT API: ${rt.error}`
+    } else if (!matchTitle(rt.title, imdb.title)) {
+        let imdbTitle = JSON.stringify(imdb.title)
+        let rtTitle = JSON.stringify(rt.title)
+        error = `title mismatch for tt${imdb.id}: imdb: ${imdbTitle}, rt: ${rtTitle}`
     }
 
-    let score = rt.ratings.critics_score
-    let status
+    if (error) return tryExternalReviews(error, imdb)
 
-    if (score === -1) {
-        status = 'N/A'
-    } else if (score < 60) {
-        status = 'Rotten'
-    } else {
-        status = 'Fresh'
+    let data = {
+        consensus: rt.critics_consensus, // XXX this appears to always be an empty string
+        score:     rt.ratings.critics_score,
+        url:       rt.links.alternate,
     }
 
-    let data = { url: rt.links.alternate, status, score }
+    return data
+}
 
-    callback(null, data, rt.year)
+// fall back to querying the film's "External Reviews" page for
+// a Rotten Tomatoes link. if this doesn't work (no link, broken link)
+// raise the original error
+function tryExternalReviews (error, imdb) {
+    console.warn(`falling back on external reviews because: ${error}`)
+
+    // don't scrape the external-reviews link from IMDb's "Reviews" widget: IMDb is unreliable e.g.
+    //
+    //     http://www.imdb.com/awards-central/title/tt2402927/
+    //
+    // links to:
+    //
+    //     http://www.imdb.com/awards-central/title/tt2402927/externalreviews
+    //
+    // which doesn't exist...
+    let url = `/title/tt${imdb.id}/externalreviews`
+
+    return get(url)
+        .then(html => {
+            let $rtLink = $(html).find('a[href^="/offsite/?page-action=offsite-rottentomatoes&"]')
+
+            if ($rtLink.length) {
+                let url = $rtLink.attr('href')
+                console.log(`found RT link: ${url}`)
+                return get(url)
+            } else {
+                console.warn(`can't find RT link in ${url}`)
+                throw error
+            }
+        })
+        .then(html => {
+            try {
+                // XXX the use of `parseHTML` and `filter` here is difficult to
+                // explain beyond "because jQuery".
+                // use this instead? https://gist.github.com/cowboy/742952
+                let $html = $($.parseHTML(html))
+                let $meta = $html.filter('meta[name="twitter:data1"]')
+                let score = Number($meta.attr('content').match(/^(\d+)/)[1])
+                let consensus = $html.filter('meta[name=description]').attr('content')
+                let url = $html.filter('link[rel=canonical]').attr('href')
+
+                return { consensus, score, url }
+            } catch (e) {
+                throw `invalid RT link: ${e.message}`
+            }
+        })
 }
