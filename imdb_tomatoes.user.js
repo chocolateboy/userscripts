@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.0
+// @version       1.1.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -52,6 +52,10 @@
  *    Diacritics:
  *
  *        http://www.imdb.com/title/tt0211915/ - Amélie
+ *
+ *    Double quotes in the consensus:
+ *
+ *        http://www.imdb.com/title/tt3181822/ - The Boy Next Door
  *
  * Broken:
  *
@@ -103,7 +107,7 @@ function render ($target, { consensus, score, url }) {
     }
 
     let altText = (consensus && consensus !== 'N/A')
-        ? consensus.replace(/--/g, '—')
+        ? consensus.replace(/--/g, '—').replace(/"/g, '&#34;')
         : status
 
     let style = STATUS_TO_STYLE[status]
