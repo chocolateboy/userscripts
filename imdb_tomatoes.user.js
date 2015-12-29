@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.1
+// @version       1.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -16,6 +16,7 @@
 // @grant         GM_registerMenuCommand
 // @grant         GM_setValue
 // @grant         GM_xmlhttpRequest
+// @noframes
 // ==/UserScript==
 
 /*
