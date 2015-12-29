@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
+// @version       1.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -66,7 +66,6 @@
 const COMMAND_NAME    = GM_info.script.name + ': clear cache'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
 const CURRENT_YEAR    = new Date().getFullYear()
-const NO_CONSENSUS    = /^The latest critic and user reviews, photos and cast info for\s+.+$/
 const NOW             = Date.now()
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
@@ -103,7 +102,7 @@ function render ($target, { consensus, score, url }) {
         status = 'Fresh'
     }
 
-    let altText = (consensus && consensus.length && !NO_CONSENSUS.test(consensus))
+    let altText = (consensus && consensus !== 'N/A')
         ? consensus.replace(/--/g, '—')
         : status
 
@@ -207,7 +206,7 @@ if ($target && $type.attr('content') === 'video.movie') {
         } else {
             let title = $('meta[property="og:title"]').attr('content').match(/^(.+?)\s+\(\d{4}\)$/)[1]
             let imdb = { id: imdbId, title }
-            let url = `http://api.rottentomatoes.com/api/public/v1.0/movie_alias.json?id=${imdbId}&type=imdb`
+            let url = `http://www.omdbapi.com/?i=tt${imdbId}&r=json&tomatoes=true`
 
             get(url)
                 .then(json => processJSON(json, imdb))
@@ -235,30 +234,31 @@ function matchTitle ($t1, $t2) {
     return compare === 0
 }
 
-// process RT's JSON response. returning data rather than HTML allows the
+// process the OMDb API's JSON response. returning data rather than HTML allows the
 // same (cached) data to be rendered in the two targets (one of which — the
 // review bar — is only visible to logged-in users)
 function processJSON (json, imdb) {
     let rt = JSON.parse(json)
     let error
 
-    if (rt.error) {
-        error = `error retrieving JSON for tt${imdb.id} from RT API: ${rt.error}`
-    } else if (!matchTitle(rt.title, imdb.title)) {
+    if (rt.Error) {
+        error = `can't retrieve JSON from the OMDb API: ${rt.Error}`
+    } else if (!matchTitle(rt.Title, imdb.title)) {
         let imdbTitle = JSON.stringify(imdb.title)
-        let rtTitle = JSON.stringify(rt.title)
-        error = `title mismatch for tt${imdb.id}: imdb: ${imdbTitle}, rt: ${rtTitle}`
+        let rtTitle = JSON.stringify(rt.Title)
+        error = `title mismatch: imdb: ${imdbTitle}, rt: ${rtTitle}`
+    } else if (!rt.tomatoURL || rt.tomatoURL === 'N/A') {
+        error = 'no Rotten Tomatoes URL defined'
     }
 
-    if (error) return tryExternalReviews(error, imdb)
-
-    let data = {
-        consensus: rt.critics_consensus, // XXX this appears to always be an empty string
-        score:     rt.ratings.critics_score,
-        url:       rt.links.alternate,
+    if (error) {
+        error = `error querying data for tt${imdb.id}: ${error}`
+        return tryExternalReviews(error, imdb)
     }
 
-    return data
+    let score = rt.tomatoMeter === 'N/A' ? -1 : Number(rt.tomatoMeter)
+
+    return { consensus: rt.tomatoConsensus, score, url: rt.tomatoURL }
 }
 
 // fall back to querying the film's "External Reviews" page for
