@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.2.0
+// @version       1.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -70,10 +70,11 @@
 
 const COMMAND_NAME    = GM_info.script.name + ': clear cache'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
-const CURRENT_YEAR    = new Date().getFullYear()
 const NOW             = Date.now()
 const ONE_DAY         = 1000 * 60 * 60 * 24
+const ONE_WEEK        = ONE_DAY * 7
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
+const THIS_YEAR       = new Date().getFullYear()
 
 // promisified cross-origin HTTP requests
 function get (url) {
@@ -82,7 +83,8 @@ function get (url) {
             method: 'GET',
             url,
             onload: function (res) { resolve(res.responseText) },
-            onerror: function (res) { reject(`error loading ${url}:`, res) },
+            // XXX the onerror response object doesn't contain any useful info
+            onerror: function (res) { reject(`error loading ${url}`) },
         })
     })
 }
@@ -212,17 +214,19 @@ if ($target && $type.attr('content') === 'video.movie') {
             let title = $('meta[property="og:title"]').attr('content').match(/^(.+?)\s+\(\d{4}\)$/)[1]
             let imdb = { id: imdbId, title }
             let url = `http://www.omdbapi.com/?i=tt${imdbId}&r=json&tomatoes=true`
+            let imdbYear = 0 | $('meta[property="og:title"]').attr('content').match(/\((\d{4})\)$/)[1]
+            let expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
 
             get(url)
                 .then(json => processJSON(json, imdb))
                 .then(data => {
-                    let json = JSON.stringify({ expires: NOW + ONE_DAY, data })
+                    let json = JSON.stringify({ expires, data })
                     GM_setValue(imdbId, json)
                     render($target, data)
                 })
                 .catch(error => {
                     console.error(error)
-                    let json = JSON.stringify({ expires: NOW + ONE_DAY, error })
+                    let json = JSON.stringify({ expires, error })
                     GM_setValue(imdbId, json)
                 })
         }
