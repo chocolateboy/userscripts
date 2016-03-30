@@ -37,7 +37,6 @@
  *
  *         http://www.imdb.com/awards-central/title/tt2402927/ - Carol
  *
- *         http://www.imdb.com/title/tt0066921/ - A Clockwork Orange
  *         http://www.imdb.com/title/tt0104070/ - Death Becomes Her
  *         http://www.imdb.com/title/tt0363163/ - Downfall
  *         http://www.imdb.com/title/tt0057115/ - The Great Escape
@@ -60,6 +59,7 @@
  *
  * Broken:
  *
+ *     http://www.imdb.com/title/tt0066921/ - A Clockwork Orange
  *     http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
  */
 
@@ -121,7 +121,7 @@ function render ($target, { consensus, score, url }) {
         // than domain name)
         $target.find('a[href="http://www.metacritic.com"]').text('Metacritic')
 
-        // 4 review widgets is too many for the "compact" layout (e.g.
+        // 4 review widgets is too many for the "compact" layout (i.e.
         // a poster but no trailer). it's designed for a maximum of 3.
         // to work around this, we hoist the review bar out of the
         // movie-info block (plot_summary_wrapper) and float it left
