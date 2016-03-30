@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.4.0
+// @version       0.4.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://digg.com/
 // @include       https://digg.com/
@@ -19,7 +19,7 @@
 $.highlight({
     ttl:    { days: 4 },
     item:   function () {
-        return $('article[data-content-id]')
+        return $('article[data-content-id][data-primary-tag-slug]')
             .not('[data-primary-tag-slug="apps-we-digg"]')
             .not('[data-primary-tag-slug="digg-store"]')
     },
