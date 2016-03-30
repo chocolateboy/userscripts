@@ -37,7 +37,7 @@ jQuery.fn.setStringList = function (attr, stringList, removeIfEmpty) {
     var array = jQuery.pagerizer.getStringListAsArray(stringList);
 
     if (array.length === 0) {
-        // a non-empty rel in a link is invalid: remove the element
+        // an empty rel attribute in a LINK is invalid: remove the element
         // https://squizlabs.github.io/HTML_CodeSniffer/Standards/WCAG2/Examples/H59.2a.Fail.html
         // http://www.w3.org/TR/WCAG20-TECHS/H59
         if (this.is('link')) {
