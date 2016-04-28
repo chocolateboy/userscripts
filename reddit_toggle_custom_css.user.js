@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           Reddit - Toggle Custom CSS
-// @description    Enable/disable subreddit-specific CSS
+// @description    Enable/disable subreddit-specific CSS via a userscript command
 // @author         chocolateboy
 // @namespace      https://github.com/chocolateboy/userscripts
 // @include        http://reddit.com/r/*
