@@ -48,7 +48,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### Reddit
 
-* [Toggle Custom CSS](https://github.com/chocolateboy/userscripts/raw/master/reddit_toggle_custom_css.user.js) - persistently toggle custom styles off/on on subreddits.
+* [Toggle Custom CSS](https://github.com/chocolateboy/userscripts/raw/master/reddit_toggle_custom_css.user.js) - persistently toggle custom styles off/on on subreddits
 
 ### Rotten Tomatoes
 
