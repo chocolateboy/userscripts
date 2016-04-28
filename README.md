@@ -45,6 +45,10 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 * [IMDb Full Summary](https://github.com/chocolateboy/userscripts/raw/master/imdb_full_summary.user.js) - automatically show the full plot summary on IMDb
 * [IMDb Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/imdb_tomatoes.user.js) - add Rotten Tomatoes ratings to IMDb movie pages
 
+### Reddit
+
+* [Toggle Custom CSS](https://github.com/chocolateboy/userscripts/raw/master/reddit_toggle_custom_css.user.js) - persistently toggle custom styles off/on on subreddits.
+
 ### Rotten Tomatoes
 
 * [More Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/more_tomatoes.user.js) - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
