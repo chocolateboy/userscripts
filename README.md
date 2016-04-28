@@ -6,6 +6,7 @@
     - [Amazon](#amazon)
     - [GitHub](#github)
     - [IMDb](#imdb)
+    - [Reddit](#reddit)
     - [Rotten Tomatoes](#rotten-tomatoes)
     - [YouTube](#youtube)
 - [Misc](#misc)
