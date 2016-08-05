@@ -12,7 +12,7 @@
 - [Misc](#misc)
 - [See Also](#see-also)
 - [Author](#author)
-- [License](#license)
+- [Copyright and License](#copyright-and-license)
 
 ## Highlighters
 
