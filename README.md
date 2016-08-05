@@ -26,7 +26,7 @@ Highlight new stories since the last time a site was visited
 
 ## Pagerizers
 
-These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <code>[[</code> and <code>]]</code> on Vimperator, Pentadactyl &c.
+These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <code>[[</code> and <code>]]</code> in Vimperator, Pentadactyl &c.
 
 * [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ars_technica.user.js)
 * [Metafilter](https://github.com/chocolateboy/userscripts/raw/master/pagerize_metafilter.user.js)
@@ -72,6 +72,9 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 [chocolateboy](mailto:chocolate@cpan.org)
 
-## License
+## Copyright and License
 
-[GPL](http://www.gnu.org/copyleft/gpl.html)
+Copyright © 2011-2016 by chocolateboy
+
+These userscripts are free software; you can redistribute and/or modify them under the
+terms of the [GPL](http://www.gnu.org/copyleft/gpl.html).
