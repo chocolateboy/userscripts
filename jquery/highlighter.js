@@ -5,6 +5,7 @@ jQuery.highlight = (function ($) {
     var DEFAULT_TARGET = function () { return $(this) }; // i.e. $item
     var DEFAULT_TTL    = { days: 7 };
     var DEFAULT_COLOR  = '#FFFD66';
+    var HIGHLIGHTED    = 'github-com-chocolateboy-userscripts-jquery-highlighter-highlighted';
     var KEY            = 'seen';
 
     var TTL = (function (ttl) {
@@ -45,13 +46,21 @@ jQuery.highlight = (function ($) {
 
     function highlight (options) {
         // article ID -> cache expiry timestamp (epoch milliseconds)
-        var seen = JSON.parse(GM_getValue(KEY, '{}'));
+        var seen = debug ? {} : JSON.parse(GM_getValue(KEY, '{}'));
+
         // time-to-live: how long (in milliseconds) to cache IDs for
         var ttl = ttlToMilliseconds(options.ttl || DEFAULT_TTL);
+
         // the background color of the target element(s)
         var color = options.color || DEFAULT_COLOR;
+
         // the current date/time in epoch milliseconds
         var now = new Date().getTime();
+
+        // if true, the cache is neither read from or written to.
+        // this allows userscripts to be modified and reloaded
+        // without having to manually clear the cache each time
+        var debug = options.debug;
 
         // purge expired IDs
         for (var id in seen) {
@@ -67,20 +76,41 @@ jQuery.highlight = (function ($) {
             function (item, args) { return select('id', idSelector, item, args) } :
             function (item) { return $(item).attr(idSelector) };
 
+        var onHighlight = options.onHighlight || function () {};
+
         var $items = select('item', options.item);
 
-        $items.each(function () {
-            var $target = select('target', targetSelector, this);
-            var id = getId(this, [ $target ]);
+        function processItems ($items) {
+            $items.each(function () {
+                var $target = select('target', targetSelector, this);
+                var id = getId(this, [ $target ]);
 
-            if (!seen[id]) {
-                $target.css('background-color', color);
-                seen[id] = now + ttl;
+                if (!seen[id]) {
+                    $target.css('background-color', color);
+                    $target.addClass(HIGHLIGHTED);
+                    onHighlight.call(this, $target, { id: id, color: color });
+                    seen[id] = now + ttl;
+                }
+            });
+
+            if (!debug) {
+                GM_setValue(KEY, JSON.stringify(seen));
             }
-        });
+        }
 
-        GM_setValue(KEY, JSON.stringify(seen));
+        // handle dynamically-created items if the jQuery-onMutate plugin is loaded
+        var $document = $(document);
+
+        if ($document.onCreate && (typeof options.item === 'string')) {
+            $document.onCreate(options.item, processItems, true);
+        }
+
+        // handle the statically-defined items
+        processItems($items);
     }
+
+    highlight.className = HIGHLIGHTED;
+    highlight['class']  = '.' + HIGHLIGHTED;
 
     return highlight;
 }(jQuery));
