@@ -1,11 +1,11 @@
 // required: jQuery, GM_deleteValue, GM_getValue, GM_registerMenuCommand, GM_setValue
 
 jQuery.highlight = (function ($) {
+    var CLASS          = 'github-com-chocolateboy-userscripts-jquery-highlighter-highlighted';
     var DEFAULT_ID     = 'id';
     var DEFAULT_TARGET = function () { return $(this) }; // i.e. $item
     var DEFAULT_TTL    = { days: 7 };
     var DEFAULT_COLOR  = '#FFFD66';
-    var HIGHLIGHTED    = 'github-com-chocolateboy-userscripts-jquery-highlighter-highlighted';
     var KEY            = 'seen';
 
     var TTL = (function (ttl) {
@@ -57,7 +57,7 @@ jQuery.highlight = (function ($) {
         // the current date/time in epoch milliseconds
         var now = new Date().getTime();
 
-        // if true, the cache is neither read from or written to.
+        // if true, the cache is neither read from nor written to.
         // this allows userscripts to be modified and reloaded
         // without having to manually clear the cache each time
         var debug = options.debug;
@@ -87,7 +87,7 @@ jQuery.highlight = (function ($) {
 
                 if (!seen[id]) {
                     $target.css('background-color', color);
-                    $target.addClass(HIGHLIGHTED);
+                    $target.addClass(CLASS);
                     onHighlight.call(this, $target, { id: id, color: color });
                     seen[id] = now + ttl;
                 }
@@ -109,8 +109,8 @@ jQuery.highlight = (function ($) {
         processItems($items);
     }
 
-    highlight.className = HIGHLIGHTED;
-    highlight['class']  = '.' + HIGHLIGHTED;
+    highlight.className = CLASS;
+    highlight['class']  = '.' + CLASS;
 
     return highlight;
 }(jQuery));

@@ -7,8 +7,8 @@
 // @include        https://reddit.com/r/*
 // @include        http://*.reddit.com/r/*
 // @include        https://*.reddit.com/r/*
-// @require        https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.js
-// @version        0.0.1
+// @require        https://code.jquery.com/jquery-2.2.4.min.js
+// @version        0.0.2
 // @run-at         document-start
 // @grant          GM_addStyle
 // @grant          GM_deleteValue
@@ -17,11 +17,7 @@
 // @grant          GM_registerMenuCommand
 // ==/UserScript==
 
-// original: http://userscripts.org/scripts/show/109818 AKA
-// https://github.com/chocolateboy/userscripts/blob/master/maintenance/reddit_toggle_custom_styles.user.js
-
-// XXX jQuery 2.2.3 was released on 2016-04-05. Why isn't it available on Google's CDN
-// on 2016-04-28?
+// original: http://userscripts-mirror.org/scripts/show/109818
 
 // Why this remix? Because a) I don't use the other toggles (and the Unix philosophy
 // suggests they should be separate userscripts) and b) several subreddits mangle the
@@ -29,7 +25,7 @@
 // Also, this is much easier to understand/maintain.
 
 var SUBREDDIT = location.pathname.match(/\/r\/(\w+)/)[1];
-var CUSTOM_CSS = 'link[title="applied_subreddit_stylesheet"]'
+var CUSTOM_CSS = 'link[title="applied_subreddit_stylesheet"]';
 
 function toggle () {
     var disableCss = !GM_getValue(SUBREDDIT, false);
