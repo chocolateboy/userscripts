@@ -8,7 +8,6 @@
     - [IMDb](#imdb)
     - [Reddit](#reddit)
     - [Rotten Tomatoes](#rotten-tomatoes)
-    - [YouTube](#youtube)
 - [Misc](#misc)
 - [See Also](#see-also)
 - [Author](#author)
@@ -53,11 +52,6 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 ### Rotten Tomatoes
 
 * [More Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/more_tomatoes.user.js) - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
-
-### YouTube
-
-* [FullTube](https://github.com/chocolateboy/userscripts/raw/master/fulltube.user.js) - adds a full-screen button to embedded YouTube videos
-* [YouTube Hide Recommended Videos](https://github.com/chocolateboy/userscripts/raw/master/youtube_sidebar_hide_recommended_videos.user.js) - remove "Recommended for you" videos from the sidebar on YouTube video pages
 
 ### Misc
 
