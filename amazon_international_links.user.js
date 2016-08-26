@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.2
+// @version       2.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -34,36 +34,15 @@
 // @include       https://www.amazon.in/*
 // @include       https://www.amazon.it/*
 // @include       https://www.amazon.nl/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js
+// @require       https://code.jquery.com/jquery-3.1.0.min.js
 // @require       https://raw.github.com/sizzlemctwizzle/GM_config/master/gm_config.js
-// @require       https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
-// @require       https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js
+// @require       https://raw.githubusercontent.com/alexei/sprintf.js/1.0.3/dist/sprintf.min.js
+// @require       https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.15.0/lodash.min.js
 // @grant         GM_registerMenuCommand
 // @grant         GM_log
 // @grant         GM_getValue
 // @grant         GM_setValue
 // ==/UserScript==
-
-/*
- * @requires:
- *
- * jQuery 2.1.3
- *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
- *
- * GM_config
- *
- *     https://github.com/sizzlemctwizzle/GM_config/wiki
- *
- * sprintf() for JavaScript
- *
- *     http://www.diveintojavascript.com/projects/javascript-sprintf
- *     https://github.com/alexei/sprintf.js
- *
- * underscore.js utility library
- *
- *     http://jashkenas.github.io/underscore/
- */
 
 /*
  *
@@ -142,7 +121,7 @@ function initializeConstants (asin) {
 
 // build the underlying data model used by the GM_config utility
 function initializeConfig () {
-    var checkboxes = __(SITES).keys().foldl(
+    var checkboxes = __(SITES).keys().reduce(
         function (fields, tld) {
             var country = SITES[tld];
 
@@ -174,7 +153,7 @@ function showConfig () {
 // return the subset of the TLD -> country code map (SITES)
 // corresponding to the enabled sites
 function getConfiguredSites () {
-    return __(SITES).keys().foldl(
+    return __(SITES).keys().reduce(
         function (sites, tld) {
             if (GM_config.get(tld)) {
                 sites[tld] = SITES[tld];
