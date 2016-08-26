@@ -4,24 +4,16 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.3.0
+// @version       0.4.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://arstechnica.com/*
 // @include       http://*.arstechnica.com/*
 // @include       https://arstechnica.com/*
 // @include       https://*.arstechnica.com/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.js
+// @require       https://code.jquery.com/jquery-3.1.0.min.js
 // @require       https://raw.github.com/chocolateboy/userscripts/master/jquery/pagerizer.js
 // @grant         none
 // ==/UserScript==
-
-/*
- * @requires:
- *
- * jQuery 2.0.3
- *
- *     https://ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.js
- */
 
 /*
     http://arstechnica.com/information-technology/2010/01/video-editing-in-linux-a-look-at-pitivi-and-kdenlive/2/

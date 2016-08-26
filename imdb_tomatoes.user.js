@@ -4,11 +4,11 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.3.0
+// @version       1.4.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.js
+// @require       https://code.jquery.com/jquery-3.1.0.min.js
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getValue
