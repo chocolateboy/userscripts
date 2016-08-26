@@ -54,13 +54,13 @@ jQuery.highlight = (function ($) {
         // the background color of the target element(s)
         var color = options.color || DEFAULT_COLOR;
 
-        // the current date/time in epoch milliseconds
-        var now = new Date().getTime();
-
         // if true, the cache is neither read from nor written to.
         // this allows userscripts to be modified and reloaded
         // without having to manually clear the cache each time
         var debug = options.debug;
+
+        // the current date/time in epoch milliseconds
+        var now = new Date().getTime();
 
         // purge expired IDs
         for (var id in seen) {
@@ -71,6 +71,7 @@ jQuery.highlight = (function ($) {
 
         var targetSelector = options.target || DEFAULT_TARGET;
         var idSelector = options.id || DEFAULT_ID;
+        var itemSelector = options.item;
 
         var getId = (typeof idSelector === 'function') ?
             function (item, args) { return select('id', idSelector, item, args) } :
@@ -78,7 +79,7 @@ jQuery.highlight = (function ($) {
 
         var onHighlight = options.onHighlight || function () {};
 
-        var $items = select('item', options.item);
+        var $items = select('item', itemSelector);
 
         function processItems ($items) {
             $items.each(function () {
@@ -101,8 +102,8 @@ jQuery.highlight = (function ($) {
         // handle dynamically-created items if the jQuery-onMutate plugin is loaded
         var $document = $(document);
 
-        if ($document.onCreate && (typeof options.item === 'string')) {
-            $document.onCreate(options.item, processItems, true);
+        if ($document.onCreate && (typeof itemSelector === 'string')) {
+            $document.onCreate(itemSelector, processItems, true);
         }
 
         // handle the statically-defined items
