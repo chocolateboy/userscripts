@@ -54,11 +54,11 @@ jQuery.fn.setStringList = function (attr, stringList, removeIfEmpty) {
 
 // return all A and LINK elements which have rel attributes that
 // include any of the supplied values. If no values are supplied,
-// default to: findRelLinks('prev', 'next')
+// default to: findRelLinks('prev', 'previous', 'next')
 jQuery.fn.findRelLinks = function () {
     var rels = arguments.length ?
         jQuery.makeArray(arguments).map(function (rel) { return jQuery.trim(rel) }) :
-        [ 'prev', 'next' ];
+        [ 'prev', 'previous', 'next' ];
 
     var selector = rels.map(function (rel) {
         return 'a[rel~="%"], link[rel~="%"]'.replace(/%/g, rel)

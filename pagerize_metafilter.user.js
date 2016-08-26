@@ -16,34 +16,18 @@
 // ==/UserScript==
 
 /*
-
-   Top level:
-
-       <p class="copy">
-           «
+   <p class="copy">
+       «
            <a href="/index.cfm?page=3" target="_self">Older posts</a>
-               |
+           |
            <a href="/index.cfm?page=1" target="_self">Newer posts</a>
-           »
-       </p>
-
-   Article (these already work (with Pentadactyl)):
-
-        <p class="copy whitesmallcopy" style="font-size:11px;">
-            <a href="/124972/Im-in-love-with-Massachusetts-And-the-neon-when-its-cold-outside"
-                target="_self">« Older</a>
-            A bill to declare "Roadrunner" the official rock s...&nbsp;&nbsp;
-            |
-            &nbsp;&nbsp;What does ONE BILLION look lik...
-            <a href="/124974/One-Billion-Rising" target="_self">Newer »</a>
-        </p>
+       »
+   </p>
 */
 
-// if there's only one link, it must be to an older page, since the
-// oldest page (currently http://www.metafilter.com/index.cfm?page=2443)
-// still has both links, even though its "Older" link target doesn't exist (yet).
-// another way of looking at it is that the "Older" link appears (and
-// is the first page navigation link) on every page
 var $links = $('p.copy').not('.whitesmallcopy').find('a[href]');
-$links.eq(0).addRel('prev'); // always exists
-$links.eq(1).addRel('next'); // always exists (apart from on the first/front page)
+
+// use "previous" rather than "prev" (or both) to work around a bug in Vimperator:
+// https://github.com/vimperator/vimperator-labs/pull/570
+$links.eq(0).addRel('previous');
+$links.eq(1).addRel('next');
