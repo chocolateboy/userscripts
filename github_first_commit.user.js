@@ -4,11 +4,11 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
+// @version       1.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/*/*
-// @require       https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js
-// @require       https://raw.githubusercontent.com/eclecto/jQuery-onMutate/master/jquery.onmutate.min.js
+// @require       https://code.jquery.com/jquery-3.1.0.min.js
+// @require       https://raw.githubusercontent.com/eclecto/jQuery-onMutate/v1.4.2/src/jquery.onmutate.min.js
 // @grant         GM_log
 // ==/UserScript==
 
@@ -17,11 +17,11 @@
 
 // there's a per-file latest-commit link on every file page. this selector
 // adds the first-commit link to these pages as well:
-// var LATEST_COMMIT_SELECTOR = 'div.commit-tease > span.right';
+// var LATEST_COMMIT_SELECTOR = 'div.commit-tease > span.float-right';
 
 // this selector restricts the first-commit link to pages
 // with a latest-commit link
-var LATEST_COMMIT_SELECTOR = 'div.commit-tease.js-details-container > span.right';
+var LATEST_COMMIT_SELECTOR = 'div.commit-tease.js-details-container > span.float-right';
 
 function addLink ($latestCommit) {
     if ($latestCommit.not(':has(#first-commit)').length) {
