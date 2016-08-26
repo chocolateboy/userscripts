@@ -2,7 +2,7 @@
 // @name        FullTube
 // @namespace   https://github.com/chocolateboy/userscripts
 // @description Adds a full-screen button to embedded YouTube videos
-// @version     1.1.0
+// @version     1.2.0
 // @author      chocolateboy
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     *
@@ -10,22 +10,10 @@
 // @exclude     http://*.youtube.com/*
 // @exclude     https://youtube.com/*
 // @exclude     https://*.youtube.com/*
-// @require     https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js
-// @require     https://sprintf.googlecode.com/files/sprintf-0.7-beta1.js
+// @require     https://code.jquery.com/jquery-3.1.0.min.js
+// @require     https://raw.githubusercontent.com/alexei/sprintf.js/1.0.3/dist/sprintf.min.js
 // @grant       GM_registerMenuCommand
 // ==/UserScript==
-
-/*
- * @requires:
- *
- * jQuery 1.11.2 (for oldIE compatibility)
- *
- *     https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.js
- *
- * sprintf() for JavaScript
- *
- *     http://www.diveintojavascript.com/projects/javascript-sprintf
- */
 
 /*
  * 1) Iterate over all YouTube embed elements and make sure:
