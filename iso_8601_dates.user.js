@@ -2,9 +2,10 @@
 // @name           ISO 8601 Dates
 // @namespace      https://github.com/chocolateboy/userscripts
 // @description    Display US dates in the ISO 8601 YYYY-MM-DD format
-// @version        1.1.1
+// @version        1.2.0
 // @author         chocolateboy
 // @license        GPL: http://www.gnu.org/copyleft/gpl.html
+// @exclude        *
 // @grant          GM_registerMenuCommand
 // ==/UserScript==
 
@@ -16,7 +17,7 @@ var DATE  = new RegExp(
     'g'
 );
 
-//             Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
+//          Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec
 var days = [ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
 
 function leap_year (year) {
