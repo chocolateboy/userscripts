@@ -20,6 +20,11 @@
 // ==/UserScript==
 
 /*
+ * Broken:
+ *
+ *     http://www.imdb.com/title/tt5642184/
+ *     http://www.imdb.com/title/tt4180738/
+ *
  * OK:
  *
  *     http://www.imdb.com/title/tt0309698/ - 4 widgets

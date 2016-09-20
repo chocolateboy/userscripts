@@ -1,14 +1,12 @@
 // ==UserScript==
 // @name          Hacker News Highlighter
 // @description   Highlight new stories on the Hacker News front page
-// @author        Shaun G (original)
 // @author        chocolateboy
+// @author        Shaun G (original)
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.6.0
+// @version       0.6.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
-// @include       http://news.ycombinator.com/
-// @include       http://news.ycombinator.com/news
 // @include       https://news.ycombinator.com/
 // @include       https://news.ycombinator.com/news
 // @require       https://code.jquery.com/jquery-3.1.0.min.js
