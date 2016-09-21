@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name          Hacker News Date Tooltips
-// @description   Decrypt the "n days ago" timestamps on Hacker News with YYYY-MM-DD tooltips
+// @description   Deobfuscate the "n days ago" dates on Hacker News with YYYY-MM-DD tooltips
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts

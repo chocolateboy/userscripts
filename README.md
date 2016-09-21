@@ -5,6 +5,7 @@
 - [Sites](#sites)
     - [Amazon](#amazon)
     - [GitHub](#github)
+    - [Hacker News](#hacker-news)
     - [IMDb](#imdb)
     - [Reddit](#reddit)
     - [Rotten Tomatoes](#rotten-tomatoes)
@@ -39,6 +40,10 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 ### GitHub
 
 * [GitHub First Commit](https://github.com/chocolateboy/userscripts/raw/master/github_first_commit.user.js) - add a link to a GitHub repo's [first commit](http://first-commit.com)
+
+### Hacker News
+
+* [Hacker News Date Tooltips](https://github.com/chocolateboy/userscripts/raw/master/hacker_news_date_tooltips.user.js) - deobfuscate the "n days ago" dates on Hacker News with YYYY-MM-DD tooltips
 
 ### IMDb
 
