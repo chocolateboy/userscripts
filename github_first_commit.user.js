@@ -4,11 +4,11 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.0
+// @version       1.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/*/*
-// @require       https://code.jquery.com/jquery-3.1.0.min.js
-// @require       https://raw.githubusercontent.com/eclecto/jQuery-onMutate/v1.4.2/src/jquery.onmutate.min.js
+// @require       https://code.jquery.com/jquery-3.1.1.min.js
+// @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/v1.4.2/src/jquery.onmutate.min.js
 // @grant         GM_log
 // ==/UserScript==
 
