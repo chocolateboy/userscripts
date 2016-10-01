@@ -29,6 +29,7 @@ Highlight new stories since the last time a site was visited
 
 These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <code>[[</code> and <code>]]</code> in Vimperator, Pentadactyl &c.
 
+* [Amazon](https://github.com/chocolateboy/userscripts/raw/master/pagerize_amazon.user.js)
 * [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ars_technica.user.js)
 * [eBay](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ebay.user.js)
 * [Metafilter](https://github.com/chocolateboy/userscripts/raw/master/pagerize_metafilter.user.js)
@@ -45,7 +46,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### Google
 
-* [Google DWIMages](https://github.com/chocolateboy/userscripts/raw/master/google_dwimages.user.js) - Direct links to images and pages on Google Images
+* [Google DWIMages](https://github.com/chocolateboy/userscripts/raw/master/google_dwimages.user.js) - direct links to images and pages on Google Images
 
 ### Hacker News
 
