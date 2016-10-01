@@ -30,6 +30,7 @@ Highlight new stories since the last time a site was visited
 These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <code>[[</code> and <code>]]</code> in Vimperator, Pentadactyl &c.
 
 * [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ars_technica.user.js)
+* [eBay](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ebay.user.js)
 * [Metafilter](https://github.com/chocolateboy/userscripts/raw/master/pagerize_metafilter.user.js)
 
 ## Sites
