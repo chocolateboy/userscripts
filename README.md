@@ -5,6 +5,7 @@
 - [Sites](#sites)
     - [Amazon](#amazon)
     - [GitHub](#github)
+    - [Google](#google)
     - [Hacker News](#hacker-news)
     - [IMDb](#imdb)
     - [Reddit](#reddit)
@@ -40,6 +41,10 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 ### GitHub
 
 * [GitHub First Commit](https://github.com/chocolateboy/userscripts/raw/master/github_first_commit.user.js) - add a link to a GitHub repo's [first commit](http://first-commit.com)
+
+### Google
+
+* [Google DWIMages](https://github.com/chocolateboy/userscripts/raw/master/google_dwimages.user.js) - Direct links to images and pages on Google Images
 
 ### Hacker News
 
