@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           Reddit - Toggle Custom CSS
-// @description    Persistently enable/disable subreddit-specific CSS via a userscript command
+// @description    Persistently disable/re-enable subreddit-specific CSS via a userscript command
 // @author         chocolateboy
 // @namespace      https://github.com/chocolateboy/userscripts
 // @include        http://reddit.com/r/*
@@ -8,7 +8,7 @@
 // @include        http://*.reddit.com/r/*
 // @include        https://*.reddit.com/r/*
 // @require        https://code.jquery.com/jquery-3.1.1.min.js
-// @version        0.0.3
+// @version        0.0.4
 // @run-at         document-start
 // @grant          GM_addStyle
 // @grant          GM_deleteValue
