@@ -4,11 +4,11 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.4.0
+// @version       1.5.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
-// @require       https://code.jquery.com/jquery-3.1.0.min.js
+// @require       https://code.jquery.com/jquery-3.1.1.min.js
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getValue
@@ -25,6 +25,29 @@
  *     http://www.imdb.com/title/tt5642184/
  *     http://www.imdb.com/title/tt4180738/
  *
+ *     The following links are broken with the OMDB API (which is currently being used),
+ *     but work with the RT API (which was previously being used) i.e.
+ *     they didn't work; they were fixed; and now they're broken again.
+ *
+ *     The RT API reports the title used on RT, whereas the OMDB API uses the IMDB title.
+ *     Previously, if the RT title didn't match the IMDb title, we would skip the API data
+ *     and scrape it instead from the RT page (found via /externalreviews).
+ *
+ *     FIXME We can't fall back to scraping for that reason currently (we can still fall
+ *     back if a film is missing from the OMDB) because the OMDB API doesn't expose the RT title.
+ *
+ *         http://www.imdb.com/title/tt0104070/ - Death Becomes Her
+ *         http://www.imdb.com/title/tt0363163/ - Downfall
+ *         http://www.imdb.com/title/tt0057115/ - The Great Escape
+ *         http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
+ *         http://www.imdb.com/title/tt0120768/ - The Negotiator
+ *         http://www.imdb.com/title/tt0910936/ - Pineapple Express
+ *         http://www.imdb.com/title/tt0120915/ - Star Wars: Episode I - The Phantom Menace
+ *         http://www.imdb.com/title/tt0448134/ - Sunshine
+ *         http://www.imdb.com/title/tt0129387/ - There's Something About Mary
+ *         http://www.imdb.com/title/tt0418279/ - Transformers
+ *         http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
+ *
  * OK:
  *
  *     http://www.imdb.com/title/tt0309698/ - 4 widgets
@@ -38,22 +61,6 @@
  *         http://www.imdb.com/title/tt0162346/ - 4 widgets
  *         http://www.imdb.com/title/tt0159097/ - 4 widgets
  *
- *     Fallback (RT doesn't have an alias, or has the wrong alias):
- *
- *         http://www.imdb.com/awards-central/title/tt2402927/ - Carol
- *
- *         http://www.imdb.com/title/tt0104070/ - Death Becomes Her
- *         http://www.imdb.com/title/tt0363163/ - Downfall
- *         http://www.imdb.com/title/tt0057115/ - The Great Escape
- *         http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
- *         http://www.imdb.com/title/tt0120768/ - The Negotiator
- *         http://www.imdb.com/title/tt0910936/ - Pineapple Express
- *         http://www.imdb.com/title/tt0145487/ - Spider Man
- *         http://www.imdb.com/title/tt0120915/ - Star Wars: Episode I - The Phantom Menace
- *         http://www.imdb.com/title/tt0448134/ - Sunshine
- *         http://www.imdb.com/title/tt0129387/ - There's Something About Mary
- *         http://www.imdb.com/title/tt0418279/ - Transformers
- *
  *    Diacritics:
  *
  *        http://www.imdb.com/title/tt0211915/ - Amélie
@@ -62,10 +69,9 @@
  *
  *        http://www.imdb.com/title/tt3181822/ - The Boy Next Door
  *
- * Broken:
+ *    Title mismatch:
  *
- *     http://www.imdb.com/title/tt0066921/ - A Clockwork Orange
- *     http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
+ *        http://www.imdb.com/title/tt2193215/ - The Counsellor ("The Counselor" in the OMDB API)
  */
 
 // XXX unaliased and incorrectly aliased titles are common:
@@ -80,6 +86,14 @@ const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
 const THIS_YEAR       = new Date().getFullYear()
+
+// return undefined if the jQuery object's length is 0; otherwise, return
+// the result of calling `fn` with the jQuery object as its parameter
+jQuery.fn.ifExists = function ifExists (fn) {
+    if (this.length) {
+        return fn(this)
+    }
+}
 
 // promisified cross-origin HTTP requests
 function get (url) {
@@ -103,7 +117,7 @@ function purgeCached (date) {
 }
 
 // prepend a widget to the review bar or append a link to the star box
-function render ($target, { consensus, score, url }) {
+function affixRT ($target, { consensus, score, url }) {
     let status
 
     if (score === -1) {
@@ -193,57 +207,14 @@ function render ($target, { consensus, score, url }) {
     }
 }
 
-// register this first so data can be cleared even if there's an error
-GM_registerMenuCommand(COMMAND_NAME, function () { purgeCached(-1) })
-
-// make the background color more legible (darker) if the score is N/A
-GM_addStyle('.score_tbd { background-color: #D9D9D9 }')
-
-let $type = $('meta[property="og:type"')
-let $titleReviewBar = $('.titleReviewBar')
-let $starBox = $('.star-box-details')
-let $target = ($titleReviewBar.length && $titleReviewBar) || ($starBox.length && $starBox)
-
-if ($target && $type.attr('content') === 'video.movie') {
-    let $url = $('link[rel=canonical]')
-
-    if ($url.length) {
-        purgeCached(NOW)
-
-        let imdbId = $url.attr('href').match(/\/title\/tt(\d{7})\//)[1]
-        let cached = JSON.parse(GM_getValue(imdbId, 'null'))
-
-        if (cached) {
-            if (!cached.error) render($target, cached.data)
-        } else {
-            let title = $('meta[property="og:title"]').attr('content').match(/^(.+?)\s+\(\d{4}\)$/)[1]
-            let imdb = { id: imdbId, title }
-            let url = `http://www.omdbapi.com/?i=tt${imdbId}&r=json&tomatoes=true`
-            let imdbYear = 0 | $('meta[property="og:title"]').attr('content').match(/\((\d{4})\)$/)[1]
-            let expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
-
-            get(url)
-                .then(json => processJSON(json, imdb))
-                .then(data => {
-                    let json = JSON.stringify({ expires, data })
-                    GM_setValue(imdbId, json)
-                    render($target, data)
-                })
-                .catch(error => {
-                    console.error(error)
-                    let json = JSON.stringify({ expires, error })
-                    GM_setValue(imdbId, json)
-                })
-        }
-    }
-}
-
 // compare two film titles; return true if they're "equal" (disregarding case,
 // punctuation and diacritics); otherwise return false
-function matchTitle ($t1, $t2) {
-    let t1 = $t1.trim()
-    let t2 = $t2.trim()
-    let compare = t1.localeCompare(t2, [], { sensitivity: 'base', ignorePunctuation: true })
+function matchTitle (t1, t2) {
+    let compare = t1.trim().localeCompare(
+        t2.trim(),
+        [],
+        { sensitivity: 'base', ignorePunctuation: true }
+    )
 
     return compare === 0
 }
@@ -257,7 +228,7 @@ function processJSON (json, imdb) {
 
     if (rt.Error) {
         error = `can't retrieve JSON from the OMDb API: ${rt.Error}`
-    } else if (!matchTitle(rt.Title, imdb.title)) {
+    } else if (!(matchTitle(rt.Title, imdb.title) || (imdb.originalTitle && matchTitle(rt.Title, imdb.originalTitle)))) {
         let imdbTitle = JSON.stringify(imdb.title)
         let rtTitle = JSON.stringify(rt.Title)
         error = `title mismatch: imdb: ${imdbTitle}, rt: ${rtTitle}`
@@ -321,4 +292,54 @@ function tryExternalReviews (error, imdb) {
                 throw `invalid RT link: ${e.message}`
             }
         })
+}
+
+// register this first so data can be cleared even if there's an error
+GM_registerMenuCommand(COMMAND_NAME, function () { purgeCached(-1) })
+
+// make the background color more legible (darker) if the score is N/A
+GM_addStyle('.score_tbd { background-color: #D9D9D9 }')
+
+let $type = $('meta[property="og:type"')
+let $titleReviewBar = $('.titleReviewBar')
+let $starBox = $('.star-box-details')
+let $target = ($titleReviewBar.length && $titleReviewBar) || ($starBox.length && $starBox)
+
+if ($target && $type.attr('content') === 'video.movie') {
+    let $link = $('link[rel=canonical]')
+
+    if ($link.length) {
+        purgeCached(NOW)
+
+        let imdbId = $link.attr('href').match(/\/title\/tt(\d{7})\//)[1]
+        let cached = JSON.parse(GM_getValue(imdbId, 'null'))
+
+        if (cached) {
+            if (cached.error) {
+                console.warn(cache.error)
+            } else {
+                affixRT($target, cached.data)
+            }
+        } else {
+            let title = $('meta[property="og:title"]').attr('content').match(/^(.+?)\s+\(\d{4}\)$/)[1]
+            let originalTitle = $('.originalTitle').ifExists(it => it.contents().get(0).nodeValue)
+            let imdb = { id: imdbId, title, originalTitle }
+            let url = `https://www.omdbapi.com/?i=tt${imdbId}&r=json&tomatoes=true`
+            let imdbYear = 0 | $('meta[property="og:title"]').attr('content').match(/\((\d{4})\)$/)[1]
+            let expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
+
+            get(url)
+                .then(json => processJSON(json, imdb))
+                .then(data => {
+                    let json = JSON.stringify({ expires, data })
+                    GM_setValue(imdbId, json)
+                    affixRT($target, data)
+                })
+                .catch(error => {
+                    console.error(error)
+                    let json = JSON.stringify({ expires, error })
+                    GM_setValue(imdbId, json)
+                })
+        }
+    }
 }
