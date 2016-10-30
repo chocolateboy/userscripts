@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.8.0
+// @version       0.8.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
 // @include       http://www.bbc.com/news
@@ -79,7 +79,7 @@ function target () {
 function id () {
     return $(this).attr('href')
         .replace(SITE, '')
-        // don't treat a comment link as a new link e.g. identify:
+        // don't treat links with fragments as new links e.g. identify:
         //
         // "/sport/cricket/37815544/#story-footer"                   as "/sport/cricket/37815544"
         // "/news/video_and_audio/headlines/37804620#video-37804620" as "/news/video_and_audio/headlines/37804620"
