@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.4.0
+// @version       0.5.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.echojs.com/
 // @require       https://code.jquery.com/jquery-3.1.1.min.js
@@ -20,5 +20,5 @@ $.highlight({
     target: 'h2 a',
     id:     'data-news-id',
     color:  '#FFFFAB',
-    ttl:    { days: 14 }
+    ttl:    { days: 28 }
 });
