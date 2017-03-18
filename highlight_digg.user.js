@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.8.0
+// @version       0.9.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://digg.com/
 // @include       https://digg.com/
@@ -17,14 +17,19 @@
 // ==/UserScript==
 
 $.highlight({
-    ttl:    { days: 4 },
-    item:   function () {
+    ttl: { days: 4 },
+    item: function () {
         return $('article[data-content-id][data-primary-tag-slug]')
             .not('[data-primary-tag-slug="apps-we-digg"]')
             .not('[data-primary-tag-slug="digg-picks"]')
             .not('[data-primary-tag-slug="digg-store"]')
-            .not('[data-primary-tag-slug="donaldtrump"]')
+            // The "Donald Trump News" channel is the only
+            // non-news article with a data-primary-tag-slug attribute,
+            // so we need something else to exclude it from highlighting.
+            // we can't use the slug ("donaldtrump") as it's also used
+            // for Trump-related news articles, so we use its unique ID
+            .not('[data-content-id="2bcqtJ7"]')
     },
     target: 'a.digg-story__title-link',
-    id:     'data-content-id'
+    id: 'data-content-id'
 });
