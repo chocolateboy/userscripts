@@ -80,7 +80,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ## Copyright and License
 
-Copyright © 2011-2016 by chocolateboy
+Copyright © 2011-2017 by chocolateboy
 
 These userscripts are free software; you can redistribute and/or modify them under the
 terms of the [GPL](http://www.gnu.org/copyleft/gpl.html).
