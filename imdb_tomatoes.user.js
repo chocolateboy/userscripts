@@ -4,13 +4,16 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.6.0
+// @version       1.7.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.2.0.min.js
+// @require       https://cdn.rawgit.com/chocolateboy/jquery.balloon.js/040c0a3e/jquery.balloon.js
+// @resource      updates https://cdn.rawgit.com/chocolateboy/corrigenda/v0.0.1/omdb/omdb-tomatoes.json
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
+// @grant         GM_getResourceText
 // @grant         GM_getValue
 // @grant         GM_listValues
 // @grant         GM_registerMenuCommand
@@ -20,13 +23,15 @@
 // ==/UserScript==
 
 /*
- * Broken:
+ * OK:
  *
- *     No RT link:
+ *     http://www.imdb.com/title/tt0309698/ - 4 widgets
+ *     http://www.imdb.com/title/tt0086312/ - 3 widgets
+ *     http://www.imdb.com/title/tt0037638/ - 2 widgets
  *
- *         http://www.imdb.com/title/tt5642184/
+ * Fixed:
  *
- *     Link to the wrong movie:
+ *     Link to the wrong movie [1]:
  *
  *         http://www.imdb.com/title/tt0104070/ - Death Becomes Her
  *         http://www.imdb.com/title/tt0057115/ - The Great Escape
@@ -36,32 +41,53 @@
  *         http://www.imdb.com/title/tt0448134/ - Sunshine
  *         http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
  *
- * OK:
- *
- *     http://www.imdb.com/title/tt0309698/ - 4 widgets
- *     http://www.imdb.com/title/tt0086312/ - 3 widgets
- *     http://www.imdb.com/title/tt0037638/ - 2 widgets
- *
- * Fixed:
- *
  *     Layout:
  *
  *         http://www.imdb.com/title/tt0162346/ - 4 widgets
  *         http://www.imdb.com/title/tt0159097/ - 4 widgets
+ *
+ * Misc:
+ *
+ *     No RT link:
+ *
+ *         http://www.imdb.com/title/tt5642184/
+ *
  */
 
-// XXX unaliased and incorrectly aliased titles are common:
+// [1] unaliased and incorrectly aliased titles are common:
 // http://web.archive.org/web/20151105080717/http://developer.rottentomatoes.com/forum/read/110751/2
 
 'use strict';
 
 const COMMAND_NAME    = GM_info.script.name + ': clear cache'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
+const DATA_VERSION    = 2 // version of each cached record; updated whenever the schema changes
+const DEBUG           = false
+const NO_CONSENSUS    = 'No consensus yet.'
 const NOW             = Date.now()
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
 const THIS_YEAR       = new Date().getFullYear()
+
+const BALLOON_OPTIONS = {
+    classname: 'rt-consensus-balloon',
+    contents: 'Loading...',
+    css: {
+        maxWidth: '500px',
+        fontFamily: 'sans-serif',
+        fontSize: '0.9rem',
+        padding: '12px',
+    },
+    html: true,
+    position: 'bottom right',
+}
+
+function debug (message) {
+    if (DEBUG) {
+        console.warn(message)
+    }
+}
 
 // promisified cross-origin HTTP requests
 function get (url) {
@@ -79,13 +105,23 @@ function get (url) {
 // purge expired entries
 function purgeCached (date) {
     for (let key of GM_listValues()) {
-        let entry = JSON.parse(GM_getValue(key))
-        if (date === -1 || date > entry.expires) GM_deleteValue(key)
+        let value = JSON.parse(GM_getValue(key))
+
+        if (value.version !== DATA_VERSION) {
+            debug(`purging invalid value (obsolete version): ${key}`)
+            GM_deleteValue(key)
+        } else if (date === -1 || date > value.expires) {
+            debug(`purging expired value: ${key}`)
+            GM_deleteValue(key)
+        } else {
+            debug(`cached: ${key} => ${JSON.stringify(value)}`)
+        }
     }
 }
 
 // prepend a widget to the review bar or append a link to the star box
-function affixRT ($target, { consensus, score, url }) {
+function affixRT ($target, data, storeData) {
+    let { consensus, score, url } = data
     let status
 
     if (score === -1) {
@@ -95,10 +131,6 @@ function affixRT ($target, { consensus, score, url }) {
     } else {
         status = 'Fresh'
     }
-
-    let altText = (consensus && consensus !== 'N/A')
-        ? consensus.replace(/--/g, '—').replace(/"/g, '&#34;')
-        : status
 
     let style = STATUS_TO_STYLE[status]
 
@@ -148,8 +180,8 @@ function affixRT ($target, { consensus, score, url }) {
 
         let html = `
             <div class="titleReviewBarItem">
-                <a href="${url}" title="${altText}"><div
-                    class="metacriticScore score_${style} titleReviewBarSubItem"><span>${rating}</span></div></a>
+                <a href="${url}"><div
+                    class="rt-consensus metacriticScore score_${style} titleReviewBarSubItem"><span>${rating}</span></div></a>
                <div class="titleReviewBarSubItem">
                    <div>
                        <a href="${url}">Tomatometer</a>
@@ -169,10 +201,39 @@ function affixRT ($target, { consensus, score, url }) {
 
         let html = `
             <span class="ghost">|</span>
-            Rotten Tomatoes:&nbsp;<a href="${url}" title="${altText}">${rating}</a>
+            Rotten Tomatoes:&nbsp;<a class="rt-consensus" href="${url}">${rating}</a>
         `
         $target.append(html)
     }
+
+    let balloonOptions
+
+    if (consensus) {
+        balloonOptions = $.extend({}, BALLOON_OPTIONS, { contents: consensus })
+    } else {
+        function ajax () {
+            return get(data.url)
+                .then(html => {
+                    let $consensus = $(html).find('.critic_consensus').eq(0).find('span').remove().end()
+                    let consensus = $consensus.length ? $.trim($consensus.text()) : 'N/A'
+
+                    consensus = consensus.replace(/--/g, '—')
+                    data.consensus = consensus
+                    storeData(data)
+
+                    return consensus
+                }).catch(error => {
+                    console.warn(error)
+                    data.consensus = 'N/A'
+                    storeData(data)
+                    throw error
+                })
+        }
+
+        balloonOptions = $.extend({}, BALLOON_OPTIONS, { ajax })
+    }
+
+    $target.find('.rt-consensus').balloon(balloonOptions)
 }
 
 // extract the Rotten Tomatoes rating for a film from the OMDB JSON response.
@@ -193,9 +254,25 @@ function getRating (omdb) {
     return rating
 }
 
+// if an update (AKA correction) is defined for this IMDb ID, apply it
+// and return the updated OMDb record; otherwise, return the record
+// unchanged
+function applyUpdate (omdb, imdb) {
+    const json = GM_getResourceText('updates') || '{}'
+    const updates = JSON.parse(json)
+    const update = updates[imdb.id]
+
+    if (update) {
+        Object.assign(omdb, update)
+    }
+
+    return omdb
+}
+
 // process the OMDb API's JSON response. returning data rather than HTML allows the
 // same (cached) data to be rendered in the two targets (one of which — the
 // review bar — is only visible to logged-in users)
+// XXX the review bar now appears to be the default for all users
 function processJSON (json, imdb) {
     let omdb = JSON.parse(json)
     let error
@@ -204,18 +281,23 @@ function processJSON (json, imdb) {
         error = `unexpected response from the OMDb API: ${JSON.stringify(omdb)}`
     } else if (omdb.Error) {
         error = `can't retrieve JSON from the OMDb API: ${omdb.Error}`
-    } else if (!omdb.tomatoURL || omdb.tomatoURL === 'N/A') {
-        error = 'no Rotten Tomatoes URL defined'
+    } else {
+        omdb = applyUpdate(omdb, imdb)
+
+        if (!omdb.tomatoURL || omdb.tomatoURL === 'N/A') {
+            error = 'no Rotten Tomatoes URL defined'
+        }
     }
 
     if (error) {
-        error = `error querying data for tt${imdb.id}: ${error}`
+        error = `error querying data for ${imdb.id}: ${error}`
         throw error
     }
 
     let score = getRating(omdb)
+    let consensus = score === -1 ? NO_CONSENSUS : null
 
-    return { consensus: 'N/A', score, url: omdb.tomatoURL }
+    return { consensus, score, url: omdb.tomatoURL }
 }
 
 // register this first so data can be cleared even if there's an error
@@ -235,7 +317,7 @@ if ($target && $type.attr('content') === 'video.movie') {
     if ($link.length) {
         purgeCached(NOW)
 
-        let imdbId = $link.attr('href').match(/\/title\/tt(\d{7})\//)[1]
+        let imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
         let cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
         if (cached) {
@@ -247,21 +329,25 @@ if ($target && $type.attr('content') === 'video.movie') {
         } else {
             let title = $('meta[property="og:title"]').attr('content').match(/^(.+?)\s+\(\d{4}\)$/)[1]
             let imdb = { id: imdbId, title }
-            let url = `https://www.omdbapi.com/?i=tt${imdbId}&r=json&tomatoes=true`
+            let url = `https://www.omdbapi.com/?i=${imdbId}&r=json&tomatoes=true`
             let imdbYear = 0 | $('meta[property="og:title"]').attr('content').match(/\((\d{4})\)$/)[1]
             let expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
+            let version = DATA_VERSION
+
+            function storeData (data, key = 'data') {
+                let json = JSON.stringify({ expires, version, [key]: data })
+                GM_setValue(imdbId, json)
+            }
 
             get(url)
                 .then(json => processJSON(json, imdb))
                 .then(data => {
-                    let json = JSON.stringify({ expires, data })
-                    GM_setValue(imdbId, json)
-                    affixRT($target, data)
+                    storeData(data)
+                    affixRT($target, data, storeData)
                 })
                 .catch(error => {
                     console.error(error)
-                    let json = JSON.stringify({ expires, error })
-                    GM_setValue(imdbId, json)
+                    storeData(error, 'error')
                 })
         }
     }
