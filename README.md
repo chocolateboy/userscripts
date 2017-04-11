@@ -1,5 +1,6 @@
 # userscripts
 
+- [Installation](#installation)
 - [Highlighters](#highlighters)
 - [Pagerizers](#pagerizers)
 - [Sites](#sites)
@@ -14,6 +15,10 @@
 - [See Also](#see-also)
 - [Author](#author)
 - [Copyright and License](#copyright-and-license)
+
+## Installation
+
+Where possible, always install (or reinstall) these userscripts from [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy), as this repo may contain works in progress that aren't ready for release, as well as file/directory names that are subject to change.
 
 ## Highlighters
 
