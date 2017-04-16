@@ -4,12 +4,12 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.7.0
+// @version       1.7.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.2.0.min.js
-// @require       https://cdn.rawgit.com/chocolateboy/jquery.balloon.js/040c0a3e/jquery.balloon.js
+// @require       https://cdn.rawgit.com/chocolateboy/jquery.balloon.js/040c0a3e4db5e92466e9edc5a66273d67a67beeb/jquery.balloon.js
 // @resource      updates https://cdn.rawgit.com/chocolateboy/corrigenda/v0.0.1/omdb/omdb-tomatoes.json
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
