@@ -18,7 +18,7 @@
 
 ## Installation
 
-Where possible, always install (or reinstall) these userscripts from [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy), as this repo may contain works in progress that aren't ready for release, as well as file/directory names that are subject to change.
+Where possible, always install (or reinstall) these userscripts from [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy), as this repo may contain development versions of these userscripts that aren't ready for release and may not even compile. In addition, the file/directory names here are subject to change, whereas the URLs on GreasyFork will always remain stable.
 
 ## Highlighters
 

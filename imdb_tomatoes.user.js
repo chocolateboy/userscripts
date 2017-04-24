@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.7.1
+// @version       1.7.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -120,6 +120,7 @@ function purgeCached (date) {
 }
 
 // prepend a widget to the review bar or append a link to the star box
+// XXX the review bar now appears to be the default for all users
 function affixRT ($target, data, storeData) {
     let { consensus, score, url } = data
     let status
@@ -269,11 +270,11 @@ function applyUpdate (omdb, imdb) {
     return omdb
 }
 
-// process the OMDb API's JSON response. returning data rather than HTML allows the
-// same (cached) data to be rendered in the two targets (one of which — the
-// review bar — is only visible to logged-in users)
-// XXX the review bar now appears to be the default for all users
-function processJSON (json, imdb) {
+// process the OMDb API's JSON response and extract
+// the RT score and URL. if the score is unavailable
+// (-1) set the consensus to "No consensus yet.",
+// otherwise initialize it to null
+function getRTData (json, imdb) {
     let omdb = JSON.parse(json)
     let error
 
@@ -304,7 +305,7 @@ function processJSON (json, imdb) {
 GM_registerMenuCommand(COMMAND_NAME, function () { purgeCached(-1) })
 
 // make the background color more legible (darker) if the score is N/A
-GM_addStyle('.score_tbd { background-color: #D9D9D9 }')
+GM_addStyle('.score_tbd { background-color: #d9d9d9 }')
 
 let $type = $('meta[property="og:type"')
 let $titleReviewBar = $('.titleReviewBar')
@@ -320,28 +321,52 @@ if ($target && $type.attr('content') === 'video.movie') {
         let imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
         let cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
+        // code common to the two storeData callbacks: create or
+        // replace an { expires, version, data|error } entry in
+        // the cache
+        function store (entry) {
+            let json = JSON.stringify(entry)
+            GM_setValue(imdbId, json)
+        }
+
         if (cached) {
             if (cached.error) {
+                // couldn't retrieve the RT data (e.g. no RT URL),
+                // so there's nothing more we can do
                 console.warn(cached.error)
             } else {
-                affixRT($target, cached.data)
+                // update the consensus to that found on RT
+                function storeData (data) {
+                    cached.data = data
+                    store(cached)
+                }
+
+                affixRT($target, cached.data, storeData)
             }
         } else {
-            let title = $('meta[property="og:title"]').attr('content').match(/^(.+?)\s+\(\d{4}\)$/)[1]
+            let title = $('meta[property="og:title"]')
+                .attr('content')
+                .match(/^(.+?)\s+\(\d{4}\)$/)[1]
+
             let imdb = { id: imdbId, title }
             let url = `https://www.omdbapi.com/?i=${imdbId}&r=json&tomatoes=true`
-            let imdbYear = 0 | $('meta[property="og:title"]').attr('content').match(/\((\d{4})\)$/)[1]
+
+            let imdbYear = 0 | $('meta[property="og:title"]')
+                .attr('content')
+                .match(/\((\d{4})\)$/)[1]
+
             let expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
             let version = DATA_VERSION
 
             function storeData (data, key = 'data') {
-                let json = JSON.stringify({ expires, version, [key]: data })
-                GM_setValue(imdbId, json)
+                store({ expires, version, [key]: data })
             }
 
             get(url)
-                .then(json => processJSON(json, imdb))
+                .then(json => getRTData(json, imdb))
                 .then(data => {
+                    // store the initial "draft" of the data with a
+                    // (possibly) null consensus
                     storeData(data)
                     affixRT($target, data, storeData)
                 })
