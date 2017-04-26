@@ -4,11 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.8.1
+// @version       0.8.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
+// @include       http://www.bbc.co.uk/news/0
 // @include       http://www.bbc.com/news
-// @require       https://code.jquery.com/jquery-3.1.1.min.js
+// @include       http://www.bbc.com/news/0
+// @require       https://code.jquery.com/jquery-3.2.1.min.js
 // @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/v1.4.2/src/jquery.onmutate.min.js
 // @require       https://cdn.rawgit.com/chocolateboy/jquery-highlighter/v2.1.0/dist/highlighter.min.js
 // @grant         GM_deleteValue
