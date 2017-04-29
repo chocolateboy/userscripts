@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.8.2
+// @version       0.9.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
 // @include       http://www.bbc.co.uk/news/0
@@ -34,17 +34,19 @@ var SITE = /^https?:\/\/www\.bbc\.co(?:m|\.uk)/;
 var ITEMS = any(
     'a.title-link:visible',
     'a.nw-o-link-split__anchor:visible',
-    'a.most-popular-list-item__link:visible'
+    'a.most-popular-list-item__link:visible',
+    'a.gs-c-promo-heading:visible'
 );
 
 var TARGETS = any(
     '.title-link__title-text',
     '.nw-o-link-split__text',
-    '.most-popular-list-item__headline'
+    '.most-popular-list-item__headline',
+    '.gs-c-promo-heading__title'
 );
 
 function any () {
-    return [].slice.apply(arguments).join(', ');
+    return [].join.call(arguments, ', ');
 }
 
 function onHighlight ($target) {
@@ -54,10 +56,10 @@ function onHighlight ($target) {
 }
 
 function target () {
-    var $this = $(this);
-    var $target = $this.find(TARGETS);
+    var $item = $(this);
+    var $target = $item.find(TARGETS);
 
-    return $target.length ? $target : $this;
+    return $target.length ? $target : $item;
 }
 
 // links in the "Watch/Listen" blocks (two are defined in the markup,
@@ -76,15 +78,20 @@ function target () {
 //
 // "/news/magazine-37804620" -> "/news/video_and_audio/headlines/37804620"
 //
-// We get them before they're changed, which is handy as the same links
+// we get them before they're changed, which is handy as the same links
 // can appear (with the original href) in the "Most Popular" block
 function id () {
     return $(this).attr('href')
         .replace(SITE, '')
-        // don't treat links with fragments as new links e.g. identify:
+        // don't treat hrefs with fragments as new e.g. identify:
         //
-        // "/sport/cricket/37815544/#story-footer"                   as "/sport/cricket/37815544"
-        // "/news/video_and_audio/headlines/37804620#video-37804620" as "/news/video_and_audio/headlines/37804620"
+        // "/sport/cricket/37815544/#story-footer" as:
+        //
+        //     "/sport/cricket/37815544"
+        //
+        // and "/news/video_and_audio/headlines/37804620#video-37804620" as:
+        //
+        //     "/news/video_and_audio/headlines/37804620"
         .replace(/\/?#[^/]+$/, '');
 }
 
