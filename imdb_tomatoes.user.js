@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.7.2
+// @version       1.8.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
-// @require       https://code.jquery.com/jquery-3.2.0.min.js
-// @require       https://cdn.rawgit.com/chocolateboy/jquery.balloon.js/040c0a3e4db5e92466e9edc5a66273d67a67beeb/jquery.balloon.js
-// @resource      updates https://cdn.rawgit.com/chocolateboy/corrigenda/v0.0.1/omdb/omdb-tomatoes.json
+// @require       https://code.jquery.com/jquery-3.2.1.min.js
+// @require       https://cdn.rawgit.com/urin/jquery.balloon.js/1.1.2/jquery.balloon.js
+// @resource      updates https://cdn.rawgit.com/chocolateboy/corrigenda/v0.1.0/omdb/omdb-tomatoes.json
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -80,7 +80,7 @@ const BALLOON_OPTIONS = {
         padding: '12px',
     },
     html: true,
-    position: 'bottom right',
+    position: 'bottom',
 }
 
 function debug (message) {
