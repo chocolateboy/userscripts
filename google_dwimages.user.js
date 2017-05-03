@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.3.0
+// @version       0.3.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
@@ -19,15 +19,16 @@
 
 function onImageLinks ($imageLinks) {
     $imageLinks.each(function () {
-        var $imageLink = $(this).removeAttr('jsaction');
-        var $container = $imageLink.closest('.rg_di');
-        var meta       = JSON.parse($container.find('.rg_meta').text());
+        var $imageLink = $(this)
+        var $container = $imageLink.closest('.rg_di')
+        var meta       = JSON.parse($container.find('.rg_meta').text())
 
         $imageLink
+            .removeAttr('jsaction')
             .attr('href', meta.ou)
             .find('.rg_ilm')
-                .wrap($('<a></a>').attr('href', meta.ru));
-    });
+                .wrap($('<a></a>').attr('href', meta.ru))
+    })
 }
 
-$.onCreate('a.rg_l', onImageLinks, true /* multi */);
+$.onCreate('a.rg_l', onImageLinks, true /* multi */)
