@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.8.1
+// @version       2.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.2.1.min.js
 // @require       https://cdn.rawgit.com/urin/jquery.balloon.js/8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @resource      updates https://cdn.rawgit.com/chocolateboy/corrigenda/v0.1.0/omdb/omdb-tomatoes.json
+// @resource      query https://git.io/vHOqh
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -29,29 +29,24 @@
  *     http://www.imdb.com/title/tt0086312/ - 3 widgets
  *     http://www.imdb.com/title/tt0037638/ - 2 widgets
  *
- * Fixed:
+ * Fixed (layout):
  *
- *     Link to the wrong movie [1]:
+ *     http://www.imdb.com/title/tt0162346/ - 4 widgets
+ *     http://www.imdb.com/title/tt0159097/ - 4 widgets
  *
- *         http://www.imdb.com/title/tt0104070/ - Death Becomes Her
- *         http://www.imdb.com/title/tt0057115/ - The Great Escape
- *         http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
- *         http://www.imdb.com/title/tt0120768/ - The Negotiator
- *         http://www.imdb.com/title/tt0910936/ - Pineapple Express
- *         http://www.imdb.com/title/tt0448134/ - Sunshine
- *         http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
+ * Broken (incorrect RT/OMDb alias [1]):
  *
- *     Layout:
+ *     http://www.imdb.com/title/tt0104070/ - Death Becomes Her
+ *     http://www.imdb.com/title/tt0057115/ - The Great Escape
+ *     http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
+ *     http://www.imdb.com/title/tt0120768/ - The Negotiator
+ *     http://www.imdb.com/title/tt0910936/ - Pineapple Express
+ *     http://www.imdb.com/title/tt0448134/ - Sunshine
+ *     http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
  *
- *         http://www.imdb.com/title/tt0162346/ - 4 widgets
- *         http://www.imdb.com/title/tt0159097/ - 4 widgets
+ * Not on RT:
  *
- * Misc:
- *
- *     No RT link:
- *
- *         http://www.imdb.com/title/tt5642184/
- *
+ *     http://www.imdb.com/title/tt5642184/
  */
 
 // [1] unaliased and incorrectly aliased titles are common:
@@ -59,6 +54,7 @@
 
 'use strict';
 
+const API             = 'https://cinesift.com/api/values/getFilms'
 const COMMAND_NAME    = GM_info.script.name + ': clear cache'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
 const DATA_VERSION    = 2 // version of each cached record; updated whenever the schema changes
@@ -72,7 +68,6 @@ const THIS_YEAR       = new Date().getFullYear()
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
-    contents: 'Loading...',
     css: {
         maxWidth: '500px',
         fontFamily: 'sans-serif',
@@ -90,7 +85,11 @@ function debug (message) {
 }
 
 // promisified cross-origin HTTP requests
-function get (url) {
+function get (url, params) {
+    if (params) {
+        url = url + '?' + $.param(params)
+    }
+
     return new Promise((resolve, reject) => {
         GM_xmlhttpRequest({
             method: 'GET',
@@ -121,7 +120,7 @@ function purgeCached (date) {
 
 // prepend a widget to the review bar or append a link to the star box
 // XXX the review bar now appears to be the default for all users
-function affixRT ($target, data, storeData) {
+function affixRT ($target, data) {
     let { consensus, score, url } = data
     let status
 
@@ -207,98 +206,54 @@ function affixRT ($target, data, storeData) {
         $target.append(html)
     }
 
-    let balloonOptions
-
-    if (consensus) {
-        balloonOptions = $.extend({}, BALLOON_OPTIONS, { contents: consensus })
-    } else {
-        function ajax () {
-            return get(data.url)
-                .then(html => {
-                    let $consensus = $(html).find('.critic_consensus').eq(0).find('span').remove().end()
-                    let consensus = $consensus.length ? $.trim($consensus.text()) : 'N/A'
-
-                    consensus = consensus.replace(/--/g, '—')
-                    data.consensus = consensus
-                    storeData(data)
-
-                    return consensus
-                }).catch(error => {
-                    console.warn(error)
-                    data.consensus = 'N/A'
-                    storeData(data)
-                    throw error
-                })
-        }
-
-        balloonOptions = $.extend({}, BALLOON_OPTIONS, { ajax })
-    }
+    let balloonOptions = $.extend({}, BALLOON_OPTIONS, { contents: consensus })
 
     $target.find('.rt-consensus').balloon(balloonOptions)
 }
 
-// extract the Rotten Tomatoes rating for a film from the OMDB JSON response.
-// return the rating as an integer >= 0, or -1 if it's not found or not a number.
-function getRating (omdb) {
-    let rating = -1
-    let ratings = omdb.Ratings || []
-    let rtRating = $.grep(ratings, it => it.Source === 'Rotten Tomatoes')[0]
-
-    if (rtRating && rtRating.Value) {
-        let value = parseInt(rtRating.Value)
-
-        if (value === value) { // not NaN
-            rating = value
-        }
-    }
-
-    return rating
-}
-
-// if an update (AKA correction) is defined for this IMDb ID, apply it
-// and return the updated OMDb record; otherwise, return the record
-// unchanged
-function applyUpdate (omdb, imdb) {
-    const json = GM_getResourceText('updates') || '{}'
-    const updates = JSON.parse(json)
-    const update = updates[imdb.id]
-
-    if (update) {
-        Object.assign(omdb, update)
-    }
-
-    return omdb
-}
-
-// process the OMDb API's JSON response and extract
-// the RT score and URL. if the score is unavailable
-// (-1) set the consensus to "No consensus yet.",
-// otherwise initialize it to null
+// process the API's JSON response and extract
+// the RT score and consensus.
+//
+// if there's no consensus, set it to "No consensus yet."
+// if the score is null, set it to -1
 function getRTData (json, imdb) {
-    let omdb = JSON.parse(json)
-    let error
+    function error (msg) {
+        throw `error querying data for ${imdb.id}: ${msg}`
+    }
 
-    if (!omdb) {
-        error = `unexpected response from the OMDb API: ${JSON.stringify(omdb)}`
-    } else if (omdb.Error) {
-        error = `can't retrieve JSON from the OMDb API: ${omdb.Error}`
-    } else {
-        omdb = applyUpdate(omdb, imdb)
+    let response
 
-        if (!omdb.tomatoURL || omdb.tomatoURL === 'N/A') {
-            error = 'no Rotten Tomatoes URL defined'
+    try {
+        response = JSON.parse(JSON.parse(json)) // ಠ_ಠ
+    } catch (e) {
+        error(`can't parse response: ${response}`)
+    }
+
+    if (!response) {
+        error('no response')
+    }
+
+    if (!$.isArray(response)) {
+        error(`invalid response: ${{}.toString.call(response)}`)
+    }
+
+    let movie = $.grep(response, it => it.imdbID === imdb.id)
+
+    if (movie && movie.length) {
+        let consensus = movie[0].RTConsensus || NO_CONSENSUS
+        let score = movie[0].RTCriticMeter
+        let url = `https://www.rottentomatoes.com/search/?search=${imdb.title}`
+
+        consensus = consensus.replace(/--/g, '—')
+
+        if (score == null) {
+            score = -1
         }
+
+        return { consensus, score, url }
+    } else {
+        throw `No results found for ${imdb.id}`
     }
-
-    if (error) {
-        error = `error querying data for ${imdb.id}: ${error}`
-        throw error
-    }
-
-    let score = getRating(omdb)
-    let consensus = score === -1 ? NO_CONSENSUS : null
-
-    return { consensus, score, url: omdb.tomatoURL }
 }
 
 // register this first so data can be cleared even if there's an error
@@ -321,27 +276,13 @@ if ($target && $type.attr('content') === 'video.movie') {
         let imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
         let cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
-        // code common to the two storeData callbacks: create or
-        // replace an { expires, version, data|error } entry in
-        // the cache
-        function store (entry) {
-            let json = JSON.stringify(entry)
-            GM_setValue(imdbId, json)
-        }
-
         if (cached) {
             if (cached.error) {
-                // couldn't retrieve the RT data (e.g. no RT URL),
-                // so there's nothing more we can do
+                // couldn't retrieve any RT data so there's nothing
+                // more we can do
                 console.warn(cached.error)
             } else {
-                // update the consensus to that found on RT
-                function storeData (data) {
-                    cached.data = data
-                    store(cached)
-                }
-
-                affixRT($target, cached.data, storeData)
+                affixRT($target, cached.data)
             }
         } else {
             let title = $('meta[property="og:title"]')
@@ -349,8 +290,6 @@ if ($target && $type.attr('content') === 'video.movie') {
                 .match(/^(.+?)\s+\(\d{4}\)$/)[1]
 
             let imdb = { id: imdbId, title }
-            let url = `https://www.omdbapi.com/?i=${imdbId}&r=json&tomatoes=true`
-
             let imdbYear = 0 | $('meta[property="og:title"]')
                 .attr('content')
                 .match(/\((\d{4})\)$/)[1]
@@ -358,21 +297,27 @@ if ($target && $type.attr('content') === 'video.movie') {
             let expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
             let version = DATA_VERSION
 
-            function storeData (data, key = 'data') {
-                store({ expires, version, [key]: data })
+            // create or replace an { expires, version, data|error } entry in
+            // the cache
+            function store (data, key = 'data') {
+                let json = JSON.stringify({ expires, version, [key]: data })
+                GM_setValue(imdbId, json)
             }
 
-            get(url)
+            let params = JSON.parse(GM_getResourceText('query'))
+
+            params.title = title
+            params.yearMax = THIS_YEAR
+
+            get(API, params)
                 .then(json => getRTData(json, imdb))
                 .then(data => {
-                    // store the initial "draft" of the data with a
-                    // (possibly) null consensus
-                    storeData(data)
-                    affixRT($target, data, storeData)
+                    store(data)
+                    affixRT($target, data)
                 })
                 .catch(error => {
                     console.error(error)
-                    storeData(error, 'error')
+                    store(error, 'error')
                 })
         }
     }
