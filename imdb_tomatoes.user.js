@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.0
+// @version       2.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -316,8 +316,8 @@ if ($target && $type.attr('content') === 'video.movie') {
                     affixRT($target, data)
                 })
                 .catch(error => {
-                    console.error(error)
                     store(error, 'error')
+                    console.error(error)
                 })
         }
     }
