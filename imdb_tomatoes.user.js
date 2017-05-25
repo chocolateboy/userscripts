@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.0.1
+// @version       2.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.2.1.min.js
 // @require       https://cdn.rawgit.com/urin/jquery.balloon.js/8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @resource      query https://git.io/vHOqh
+// @resource      query https://git.io/vHsQM
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -54,7 +54,6 @@
 
 'use strict';
 
-const API             = 'https://cinesift.com/api/values/getFilms'
 const COMMAND_NAME    = GM_info.script.name + ': clear cache'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
 const DATA_VERSION    = 2 // version of each cached record; updated whenever the schema changes
@@ -226,7 +225,7 @@ function getRTData (json, imdb) {
     try {
         response = JSON.parse(JSON.parse(json)) // ಠ_ಠ
     } catch (e) {
-        error(`can't parse response: ${response}`)
+        error(`can't parse response: ${e}`)
     }
 
     if (!response) {
@@ -234,7 +233,8 @@ function getRTData (json, imdb) {
     }
 
     if (!$.isArray(response)) {
-        error(`invalid response: ${{}.toString.call(response)}`)
+        let type = {}.toString.call(response)
+        error(`invalid response: ${type}`)
     }
 
     let movie = $.grep(response, it => it.imdbID === imdb.id)
@@ -305,11 +305,14 @@ if ($target && $type.attr('content') === 'video.movie') {
             }
 
             let params = JSON.parse(GM_getResourceText('query'))
+            let api = params.api
+
+            delete params.api
 
             params.title = title
             params.yearMax = THIS_YEAR
 
-            get(API, params)
+            get(api, params)
                 .then(json => getRTData(json, imdb))
                 .then(data => {
                     store(data)
