@@ -4,12 +4,10 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.9.1
+// @version       0.10.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
-// @include       http://www.bbc.co.uk/news/0
 // @include       http://www.bbc.com/news
-// @include       http://www.bbc.com/news/0
 // @require       https://code.jquery.com/jquery-3.2.1.min.js
 // @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/v1.4.2/src/jquery.onmutate.min.js
 // @require       https://cdn.rawgit.com/chocolateboy/jquery-highlighter/v2.1.0/dist/highlighter.min.js
@@ -29,37 +27,42 @@
 // so to ensure an article seen on bbc.co.uk
 // is also seen on bbc.com, we remove both rather than
 // just the current site
-var SITE = /^https?:\/\/www\.bbc\.co(?:m|\.uk)/;
+var SITE = /^https?:\/\/www\.bbc\.co(?:m|\.uk)/
 
 var ITEMS = any(
-    'a.title-link:visible',
-    'a.nw-o-link-split__anchor:visible',
-    'a.most-popular-list-item__link:visible',
-    'a.gs-c-promo-heading:visible'
-);
+    // almost all links apart from the (static) "Watch Live"/"Listen Live"
+    // links
+    ':not(.nw-c-watch-listen__body) > a.gs-c-promo-heading:visible',
 
+    // links in the panel at the bottom of the page
+    'a.np-link:visible',
+
+    // bullets under the main story
+    '.nw-o-bullet\\+ > a.nw-o-link-split__anchor:visible'
+)
+
+// these correspond to the links in ITEMS
 var TARGETS = any(
-    '.title-link__title-text',
-    '.nw-o-link-split__text',
-    '.most-popular-list-item__headline',
-    '.gs-c-promo-heading__title'
-);
+    '.gs-c-promo-heading__title',
+    'h3',
+    '.nw-o-link-split__text'
+)
 
 function any () {
-    return [].join.call(arguments, ', ');
+    return [].join.call(arguments, ', ')
 }
 
 function onHighlight ($target) {
     if ($target.css('color') === 'rgb(255, 255, 255)') {
-        $target.css('color', 'rgb(34, 34, 34)');
+        $target.css('color', 'rgb(34, 34, 34)')
     }
 }
 
 function target () {
-    var $item = $(this);
-    var $target = $item.find(TARGETS);
+    var $item = $(this)
+    var $target = $item.find(TARGETS)
 
-    return $target.length ? $target : $item;
+    return $target.length ? $target : $item
 }
 
 // links in the "Watch/Listen" blocks (two are defined in the markup,
@@ -92,7 +95,7 @@ function id () {
         // and "/news/video_and_audio/headlines/37804620#video-37804620" as:
         //
         //     "/news/video_and_audio/headlines/37804620"
-        .replace(/\/?#[^/]+$/, '');
+        .replace(/\/?#[^/]+$/, '')
 }
 
 $.highlight({
@@ -100,4 +103,4 @@ $.highlight({
     id:          id,
     target:      target,
     onHighlight: onHighlight,
-});
+})
