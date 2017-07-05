@@ -9,6 +9,7 @@
     - [Google](#google)
     - [Hacker News](#hacker-news)
     - [IMDb](#imdb)
+    - [Last.fm](#last-fm)
     - [Reddit](#reddit)
     - [Rotten Tomatoes](#rotten-tomatoes)
 - [Misc](#misc)
@@ -61,6 +62,10 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 * [IMDb Full Summary](https://github.com/chocolateboy/userscripts/raw/master/imdb_full_summary.user.js) - automatically show the full plot summary on IMDb
 * [IMDb Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/imdb_tomatoes.user.js) - add Rotten Tomatoes ratings to IMDb movie pages
+
+### Last.fm
+
+* [Last Picture Show](https://github.com/chocolateboy/userscripts/raw/master/last_picture_show.user.js) - Link last.fm artist/album images directly to the image page
 
 ### Reddit
 
