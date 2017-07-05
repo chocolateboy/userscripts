@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name          Last Picture Show
-// @description   Link last.fm library images directly to the image page
+// @description   Link last.fm artist/album images directly to the image page
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.1
+// @version       1.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.last.fm/*
 // @include       https://*.last.fm/*
