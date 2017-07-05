@@ -9,7 +9,7 @@
     - [Google](#google)
     - [Hacker News](#hacker-news)
     - [IMDb](#imdb)
-    - [Last.fm](#last-fm)
+    - [Last.fm](#lastfm)
     - [Reddit](#reddit)
     - [Rotten Tomatoes](#rotten-tomatoes)
 - [Misc](#misc)
