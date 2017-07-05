@@ -4,14 +4,14 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
+// @version       1.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.last.fm/*
 // @include       https://*.last.fm/*
 // @include       http://*.lastfm.tld/*
 // @include       https://*.lastfm.tld/*
 // @require       https://code.jquery.com/jquery-3.2.1.min.js
-// @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/v1.4.2/src/jquery.onmutate.min.js
+// @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log
 // ==/UserScript==
 
