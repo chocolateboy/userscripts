@@ -8,7 +8,8 @@
 // @include      http://*.reddit.com/r/*
 // @include      https://*.reddit.com/r/*
 // @require      https://code.jquery.com/jquery-3.2.1.min.js
-// @version      1.0.0
+// @require      https://cdn.rawgit.com/eclecto/jQuery-onMutate/79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
+// @version      1.1.0
 // @run-at       document-start
 // @grant        GM_addStyle
 // @grant        GM_deleteValue
@@ -35,20 +36,26 @@ function toggle () {
     }
 }
 
+// NOTE we need to disable the display rather than setting its visibility to
+// hidden as the latter doesn't hide the background (which leads to a flash of
+// styled content (FOSC) on subreddits with a custom background color and/or
+// image)
+//
+// XXX hide the html element rather than the body element as the latter still
+// results in a FOSC on some subreddits e.g. /r/firefox
+function hidePage () {
+    GM_addStyle('html { display: none !important }')
+}
+
 const disableCss = GM_getValue(SUBREDDIT, false)
 
 if (disableCss) {
+    $(document).onCreate('head', hidePage)
+
     // https://wiki.greasespot.net/DOMContentLoaded#Workaround
-
-    // NOTE we need to disable the display rather than setting its
-    // visibility to hidden as the latter doesn't hide the background
-    // (which leads to a flash of styled content on subreddits with a custom
-    // background color and/or image)
-    GM_addStyle('body { display: none !important }')
-
-    $(document).on('DOMContentLoaded', function () {
+    $(document).on('DOMContentLoaded', () => {
         $(CUSTOM_CSS).prop('disabled', true)
-        GM_addStyle('body { display: initial !important }')
+        GM_addStyle('html { display: initial !important }')
     })
 }
 
