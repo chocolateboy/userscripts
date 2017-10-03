@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
+// @version       0.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/*
 // @require       https://code.jquery.com/jquery-3.1.0.min.js
@@ -17,7 +17,7 @@
 
 var DELTA = 1, UNIT = 2;
 
-var DATES = $('html').attr('op') == 'user' ?
+var DATES = $('html').attr('op') === 'user' ?
     'table:eq(-1) tr:eq(1) td:eq(-1)' :
     'span.age a';
 

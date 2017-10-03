@@ -2,7 +2,7 @@
 // @name           ISO 8601 Dates
 // @namespace      https://github.com/chocolateboy/userscripts
 // @description    Display US dates in the ISO 8601 YYYY-MM-DD format
-// @version        1.2.0
+// @version        1.2.1
 // @author         chocolateboy
 // @license        GPL: http://www.gnu.org/copyleft/gpl.html
 // @exclude        *
@@ -21,11 +21,11 @@ var DATE  = new RegExp(
 var days = [ 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
 
 function leap_year (year) {
-    if ((year % 400) == 0) {           // multiples of 400 are leap years
+    if ((year % 400) === 0) {           // multiples of 400 are leap years
         return true;
-    } else if ((year % 100) == 0) {    // the remaining multiples of 100 are not leap years
+    } else if ((year % 100) === 0) {    // the remaining multiples of 100 are not leap years
         return false;
-    } else if ((year % 4) == 0) {      // the remaining multiples of 4 are leap years
+    } else if ((year % 4) === 0) {      // the remaining multiples of 4 are leap years
         return true;
     } else {                           // the rest are common years
         return false;
@@ -42,7 +42,7 @@ function replace (match, m1, d1, y1, m2, d2, y2, offset, string) {
     if (offset > 0) {
         var prefix = string[offset - 1];
 
-        if ((prefix == '-') || (prefix == '/')) {
+        if ((prefix === '-') || (prefix === '/')) {
             return match;
         }
     }
@@ -51,12 +51,12 @@ function replace (match, m1, d1, y1, m2, d2, y2, offset, string) {
         return match;
     }
 
-    if (year.length == 2) {
+    if (year.length === 2) {
         // Internet Founding Fathers, forgive us. From the epoch to 1999, we knew not what to do...
         year = (((year >= 70) && (year <= 99)) ? '19' : '20') + year;
     }
 
-    if ((month == '02') && (day == '29') && !leap_year(year)) {
+    if ((month === '02') && (day === '29') && !leap_year(year)) {
         return match;
     }
 

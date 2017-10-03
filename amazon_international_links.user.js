@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.2.0
+// @version       2.2.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       http://www.amazon.ca/*
@@ -128,7 +128,7 @@ function initializeConfig () {
                 type: 'checkbox',
                 label: country,
                 title: sprintf('amazon.%s', tld),
-                default: (country == 'UK' || country == 'US')
+                default: (country === 'UK' || country === 'US')
             };
 
             return fields;
@@ -175,7 +175,7 @@ function removeLinks () {
 function v1AddLink (tld, country) {
     var html;
 
-    if (tld == CURRENT_TLD) {
+    if (tld === CURRENT_TLD) {
         html = sprintf('<strong title="amazon.%s">%s</strong>', tld, country);
     } else {
         html = sprintf(
@@ -191,7 +191,7 @@ function v1AddLink (tld, country) {
 function v2AddLink (tld, country) {
     var html;
 
-    if (tld == CURRENT_TLD) {
+    if (tld === CURRENT_TLD) {
         html = sprintf(
             '<li class="nav-xs-link"><strong class="nav_a" title="amazon.%s">%s</strong></li>',
             tld, country
@@ -219,7 +219,7 @@ function v2AddLink (tld, country) {
 function v3AddLink (tld, country) {
     var html;
 
-    if (tld == CURRENT_TLD) {
+    if (tld === CURRENT_TLD) {
         html = sprintf(
            '<strong style="display: inline-block;" tabindex="1" class="nav-a" title="amazon.%s">%s</strong>',
            tld,
