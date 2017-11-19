@@ -4,10 +4,10 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.2.0
+// @version       1.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/*/*
-// @require       https://code.jquery.com/jquery-3.1.1.min.js
+// @require       https://code.jquery.com/jquery-3.2.1.min.js
 // @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/v1.4.2/src/jquery.onmutate.min.js
 // @grant         GM_log
 // ==/UserScript==
@@ -17,23 +17,24 @@
 
 // there's a per-file latest-commit link on every file page. this selector
 // adds the first-commit link to these pages as well:
-// var LATEST_COMMIT_SELECTOR = 'div.commit-tease > span.float-right';
+// const LATEST_COMMIT_SELECTOR = 'div.commit-tease > span.float-right'
 
 // this selector restricts the first-commit link to pages
 // with a latest-commit link
-var LATEST_COMMIT_SELECTOR = 'div.commit-tease.js-details-container > span.float-right';
+const LATEST_COMMIT_SELECTOR = 'div.commit-tease.js-details-container > span.float-right'
 
 function addLink ($latestCommit) {
     if ($latestCommit.not(':has(#first-commit)').length) {
-        var repo = $('meta[property="og:title"]').attr('content');
-        var href = 'http://first-commit.com/' + repo;
+        const repo = $('meta[name="octolytics-dimension-repository_network_root_nwo"]')
+            .attr('content')
+        const href = 'http://first-commit.com/' + repo
 
         $latestCommit.append(
             '<span id="first-commit">' +
                 '|&nbsp;' +
                 '<a class="message" href="' + href + '">First commit</a>' +
             '</span>'
-        );
+        )
     }
 }
 
@@ -45,4 +46,4 @@ function addLink ($latestCommit) {
 //
 // jQuery-onMutate fires the callback immediately if the element already exists,
 // so it handles both cases
-$('#js-repo-pjax-container').onCreate(LATEST_COMMIT_SELECTOR, addLink, true /* multi */);
+$('#js-repo-pjax-container').onCreate(LATEST_COMMIT_SELECTOR, addLink, true /* multi */)
