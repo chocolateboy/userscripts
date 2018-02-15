@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.2.0
+// @version       2.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
-// @require       https://code.jquery.com/jquery-3.2.1.min.js
+// @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdn.rawgit.com/urin/jquery.balloon.js/8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @resource      query https://git.io/vdMJB
+// @resource      query https://git.io/vAndS
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -299,8 +299,9 @@ if ($target && $type.attr('content') === 'video.movie') {
 
             // create or replace an { expires, version, data|error } entry in
             // the cache
-            function store (data, key = 'data') {
-                let json = JSON.stringify({ expires, version, [key]: data })
+            function store (data) {
+                const cached = Object.assign({ expires, version }, data)
+                let json = JSON.stringify(cached)
                 GM_setValue(imdbId, json)
             }
 
@@ -315,11 +316,11 @@ if ($target && $type.attr('content') === 'video.movie') {
             get(api, params)
                 .then(json => getRTData(json, imdb))
                 .then(data => {
-                    store(data)
+                    store({ data })
                     affixRT($target, data)
                 })
                 .catch(error => {
-                    store(error, 'error')
+                    store({ error })
                     console.error(error)
                 })
         }
