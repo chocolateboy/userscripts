@@ -102,8 +102,8 @@ function get (url, params) {
 
 // purge expired entries
 function purgeCached (date) {
-    for (let key of GM_listValues()) {
-        let value = JSON.parse(GM_getValue(key))
+    for (const key of GM_listValues()) {
+        const value = JSON.parse(GM_getValue(key))
 
         if (value.version !== DATA_VERSION) {
             debug(`purging invalid value (obsolete version): ${key}`)
@@ -120,7 +120,7 @@ function purgeCached (date) {
 // prepend a widget to the review bar or append a link to the star box
 // XXX the review bar now appears to be the default for all users
 function affixRT ($target, data) {
-    let { consensus, score, url } = data
+    const { consensus, score, url } = data
     let status
 
     if (score === -1) {
@@ -131,7 +131,7 @@ function affixRT ($target, data) {
         status = 'Fresh'
     }
 
-    let style = STATUS_TO_STYLE[status]
+    const style = STATUS_TO_STYLE[status]
 
     if ($target.hasClass('titleReviewBar')) {
         // reduce the amount of space taken up by the Metacritic widget
@@ -164,7 +164,7 @@ function affixRT ($target, data) {
         // [  [RT] [MC] [IMDb] [&c.]           ]
 
         if ($(COMPACT_LAYOUT).length && $target.find('.titleReviewBarItem').length > 2) {
-            let $clear = $('<div class="clear">&nbsp;</div>')
+            const $clear = $('<div class="clear">&nbsp;</div>')
 
             $('.plot_summary_wrapper').after($target.remove())
 
@@ -175,9 +175,9 @@ function affixRT ($target, data) {
             })
         }
 
-        let rating = score === -1 ? 'N/A' : score
+        const rating = score === -1 ? 'N/A' : score
 
-        let html = `
+        const html = `
             <div class="titleReviewBarItem">
                 <a href="${url}"><div
                     class="rt-consensus metacriticScore score_${style} titleReviewBarSubItem"><span>${rating}</span></div></a>
@@ -196,16 +196,16 @@ function affixRT ($target, data) {
         `
         $target.prepend(html)
     } else {
-        let rating = score === -1 ? 'N/A' : `${score}%`
+        const rating = score === -1 ? 'N/A' : `${score}%`
 
-        let html = `
+        const html = `
             <span class="ghost">|</span>
             Rotten Tomatoes:&nbsp;<a class="rt-consensus" href="${url}">${rating}</a>
         `
         $target.append(html)
     }
 
-    let balloonOptions = $.extend({}, BALLOON_OPTIONS, { contents: consensus })
+    const balloonOptions = $.extend({}, BALLOON_OPTIONS, { contents: consensus })
 
     $target.find('.rt-consensus').balloon(balloonOptions)
 }
@@ -233,16 +233,17 @@ function getRTData (json, imdb) {
     }
 
     if (!$.isArray(response)) {
-        let type = {}.toString.call(response)
+        const type = {}.toString.call(response)
         error(`invalid response: ${type}`)
     }
 
-    let movie = $.grep(response, it => it.imdbID === imdb.id)
+    const movie = $.grep(response, it => it.imdbID === imdb.id)
 
     if (movie && movie.length) {
+        const url = `https://www.rottentomatoes.com/search/?search=${imdb.title}`
+
         let consensus = movie[0].RTConsensus || NO_CONSENSUS
         let score = movie[0].RTCriticMeter
-        let url = `https://www.rottentomatoes.com/search/?search=${imdb.title}`
 
         consensus = consensus.replace(/--/g, '—')
 
@@ -262,19 +263,19 @@ GM_registerMenuCommand(COMMAND_NAME, function () { purgeCached(-1) })
 // make the background color more legible (darker) if the score is N/A
 GM_addStyle('.score_tbd { background-color: #d9d9d9 }')
 
-let $type = $('meta[property="og:type"')
-let $titleReviewBar = $('.titleReviewBar')
-let $starBox = $('.star-box-details')
-let $target = ($titleReviewBar.length && $titleReviewBar) || ($starBox.length && $starBox)
+const $type = $('meta[property="og:type"')
+const $titleReviewBar = $('.titleReviewBar')
+const $starBox = $('.star-box-details')
+const $target = ($titleReviewBar.length && $titleReviewBar) || ($starBox.length && $starBox)
 
 if ($target && $type.attr('content') === 'video.movie') {
-    let $link = $('link[rel=canonical]')
+    const $link = $('link[rel=canonical]')
 
     if ($link.length) {
         purgeCached(NOW)
 
-        let imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
-        let cached = JSON.parse(GM_getValue(imdbId, 'null'))
+        const imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
+        const cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
         if (cached) {
             if (cached.error) {
@@ -285,28 +286,29 @@ if ($target && $type.attr('content') === 'video.movie') {
                 affixRT($target, cached.data)
             }
         } else {
-            let title = $('meta[property="og:title"]')
+            const title = $('meta[property="og:title"]')
                 .attr('content')
                 .match(/^(.+?)\s+\(\d{4}\)$/)[1]
 
-            let imdb = { id: imdbId, title }
-            let imdbYear = 0 | $('meta[property="og:title"]')
+            const imdb = { id: imdbId, title }
+            const imdbYear = 0 | $('meta[property="og:title"]')
                 .attr('content')
                 .match(/\((\d{4})\)$/)[1]
 
-            let expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
-            let version = DATA_VERSION
+            const expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
+            const version = DATA_VERSION
 
             // create or replace an { expires, version, data|error } entry in
             // the cache
             function store (data) {
                 const cached = Object.assign({ expires, version }, data)
-                let json = JSON.stringify(cached)
+                const json = JSON.stringify(cached)
+
                 GM_setValue(imdbId, json)
             }
 
-            let params = JSON.parse(GM_getResourceText('query'))
-            let api = params.api
+            const params = JSON.parse(GM_getResourceText('query'))
+            const api = params.api
 
             delete params.api
 
