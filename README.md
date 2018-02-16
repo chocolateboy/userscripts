@@ -52,32 +52,32 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### Google
 
-* [Google DWIMages](https://github.com/chocolateboy/userscripts/raw/master/google_dwimages.user.js) - direct links to images and pages on Google Images
+* [Google DWIMages](https://greasyfork.org/scripts/29420-google-dwimages/code/Google%20DWIMages.user.js) - direct links to images and pages on Google Images
 
 ### Hacker News
 
-* [Hacker News Date Tooltips](https://github.com/chocolateboy/userscripts/raw/master/hacker_news_date_tooltips.user.js) - deobfuscate the "n days ago" dates on Hacker News with YYYY-MM-DD tooltips
+* [Hacker News Date Tooltips](https://greasyfork.org/scripts/23432-hacker-news-date-tooltips/code/Hacker%20News%20Date%20Tooltips.user.js) - deobfuscate the "n days ago" dates on Hacker News with YYYY-MM-DD tooltips
 
 ### IMDb
 
-* [IMDb Full Summary](https://github.com/chocolateboy/userscripts/raw/master/imdb_full_summary.user.js) - automatically show the full plot summary on IMDb
-* [IMDb Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/imdb_tomatoes.user.js) - add Rotten Tomatoes ratings to IMDb movie pages
+* [IMDb Full Summary](https://greasyfork.org/scripts/23433-imdb-full-summary/code/IMDb%20Full%20Summary.user.js) - automatically show the full plot summary on IMDb
+* [IMDb Tomatoes](https://greasyfork.org/scripts/15222-imdb-tomatoes/code/IMDb%20Tomatoes.user.js) - add Rotten Tomatoes ratings to IMDb movie pages
 
 ### Last.fm
 
-* [Last Picture Show](https://github.com/chocolateboy/userscripts/raw/master/last_picture_show.user.js) - Link last.fm artist/album images directly to the image page
+* [Last Picture Show](https://greasyfork.org/scripts/31179-last-picture-show/code/Last%20Picture%20Show.user.js) - Link last.fm artist/album images directly to the image page
 
 ### Reddit
 
-* [Toggle Custom CSS](https://github.com/chocolateboy/userscripts/raw/master/reddit_toggle_custom_css.user.js) - adds a userscript command to persistently toggle custom styles off/on on subreddits
+* [Toggle Custom CSS](https://greasyfork.org/scripts/23434-reddit-toggle-custom-css/code/Reddit%20-%20Toggle%20Custom%20CSS.user.js) - adds a userscript command to persistently toggle custom styles off/on on subreddits
 
 ### Rotten Tomatoes
 
-* [More Tomatoes](https://github.com/chocolateboy/userscripts/raw/master/more_tomatoes.user.js) - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
+* [More Tomatoes](https://greasyfork.org/scripts/23435-more-tomatoes/code/More%20Tomatoes.user.js) - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
 
 ### Misc
 
-* [ISO 8601 Dates](https://github.com/chocolateboy/userscripts/raw/master/iso_8601_dates.user.js) - display US dates in the ISO 8601 YYYY-MM-DD format
+* [ISO 8601 Dates](https://greasyfork.org/scripts/23436-iso-8601-dates/code/ISO%208601%20Dates.user.js) - display US dates in the ISO 8601 YYYY-MM-DD format
 
 ## See Also
 
