@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.3.0
+// @version       2.3.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -103,7 +103,8 @@ function get (url, params) {
 // purge expired entries
 function purgeCached (date) {
     for (const key of GM_listValues()) {
-        const value = JSON.parse(GM_getValue(key))
+        const json = GM_getValue(key)
+        const value = JSON.parse(json)
 
         if (value.version !== DATA_VERSION) {
             debug(`purging invalid value (obsolete version): ${key}`)
@@ -112,7 +113,7 @@ function purgeCached (date) {
             debug(`purging expired value: ${key}`)
             GM_deleteValue(key)
         } else {
-            debug(`cached: ${key} => ${JSON.stringify(value)}`)
+            debug(`cached: ${key} => ${json}`)
         }
     }
 }
@@ -121,6 +122,7 @@ function purgeCached (date) {
 // XXX the review bar now appears to be the default for all users
 function affixRT ($target, data) {
     const { consensus, score, url } = data
+
     let status
 
     if (score === -1) {
