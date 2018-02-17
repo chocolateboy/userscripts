@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.2.0
+// @version       2.2.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/*/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
@@ -23,14 +23,13 @@ const FIRST_COMMIT =
         <a id="first-commit-link" style="cursor: pointer" class="message">First commit</a>
     </span>`
 
-// this function extracts (and navigates to) the URL of the repo's first-commit.
-// it is based on:
+// this function extracts the URL of the repo's first-commit and navigates to it.
+// it is based on code by several developers, a list of whom can be found here:
+// https://github.com/FarhadG/init#contributors
 //
-//     https://gist.github.com/pitaj/e52862409dd5726711214a55189f332d
-//
-// similar/related snippets are listed here:
-//
-//     https://github.com/wong2/first-commit/issues/15#issuecomment-317750579
+// XXX it doesn't work on private repos. a way to do that can be found here,
+// but it requires an authentication token:
+// https://gist.github.com/simonewebdesign/a70f6c89ffd71e6ba4f7dcf7cc74ccf8
 function openFirstCommit (user, repo) {
     return fetch(`https://api.github.com/repos/${user}/${repo}/commits`)
         // the `Link` header has additional URLs for paging.
@@ -40,7 +39,7 @@ function openFirstCommit (user, repo) {
         .then(([link, commits]) => {
             if (link) {
                 // the link header contains two URLs and has the following
-                // format in a single line (wrapped for readability):
+                // format (wrapped for readability):
                 //
                 //     <https://api.github.com/repositories/1234/commits?page=2>;
                 //     rel="next",
@@ -74,7 +73,7 @@ function addLink ($commitBar) {
     // the "First commit" link already exists when navigating to a repo's
     // homepage via the back button. however, resurrecting the link in this way
     // causes its onclick event handler to be unregistered (XXX why?), so we
-    // need to re-attach it
+    // still need to re-attach it
     let $firstCommit = $commitBar.find('#first-commit')
 
     if (!$firstCommit.length) {
