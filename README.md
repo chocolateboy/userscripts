@@ -49,7 +49,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### GitHub
 
-* [GitHub First Commit](https://github.com/chocolateboy/userscripts/raw/master/github_first_commit.user.js "Install") - add a link to a GitHub repo's first commit
+* [GitHub First Commit](https://greasyfork.org/en/scripts/38557-github-first-commit "Homepage") - add a link to a GitHub repo's first commit
 
 ### Google
 
