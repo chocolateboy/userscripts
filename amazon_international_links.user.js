@@ -3,41 +3,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.2.1
+// @version       3.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
-// @include       http://www.amazon.ca/*
-// @include       http://www.amazon.cn/*
-// @include       http://www.amazon.co.jp/*
-// @include       http://www.amazon.co.uk/*
-// @include       http://www.amazon.com/*
-// @include       http://www.amazon.com.au/*
-// @include       http://www.amazon.com.br/*
-// @include       http://www.amazon.com.mx/*
-// @include       http://www.amazon.de/*
-// @include       http://www.amazon.es/*
-// @include       http://www.amazon.fr/*
-// @include       http://www.amazon.in/*
-// @include       http://www.amazon.it/*
-// @include       http://www.amazon.nl/*
-// @include       https://www.amazon.ca/*
-// @include       https://www.amazon.cn/*
-// @include       https://www.amazon.co.jp/*
-// @include       https://www.amazon.co.uk/*
-// @include       https://www.amazon.com/*
-// @include       https://www.amazon.com.au/*
-// @include       https://www.amazon.com.br/*
-// @include       https://www.amazon.com.mx/*
-// @include       https://www.amazon.de/*
-// @include       https://www.amazon.es/*
-// @include       https://www.amazon.fr/*
-// @include       https://www.amazon.in/*
-// @include       https://www.amazon.it/*
-// @include       https://www.amazon.nl/*
-// @require       https://code.jquery.com/jquery-3.1.1.min.js
-// @require       https://cdn.rawgit.com/sizzlemctwizzle/GM_config/master/gm_config.js
-// @require       https://cdn.rawgit.com/alexei/sprintf.js/1.0.3/dist/sprintf.min.js
-// @require       https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.16.2/lodash.min.js
+// @include       https://www.amazon.tld/*
+// @require       https://code.jquery.com/jquery-3.3.1.min.js
+// @require       https://cdn.rawgit.com/sizzlemctwizzle/GM_config/6a82709680bbeb3bd2041a4345638b628d537c96/gm_config.js
+// @require       https://cdn.rawgit.com/aduth/hijinks/23b74cdb43d3a76f4981c815eb3961c2625c7ae7/hijinks.min.js
 // @grant         GM_registerMenuCommand
 // @grant         GM_getValue
 // @grant         GM_setValue
@@ -52,237 +24,180 @@
 
 /*********************** Constants ********************************/
 
-var ASIN, CURRENT_TLD, LINKS, PROTOCOL, SITES;
-var $CROSS_SHOP_LINKS, $LINK, $SEPARATOR; // the $ sigil denotes jQuery objects
-var addLink, displayLinks; // functions that depend on the site design
+// a map from the Amazon TLD to the corresponding two-letter country code
+// XXX technically, UK should be GB: http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+const SITES = {
+    'com.au': 'AU', // Australia
+    'com.br': 'BR', // Brazil
+    'ca':     'CA', // Canada
+    'cn':     'CN', // China
+    'de':     'DE', // Germany
+    'es':     'ES', // Spain
+    'fr':     'FR', // France
+    'in':     'IN', // India
+    'it':     'IT', // Italy
+    'co.jp':  'JP', // Japan
+    'com.mx': 'MX', // Mexico
+    'nl':     'NL', // Netherlands
+    'co.uk':  'UK', // UK
+    'com':    'US'  // US
+}
 
-/*********************** Functions ********************************/
+// a tiny DOM builder to avoid cluttering the code with HTML templates
+// https://github.com/aduth/hijinks
+const el = hijinks
 
-// convenience function to reduce the verbosity of underscore.js chaining
-// see: http://github.com/documentcloud/underscore/issues/issue/37
-function __(obj) { return _(obj).chain() }
+/*********************** Functions and Classes ********************************/
 
-// lazily initialize constants - these are only assigned if the ASIN is found
-function initializeConstants (asin) {
-    var location = document.location;
+// A class which encapsulates the logic for creating and updating cross-site links
+class Linker {
+    // get the unique identifier (ASIN - Amazon Standard Identification Number)
+    // for this product, or return a falsey value if it's not found
+    static getASIN () {
+        let asin, $asin = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]')
 
-    if (($CROSS_SHOP_LINKS = $('#nav-xshop')).length) { // v3
-        addLink = v3AddLink;
-        displayLinks = v2DisplayLinks;
-    } else if (($CROSS_SHOP_LINKS = $('#nav-cross-shop-links')).length) { // v2
-        addLink = v2AddLink;
-        displayLinks = v2DisplayLinks;
-    } else { // v1 (XXX probably no longer used)
-        // the penultimate Amazon cross-site link e.g. "Your Account"
-        $LINK = $('a.navCrossshopYALink').eq(-2);
+        if ($asin.length) {
+            asin = $asin.val()
+        } else { // if there's a canonical link, try to retrieve the ASIN from its URI
+            // <link rel="canonical" href="https://www.amazon.com/Follows-Movie-Poster-18-28/dp/B01BKUBARA" />
+            let match, canonical = $('link[rel="canonical"][href]').attr('href')
 
-        // a span with a spaced vertical bar
-        $SEPARATOR = $LINK.next();
+            if (canonical && (match = canonical.match('/dp/(\\w+)$'))) {
+                asin = match[1]
+            }
+        }
 
-        addLink = v1AddLink;
-        displayLinks = v1DisplayLinks;
+        return asin
     }
 
-    // the unique Amazon identifier for this product
-    ASIN = asin;
+    // return the subset of the TLD -> country-code map (SITES)
+    // corresponding to the enabled sites
+    static getConfiguredSites () {
+        const sites = {}
 
-    // one of the current Amazon TLDs
-    CURRENT_TLD = location.hostname.substr('www.amazon.'.length);
-
-    // an array of our added elements - jQuery objects representing (v1)
-    // alternating links and separators, (v2) li-wrapped links, or (v3)
-    // links
-    LINKS = [];
-
-    // http: or https:
-    PROTOCOL = location.protocol;
-
-    // a map from the Amazon TLD to the corresponding two-letter country code
-    // (technically (shmechnically), UK should be GB:
-    // http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
-    SITES = {
-        'com.au': 'AU', // Australia
-        'com.br': 'BR', // Brazil
-        'ca':     'CA', // Canada
-        'cn':     'CN', // China
-        'de':     'DE', // Germany
-        'es':     'ES', // Spain
-        'fr':     'FR', // France
-        'in':     'IN', // India
-        'it':     'IT', // Italy
-        'co.jp':  'JP', // Japan
-        'com.mx': 'MX', // Mexico
-        'nl':     'NL', // Netherlands
-        'co.uk':  'UK', // UK
-        'com':    'US'  // US
-    };
-}
-
-// build the underlying data model used by the GM_config utility
-function initializeConfig () {
-    var checkboxes = __(SITES).keys().reduce(
-        function (fields, tld) {
-            var country = SITES[tld];
-
-            fields[tld] = {
-                type: 'checkbox',
-                label: country,
-                title: sprintf('amazon.%s', tld),
-                default: (country === 'UK' || country === 'US')
-            };
-
-            return fields;
-        },
-        {}
-    ).value();
-
-    // re-render the links if the settings are updated
-    var callbacks = {
-        save: function () { removeLinks(); addLinks() }
-    };
-
-    GM_config.init('Amazon International Links Settings', checkboxes, callbacks);
-}
-
-// display the settings manager
-function showConfig () {
-    GM_config.open();
-}
-
-// return the subset of the TLD -> country code map (SITES)
-// corresponding to the enabled sites
-function getConfiguredSites () {
-    return __(SITES).keys().reduce(
-        function (sites, tld) {
+        for (const tld of Object.keys(SITES)) {
             if (GM_config.get(tld)) {
-                sites[tld] = SITES[tld];
+                sites[tld] = SITES[tld]
+            }
+        }
+
+        return sites
+    }
+
+    constructor (asin) {
+        // the unique Amazon identifier for this product
+        this.asin = asin
+
+        // the navbar to add the cross-site links to
+        this.crossSiteLinks = $('#nav-xshop')
+
+        // an array of our added elements - jQuery objects representing
+        // <a>...</a> links
+        //
+        // we keep a reference to these elements so we can easily remove them
+        // from the DOM (and replace them with new elements) whenever the
+        // country selection changes
+        this.links = []
+    }
+
+    // add a link element to the internal `links` array
+    addLink (tld, country) {
+        const attrs = {
+            class: 'nav-a',
+            style: 'display: inline-block',
+            title: `amazon.${tld}`
+        }
+
+        // one of the current Amazon TLDs
+        const currentTld = location.hostname.substr('www.amazon.'.length)
+
+        let tag
+
+        if (tld === currentTld) {
+            tag = 'strong'
+        } else {
+            tag = 'a'
+            attrs.href = `//www.amazon.${tld}/dp/${this.asin}`
+        }
+
+        const link = el(tag, attrs, country)
+
+        this.links.push($(link))
+    }
+
+    // populate the array of links and display them by appending them to the
+    // body of the cross-site navigation bar
+    addLinks () {
+        const sites = this.constructor.getConfiguredSites()
+
+        if (!$.isEmptyObject(sites)) {
+            // sort the TLDs by the country code (e.g. AU) rather than the TLD
+            // (e.g. com.au)
+            // const tlds = sortBy(Object.keys(sites), tld => sites[tld])
+            const tlds = Object.keys(sites).sort((a, b) => sites[a].localeCompare(sites[b]))
+
+            // populate the `links` array with jQuery wrappers for link
+            // (i.e. <a>...</a>) elements
+            for (const tld of tlds) {
+                const country = sites[tld]
+                this.addLink(tld, country)
             }
 
-            return sites;
-        },
-        {}
-    ).value();
-}
-
-// remove all added links (and separators) from the DOM and clear the array
-// referencing them
-function removeLinks () {
-    _.each(LINKS, function (el) { el.remove() }); // remove from the DOM...
-    LINKS.length = 0; // ...and empty the array
-}
-
-// add a link + separator to the LINKS array
-function v1AddLink (tld, country) {
-    var html;
-
-    if (tld === CURRENT_TLD) {
-        html = sprintf('<strong title="amazon.%s">%s</strong>', tld, country);
-    } else {
-        html = sprintf(
-            '<a href="%s//www.amazon.%s/dp/%s" class="navCrossshopYALink" title="amazon.%2$s">%s</a>',
-            PROTOCOL, tld, ASIN, country
-        );
+            // append the cross-site links to the body of the crossSiteLinks container
+            this.crossSiteLinks.append.apply(this.crossSiteLinks, this.links)
+        }
     }
 
-    LINKS.push($(html), $SEPARATOR.clone());
-}
+    // build the underlying data model used by the GM_config utility
+    initializeConfig () {
+        const checkboxes = {}
 
-// add a li-wrapped link to the LINKS array
-function v2AddLink (tld, country) {
-    var html;
+        for (const tld of Object.keys(SITES)) {
+            const country = SITES[tld]
 
-    if (tld === CURRENT_TLD) {
-        html = sprintf(
-            '<li class="nav-xs-link"><strong class="nav_a" title="amazon.%s">%s</strong></li>',
-            tld, country
-        );
-    } else {
-        html = sprintf(
-            '<li class="nav-xs-link"><a class="nav_a" href="%s//www.amazon.%s/dp/%s" title="amazon.%2$s">%s</a></li>',
-            PROTOCOL, tld, ASIN, country
-        );
+            checkboxes[tld] = {
+                type: 'checkbox',
+                label: country,
+                title: `amazon.${tld}`,
+                default: (country === 'UK' || country === 'US')
+            }
+        }
+
+        // re-render the links when the settings are updated
+        const save = () => {
+            this.removeLinks()
+            this.addLinks()
+            GM_config.close()
+        }
+
+        const callbacks = { save }
+
+        GM_config.init('Amazon International Links Settings', checkboxes, callbacks)
     }
 
-    var $link = $(html);
+    // remove all added links (and separators) from the DOM and clear the array
+    // referencing them
+    removeLinks () {
+        const { links } = this
 
-    // 2014-03-07: Amazon appear to be testing a new design
-    // in which these links are no longer enclosed by <li>
-    // elements
-    if (!$CROSS_SHOP_LINKS.children('li').length) {
-        $link = $link.children(); // remove the <li> wrapper
-    }
+        for (const $link of links) {
+            $link.remove() // remove from the DOM...
+        }
 
-    LINKS.push($link);
-}
-
-// add a link to the LINKS array
-function v3AddLink (tld, country) {
-    var html;
-
-    if (tld === CURRENT_TLD) {
-        html = sprintf(
-           '<strong style="display: inline-block;" tabindex="1" class="nav-a" title="amazon.%s">%s</strong>',
-           tld,
-           country
-        );
-    } else {
-        html = sprintf(
-            '<a style="display: inline-block;" tabindex="1" href="%s//www.amazon.%s/dp/%s" class="nav-a" ' +
-                'title="amazon.%2$s">%s</a>',
-            PROTOCOL, tld, ASIN, country
-        );
-    }
-
-    LINKS.push($(html));
-}
-
-// prepend the cross-site links to the "Your Account" link
-function v1DisplayLinks () {
-    $LINK.before.apply($LINK, LINKS);
-}
-
-// append the cross-site links to the body of the $CROSS_SHOP_LINKS container
-function v2DisplayLinks () {
-    $CROSS_SHOP_LINKS.append.apply($CROSS_SHOP_LINKS, LINKS);
-}
-
-// populate the array of links and display them by attaching them to the body of
-// the cross-site navigation bar
-function addLinks () {
-    var sites = getConfiguredSites();
-
-    if (!_.isEmpty(sites)) {
-        var tlds = __(sites).keys().sortBy(function (tld) { return sites[tld] }).value();
-
-        _.each(tlds, function (tld) {
-            var country = sites[tld];
-            addLink(tld, country);
-        });
-
-        displayLinks();
+        links.length = 0; // ...and empty the array
     }
 }
 
 /*********************** Main ********************************/
 
-var asin;
-var $asin = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]');
-
-if ($asin.length) {
-    asin = $asin.val();
-} else { // if there's a canonical link, try to retrieve the ASIN from the URI
-    // <link rel="canonical" href="http://www.amazon.com/The-Frozen-Lake-ebook/dp/B005O53TPE" />
-    var canonical = $('link[rel="canonical"][href]').attr('href');
-    var match;
-
-    if (canonical && (match = canonical.match('/dp/(\\w+)$'))) {
-        asin = match[1];
-    }
-}
+const asin = Linker.getASIN()
 
 if (asin) {
-    initializeConstants(asin);
-    initializeConfig();
-    GM_registerMenuCommand('Configure Amazon International Links', showConfig);
-    addLinks();
+    const showConfig = () => GM_config.open() // display the settings manager
+    const linker = new Linker(asin)
+
+    linker.initializeConfig()
+    linker.addLinks()
+
+    GM_registerMenuCommand('Configure Amazon International Links', showConfig)
 }
