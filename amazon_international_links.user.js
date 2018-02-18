@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       3.0.0
+// @version       3.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       https://www.amazon.tld/*
@@ -91,6 +91,9 @@ class Linker {
         // the navbar to add the cross-site links to
         this.crossSiteLinks = $('#nav-xshop')
 
+        // the TLD of the current Amazon site e.g. "co.uk" or "com"
+        this.currentTld = location.hostname.substr('www.amazon.'.length)
+
         // an array of our added elements - jQuery objects representing
         // <a>...</a> links
         //
@@ -108,12 +111,9 @@ class Linker {
             title: `amazon.${tld}`
         }
 
-        // one of the current Amazon TLDs
-        const currentTld = location.hostname.substr('www.amazon.'.length)
-
         let tag
 
-        if (tld === currentTld) {
+        if (tld === this.currentTld) {
             tag = 'strong'
         } else {
             tag = 'a'
