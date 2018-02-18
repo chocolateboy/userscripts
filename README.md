@@ -45,7 +45,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### Amazon
 
-* [Amazon International Links](https://github.com/chocolateboy/userscripts/raw/master/amazon_international_links.user.js "Install") - add international links to Amazon product pages
+* [Amazon International Links](https://greasyfork.org/en/scripts/38639-amazon-international-links "Homepage") - add international links to Amazon product pages
 
 ### GitHub
 
