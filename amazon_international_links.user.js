@@ -3,7 +3,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       3.0.1
+// @version       3.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @description   Add international links to Amazon product pages
 // @include       https://www.amazon.tld/*
@@ -31,16 +31,16 @@ const SITES = {
     'com.br': 'BR', // Brazil
     'ca':     'CA', // Canada
     'cn':     'CN', // China
-    'de':     'DE', // Germany
-    'es':     'ES', // Spain
     'fr':     'FR', // France
+    'de':     'DE', // Germany
     'in':     'IN', // India
     'it':     'IT', // Italy
     'co.jp':  'JP', // Japan
     'com.mx': 'MX', // Mexico
     'nl':     'NL', // Netherlands
+    'es':     'ES', // Spain
     'co.uk':  'UK', // UK
-    'com':    'US'  // US
+    'com':    'US', // US
 }
 
 // a tiny DOM builder to avoid cluttering the code with HTML templates
@@ -70,29 +70,12 @@ class Linker {
         return asin
     }
 
-    // return the subset of the TLD -> country-code map (SITES)
-    // corresponding to the enabled sites
-    static getConfiguredSites () {
-        const sites = {}
-
-        for (const tld of Object.keys(SITES)) {
-            if (GM_config.get(tld)) {
-                sites[tld] = SITES[tld]
-            }
-        }
-
-        return sites
-    }
-
     constructor (asin) {
         // the unique Amazon identifier for this product
         this.asin = asin
 
         // the navbar to add the cross-site links to
         this.crossSiteLinks = $('#nav-xshop')
-
-        // the TLD of the current Amazon site e.g. "co.uk" or "com"
-        this.currentTld = location.hostname.substr('www.amazon.'.length)
 
         // an array of our added elements - jQuery objects representing
         // <a>...</a> links
@@ -101,6 +84,9 @@ class Linker {
         // from the DOM (and replace them with new elements) whenever the
         // country selection changes
         this.links = []
+
+        // the TLD of the current Amazon site e.g. "co.uk" or "com"
+        this.tld = location.hostname.substr('www.amazon.'.length)
     }
 
     // add a link element to the internal `links` array
@@ -113,7 +99,7 @@ class Linker {
 
         let tag
 
-        if (tld === this.currentTld) {
+        if (tld === this.tld) {
             tag = 'strong'
         } else {
             tag = 'a'
@@ -128,7 +114,11 @@ class Linker {
     // populate the array of links and display them by appending them to the
     // body of the cross-site navigation bar
     addLinks () {
-        const sites = this.constructor.getConfiguredSites()
+        // create the subset of the TLD -> country-code map (SITES)
+        // corresponding to the enabled sites
+        const sites = Object.entries(SITES)
+            .filter(([tld]) => GM_config.get(tld))
+            .reduce((obj, [key, val]) => { return obj[key] = val, obj }, {})
 
         if (!$.isEmptyObject(sites)) {
             // sort the TLDs by the country code (e.g. AU) rather than the TLD
@@ -175,8 +165,7 @@ class Linker {
         GM_config.init('Amazon International Links Settings', checkboxes, callbacks)
     }
 
-    // remove all added links (and separators) from the DOM and clear the array
-    // referencing them
+    // remove all added links from the DOM and clear the array referencing them
     removeLinks () {
         const { links } = this
 
