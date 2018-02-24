@@ -21,7 +21,14 @@
 
 Each link below points to the userscript's homepage on [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy). If a userscript doesn't have a homepage (yet), clicking the link installs it directly.
 
-:bulb: Where possible, always install (or reinstall) these userscripts from GreasyFork, as this repo may contain development versions of these userscripts that aren't ready for release and may not even compile. In addition, the file/directory names here are subject to change, whereas the URLs on GreasyFork will always remain stable.
+Where possible, always install (or reinstall) these userscripts from GreasyFork, as this repo may contain development versions of these userscripts that aren't ready for release and may not even compile. In addition, the file/directory names here are subject to change, whereas the URLs on GreasyFork will always remain stable.
+
+Note that these scripts don't currently support the [Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html). Some may work, but none have been tested. For scripts that no longer work with Greasemonkey 4, the following options are available:
+
+* [Greasemonkey 3](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/versions/?page=1#version-3.17) on versions of Firefox that support legacy addons (e.g. [Waterfox](https://www.waterfoxproject.org/) and [Firefox 52 ESR](https://www.mozilla.org/en-US/firefox/organizations/))
+* [Violentmonkey](https://violentmonkey.github.io/get-it/)
+* [Tampermonkey](https://tampermonkey.net/) ([closed source](https://github.com/Tampermonkey/tampermonkey/issues/214))
+
 ## Highlighters
 
 Highlight new stories since the last time a site was visited
