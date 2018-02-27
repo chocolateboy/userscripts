@@ -4,16 +4,18 @@
 - [Highlighters](#highlighters)
 - [Pagerizers](#pagerizers)
 - [Sites](#sites)
-    - [Amazon](#amazon)
-    - [GitHub](#github)
-    - [Google](#google)
-    - [Hacker News](#hacker-news)
-    - [IMDb](#imdb)
-    - [Last.fm](#lastfm)
-    - [Reddit](#reddit)
-    - [Rotten Tomatoes](#rotten-tomatoes)
+  - [Amazon](#amazon)
+  - [GitHub](#github)
+  - [Google](#google)
+  - [Hacker News](#hacker-news)
+  - [IMDb](#imdb)
+  - [Last.fm](#lastfm)
+  - [Reddit](#reddit)
+  - [Rotten Tomatoes](#rotten-tomatoes)
 - [Misc](#misc)
 - [See Also](#see-also)
+  - [Libraries](#libraries)
+  - [Links](#links)
 - [Author](#author)
 - [Copyright and License](#copyright-and-license)
 
@@ -83,11 +85,18 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 * [More Tomatoes](https://greasyfork.org/scripts/23435-more-tomatoes/ "Homepage") - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
 
-### Misc
+## Misc
 
 * [ISO 8601 Dates](https://greasyfork.org/scripts/23436-iso-8601-dates/ "Homepage") - display US dates in the ISO 8601 YYYY-MM-DD format
 
 ## See Also
+
+### Libraries
+
+* [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - jQuery plugin for highlighter userscripts
+* [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - jQuery plugin for pagerizer userscripts
+
+### Links
 
 * [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy)
 * [USO Mirror](http://userscripts-mirror.org/users/3169/scripts)
