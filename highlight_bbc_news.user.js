@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.11.0
+// @version       0.12.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
 // @include       http://www.bbc.com/news
@@ -18,16 +18,6 @@
 // @grant         GM_registerMenuCommand
 // @grant         GM_setValue
 // ==/UserScript==
-
-// a few hrefs are absolute URLs even though they link to internal articles.
-// This regex is used to make them relative by stripping the site prefix e.g.:
-//
-//     "http://www.bbc.com/sport/cricket/37815544" -> "/sport/cricket/37815544"
-//
-// some articles on bbc.com link to bbc.co.uk, so to ensure an article seen on
-// bbc.co.uk is also seen on bbc.com, we remove both rather than just the
-// current site
-const SITE = /^https?:\/\/www\.bbc\.co(?:m|\.uk)/
 
 // a mapping from item selectors to target selectors on the main news page
 // e.g. http://www.bbc.co.uk/news
@@ -98,43 +88,22 @@ function target () {
     return $item
 }
 
-// return a unique identifier for each link: a cleaned up, site-agnostic version
+// return a unique identifier for each link: a cleaned up, cross-site version
 // of the link's href
 //
-// links in the "Watch/Listen" blocks (two are defined in the markup,
-// but only one is displayed) are dynamically changed (by a `replaceUrls`
-// method defined in all.js)
+// remove the hash, if any, and any trailing non-word characters from the
+// path of the resolved URL. this treats the following pairs as equivalent:
 //
-// from (e.g.):
+//     "/sport/cricket/37815544/#story-footer"
+//     "/sport/cricket/37815544"
 //
-//     "/news/magazine-<asset-id>"
-//
-// to:
-//
-//      "<headlines>/<asset-id>"                  # wide
-//      "<headlines>/<asset-id>#video-<asset-id>" # compact
-//
-// where <headlines> is the href of the "More Video Top Stories"
-// link, currently "/news/video_and_audio/headlines"
-//
-// e.g.:
-//
-//     "/news/magazine-37804620" -> "/news/video_and_audio/headlines/37804620"
-//
-// we get them before they're changed, which is handy as the same links
-// can appear (with the original href) in the "Most Popular" block
+//     "/news/video_and_audio/headlines/37804620#video-37804620"
+//     "/news/video_and_audio/headlines/37804620"
 function id () {
-    return $(this).attr('href')
-        .replace(SITE, '')
-        // don't treat hrefs with fragments as new e.g. treat the following
-        // as equivalent:
-        //
-        //     "/sport/cricket/37815544/#story-footer"
-        //     "/sport/cricket/37815544"
-        //
-        //     "/news/video_and_audio/headlines/37804620#video-37804620"
-        //     "/news/video_and_audio/headlines/37804620"
-        .replace(/\/?#[^/]+$/, '')
+    const href = $(this).attr('href')
+    const url = new URL(href, location.href)
+
+    return url.pathname.replace(/\W+$/, '')
 }
 
 $.highlight({ item: ITEMS, id, target, onHighlight })
