@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.2.1
+// @version       2.2.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/*/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
@@ -23,7 +23,7 @@ const FIRST_COMMIT =
         <a id="first-commit-link" style="cursor: pointer" class="message">First commit</a>
     </span>`
 
-// this function extracts the URL of the repo's first-commit and navigates to it.
+// this function extracts the URL of the repo's first commit and navigates to it.
 // it is based on code by several developers, a list of whom can be found here:
 // https://github.com/FarhadG/init#contributors
 //
@@ -46,14 +46,16 @@ function openFirstCommit (user, repo) {
                 //     <https://api.github.com/repositories/1234/commits?page=9>;
                 //     rel="last"
 
-                // extract the URL of the last page
+                // extract the URL of the last page (commits are ordered in
+                // reverse chronological order, like the CLI, so the first
+                // commit is on the last page)
                 const lastPage = link.match(/^.+?<([^>]+)>;/)[1]
 
                 // fetch the last page of results
                 return fetch(lastPage).then(res => res.json())
             }
 
-            // if no link, we know we're on the only page
+            // if there's no link, we know we're on the only page
             return commits
         })
 
@@ -91,7 +93,7 @@ function addLink ($commitBar) {
 }
 
 // the commit bar (div.commit-tease) is statically defined in the HTML
-// for users who aren't logged in. for logged in users, it's loaded dynamically
+// for users who aren't logged in. for logged-in users, it's loaded dynamically
 // via an <include-fragment> custom element:
 //
 //     https://github.com/github/include-fragment-element
