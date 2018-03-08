@@ -75,7 +75,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### Last.fm
 
-* [Last Picture Show](https://greasyfork.org/scripts/31179-last-picture-show/ "Homepage") - Link last.fm artist/album images directly to the image page
+* [Last Picture Show](https://greasyfork.org/scripts/31179-last-picture-show/ "Homepage") - link last.fm artist/album images directly to the image page
 
 ### Reddit
 
@@ -93,8 +93,8 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### Libraries
 
-* [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - A jQuery plugin to highlight new items on news sites
-* [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - A jQuery plugin to add next/previous page annotations to web pages
+* [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - a jQuery plugin to highlight new items since the last time a site was visited
+* [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - a jQuery plugin to mark up web pages with next/previous page annotations
 
 ### Links
 
