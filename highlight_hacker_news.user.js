@@ -5,7 +5,7 @@
 // @author        Shaun G (original)
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.9.0
+// @version       0.10.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/
 // @include       /^https://news\.ycombinator\.com/(active|ask|best|front|newest|news|noobstories|show|shownew)\b/
@@ -18,8 +18,7 @@
 // ==/UserScript==
 
 $.highlight({
-    ttl:    { days: 3 },
-    item:   function () { return $('td a[id^=up_]').closest('tr') },
-    target: 'td.title a[href]',
-    id:     function () { return $(this).find('td a[id^=up_]').attr('id').replace('up_', '') }
-});
+    item () { return $('td a[id^=up_]').closest('tr') },
+    target: 'td.title a[href].storylink',
+    id () { return $(this).find('td a[id^=up_]').attr('id').replace('up_', '') },
+})
