@@ -35,11 +35,11 @@ Note that these scripts don't currently support the [Greasemonkey 4 API](https:/
 
 Highlight new stories since the last time a site was visited
 
-* [BBC News](https://github.com/chocolateboy/userscripts/raw/master/highlight_bbc_news.user.js "Install")
-* [Digg](https://github.com/chocolateboy/userscripts/raw/master/highlight_digg.user.js "Install")
-* [Echo JS](https://github.com/chocolateboy/userscripts/raw/master/highlight_echo_js.user.js "Install")
-* [Hacker News](https://github.com/chocolateboy/userscripts/raw/master/highlight_hacker_news.user.js "Install")
-* [Reddit](https://github.com/chocolateboy/userscripts/raw/master/highlight_reddit.user.js "Install")
+* [BBC News](https://greasyfork.org/en/scripts/39310-bbc-news-highlighter "Homepage")
+* [Digg](https://greasyfork.org/en/scripts/39308-digg-highlighter "Homepage")
+* [Echo JS](https://greasyfork.org/en/scripts/39309-echo-js-highlighter "Homepage")
+* [Hacker News](https://greasyfork.org/en/scripts/39311-hacker-news-highlighter "Homepage")
+* [Reddit](https://greasyfork.org/en/scripts/39312-reddit-highlighter "Homepage")
 
 ## Pagerizers
 
