@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name          Hacker News Highlighter
-// @description   Highlight new stories on the Hacker News front page
+// @description   Highlight new stories on Hacker News
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.11.1
+// @version       0.11.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/
 // @include       /^https://news\.ycombinator\.com/(active|ask|best|front|newest|news|noobstories|show|shownew)\b/

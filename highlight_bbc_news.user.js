@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name          BBC News Highlighter
-// @description   Highlight new stories on the BBC News homepage
+// @description   Highlight new stories on BBC News
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.13.1
+// @version       0.13.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
 // @include       http://www.bbc.com/news
