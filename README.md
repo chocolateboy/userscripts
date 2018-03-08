@@ -93,8 +93,8 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 
 ### Libraries
 
-* [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - jQuery plugin for highlighter userscripts
-* [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - jQuery plugin for pagerizer userscripts
+* [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - A jQuery plugin to highlight new items on news sites
+* [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - A jQuery plugin to add next/previous page annotations to web pages
 
 ### Links
 
