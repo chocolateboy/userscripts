@@ -4,10 +4,12 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.3.1
+// @version       2.4.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
+// @include       https://*.imdb.tld/title/tt*
+// @include       https://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdn.rawgit.com/urin/jquery.balloon.js/8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @resource      query https://git.io/vAndS
