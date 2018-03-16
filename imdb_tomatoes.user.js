@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.4.0
+// @version       2.4.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -191,7 +191,7 @@ function affixRT ($target, data) {
                    </div>
                    <div>
                        <span class="subText">
-                           From <a href="http://www.rottentomatoes.com" target="_blank">Rotten Tomatoes</a>
+                           From <a href="https://www.rottentomatoes.com" target="_blank">Rotten Tomatoes</a>
                        </span>
                    </div>
                 </div>
