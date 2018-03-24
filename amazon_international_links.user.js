@@ -121,7 +121,7 @@ class Linker {
             .reduce((obj, [key, val]) => { return obj[key] = val, obj }, {})
 
         if (!$.isEmptyObject(sites)) {
-            // sort the TLDs by the country code (e.g. AU) rather than the TLD
+            // sort the sites by the country code (e.g. AU) rather than the TLD
             // (e.g. com.au)
             // const tlds = sortBy(Object.keys(sites), tld => sites[tld])
             const tlds = Object.keys(sites).sort((a, b) => sites[a].localeCompare(sites[b]))
