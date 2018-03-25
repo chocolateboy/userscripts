@@ -47,7 +47,7 @@ function openFirstCommit (user, repo) {
                 //     rel="last"
 
                 // extract the URL of the last page (commits are ordered in
-                // reverse chronological order, like the CLI, so the first
+                // reverse chronological order, like the CLI, so the oldest
                 // commit is on the last page)
                 const lastPage = link.match(/^.+?<([^>]+)>;/)[1]
 
