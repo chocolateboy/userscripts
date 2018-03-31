@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.5.0
+// @version       2.6.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -244,7 +244,8 @@ function getRTData (json, imdb) {
     const movie = $.grep(response, it => it.imdbID === imdb.id)
 
     if (movie && movie.length) {
-        const url = `https://www.rottentomatoes.com/search/?search=${imdb.title}`
+        const title = escape(imdb.title)
+        const url = `https://www.rottentomatoes.com/search/?search=${title}`
 
         let consensus = movie[0].RTConsensus || NO_CONSENSUS
         let score = movie[0].RTCriticMeter
