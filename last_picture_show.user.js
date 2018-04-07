@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.0
+// @version       1.1.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.last.fm/*
 // @include       https://*.last.fm/*
@@ -69,7 +69,7 @@
         </div>
 */
 
-// XXX don't include the images in "Similar Tracks" grids. those images are
+// XXX don't include the images in "Similar Tracks" grids. their pages are
 // located in album (or release) "subfolders" e.g.:
 //
 //   - image: https://lastfm-img2.akamaized.net/i/u/300x300/fafc74a8f45241acc10158be6e2d8270.jpg
@@ -82,7 +82,7 @@
 // XXX last.fm doesn't distinguish the "Similar Tracks" grid from the "Similar
 // Artists" grid in any way (same markup and CSS), so we have to identify
 // (and exclude) it as "section 1 of 2 in the similar-tracks-and-artists row"
-const GRID_ITEMS = '.grid-items-cover-image:not(.similar-tracks-and-artists-row section:nth-of-type(1) .grid-items-cover-image)'
+const ITEMS = '.grid-items-cover-image:not(.similar-tracks-and-artists-row section:nth-of-type(1) .grid-items-cover-image)'
 
 function onItems ($items) {
     $items.each(function () {
@@ -95,4 +95,4 @@ function onItems ($items) {
     })
 }
 
-$.onCreate(GRID_ITEMS, onItems, true /* multi */)
+$.onCreate(ITEMS, onItems, true /* multi */)
