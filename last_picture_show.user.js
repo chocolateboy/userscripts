@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.1.1
+// @version       1.2.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.last.fm/*
 // @include       https://*.last.fm/*
@@ -69,23 +69,42 @@
         </div>
 */
 
-// XXX don't include the images in "Similar Tracks" grids. their pages are
-// located in album (or release) "subfolders" e.g.:
-//
-//   - image: https://lastfm-img2.akamaized.net/i/u/300x300/fafc74a8f45241acc10158be6e2d8270.jpg
-//   - track: https://www.last.fm/music/The+Beatles/_/Doctor+Robert
-//   - image page: https://www.last.fm/music/The+Beatles/Revolver/+images/fafc74a8f45241acc10158be6e2d8270
-//
-// but last.fm doesn't include any additional data in the "Similar Tracks"
-// grids which can be used to identify the release (e.g. "Revolver").
-//
-// XXX last.fm doesn't distinguish the "Similar Tracks" grid from the "Similar
-// Artists" grid in any way (same markup and CSS), so we have to identify
-// (and exclude) it as "section 1 of 2 in the similar-tracks-and-artists row"
-const ITEMS = '.grid-items-cover-image:not(.similar-tracks-and-artists-row section:nth-of-type(1) .grid-items-cover-image)'
+// selector for the nearest parent element (div) which contains both the image
+// and a link to the artist/album
+const ITEM = '.grid-items-cover-image'
+
+// filter out "Similar Tracks" tiles (no way to determine the image page) and
+// tiles without an image
+function filterItems () {
+    const $item = $(this)
+
+    // XXX don't include the images in "Similar Tracks" grids. their pages are
+    // located in album (or release) "subfolders" e.g.:
+    //
+    //   - image: https://lastfm-img2.akamaized.net/i/u/300x300/fafc74a8f45241acc10158be6e2d8270.jpg
+    //   - track: https://www.last.fm/music/The+Beatles/_/Doctor+Robert
+    //   - image page: https://www.last.fm/music/The+Beatles/Revolver/+images/fafc74a8f45241acc10158be6e2d8270
+    //
+    // but last.fm doesn't include any additional data in the "Similar Tracks"
+    // grids which can be used to identify the release (e.g. "Revolver").
+    //
+    // XXX last.fm doesn't distinguish the "Similar Tracks" grid from the "Similar
+    // Artists" grid in any way (same markup and CSS), so we have to identify
+    // (and exclude) it as "section 1 of 2 in the similar-tracks-and-artists row"
+    if ($item.is(`.similar-tracks-and-artists-row section:nth-of-type(1) ${ITEM}`))
+        return false
+
+    // XXX we also need to exclude tiles with missing/default images. they have
+    // an additional .grid-items-cover-default class on their image-container div
+    // alongside .grid-items-cover-image-image
+    if ($item.has('.grid-items-cover-default').length)
+        return false
+
+    return true
+}
 
 function onItems ($items) {
-    $items.each(function () {
+    $items.filter(filterItems).each(function () {
         const $item = $(this)
         const $image = $item.find('.grid-items-cover-image-image img[src]')
         const imageId = $image.attr('src').match(/\/([^/.]+)\.\w+$/)[1]
@@ -95,4 +114,4 @@ function onItems ($items) {
     })
 }
 
-$.onCreate(ITEMS, onItems, true /* multi */)
+$.onCreate(ITEM, onItems, true /* multi */)
