@@ -4,13 +4,13 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.3
+// @version       1.1.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.last.fm/*
 // @include       https://*.last.fm/*
 // @include       http://*.lastfm.tld/*
 // @include       https://*.lastfm.tld/*
-// @require       https://code.jquery.com/jquery-3.2.1.min.js
+// @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log
 // ==/UserScript==
@@ -32,6 +32,7 @@
                     alt="Image for 'Ellie Goulding'"
                 />
             </div>
+
             <div class="grid-items-item-details">
                 <p class="grid-items-item-main-text">
                     <!-- XXX grab the path prefix from here -->
@@ -55,6 +56,7 @@
                     />
                 </a>
             </div>
+
             <div class="grid-items-item-details">
                 <p class="grid-items-item-main-text">
                     <a href="/music/Ellie+Goulding" class="link-block-target">Ellie Goulding</a>
@@ -67,6 +69,21 @@
         </div>
 */
 
+// XXX don't include the images in "Similar Tracks" grids. those images are
+// located in album (or release) "subfolders" e.g.:
+//
+//   - image: https://lastfm-img2.akamaized.net/i/u/300x300/fafc74a8f45241acc10158be6e2d8270.jpg
+//   - track: https://www.last.fm/music/The+Beatles/_/Doctor+Robert
+//   - image page: https://www.last.fm/music/The+Beatles/Revolver/+images/fafc74a8f45241acc10158be6e2d8270
+//
+// but last.fm doesn't include any additional data in the "Similar Tracks"
+// grids which can be used to identify the release (e.g. "Revolver").
+//
+// XXX last.fm doesn't distinguish the "Similar Tracks" grid from the "Similar
+// Artists" grid in any way (same markup and CSS), so we have to identify
+// (and exclude) it as "section 1 of 2 in the similar-tracks-and-artists row"
+const GRID_ITEMS = '.grid-items-cover-image:not(.similar-tracks-and-artists-row section:nth-of-type(1) .grid-items-cover-image)'
+
 function onItems ($items) {
     $items.each(function () {
         const $item = $(this)
@@ -78,4 +95,4 @@ function onItems ($items) {
     })
 }
 
-$.onCreate('.grid-items-cover-image', onItems, true /* multi */)
+$.onCreate(GRID_ITEMS, onItems, true /* multi */)
