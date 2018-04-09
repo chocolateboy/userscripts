@@ -4,11 +4,12 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.2.2
+// @version       2.3.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
-// @include       https://github.com/*/*
+// @include       https://github.com/
+// @include       https://github.com/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
-// @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
+// @require       https://cdn.rawgit.com/pie6k/jquery.initialize/16342abd3d411a20d35390f3e4c966ceb37ec43e/jquery.initialize.min.js
 // @grant         GM_log
 // ==/UserScript==
 
@@ -67,7 +68,8 @@ function openFirstCommit (user, repo) {
 }
 
 // add the "First commit" link as the last child of the commit bar
-function addLink ($commitBar) {
+function addLink () {
+    const $commitBar = $(this)
     const [user, repo] = $('meta[name="octolytics-dimension-repository_network_root_nwo"]')
         .attr('content')
         .split('/')
@@ -98,9 +100,6 @@ function addLink ($commitBar) {
 //
 //     https://github.com/github/include-fragment-element
 //
-// jQuery-onMutate fires the callback immediately if the element already exists,
+// jquery.initialize fires the callback immediately if the element already exists,
 // so it handles both cases
-
-// #js-repo-pjax-container is only created on repo homepages
-// see here for more details: https://github.com/Mottie/GitHub-userscripts/wiki/How-to
-$('#js-repo-pjax-container').onCreate(COMMIT_BAR, addLink, true /* multi */)
+$.initialize(COMMIT_BAR, addLink)
