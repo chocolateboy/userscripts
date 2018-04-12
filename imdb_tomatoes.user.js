@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.6.0
+// @version       2.6.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -38,17 +38,7 @@
  *
  * Broken (incorrect RT/OMDb alias [1]):
  *
- *     http://www.imdb.com/title/tt0104070/ - Death Becomes Her
- *     http://www.imdb.com/title/tt0057115/ - The Great Escape
  *     http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
- *     http://www.imdb.com/title/tt0120768/ - The Negotiator
- *     http://www.imdb.com/title/tt0910936/ - Pineapple Express
- *     http://www.imdb.com/title/tt0448134/ - Sunshine
- *     http://www.imdb.com/title/tt0451279/ - Wonder Woman (2017)
- *
- * Not on RT:
- *
- *     http://www.imdb.com/title/tt5642184/
  */
 
 // [1] unaliased and incorrectly aliased titles are common:
@@ -209,16 +199,16 @@ function affixRT ($target, data) {
         $target.append(html)
     }
 
-    const balloonOptions = $.extend({}, BALLOON_OPTIONS, { contents: consensus })
+    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
 
     $target.find('.rt-consensus').balloon(balloonOptions)
 }
 
-// process the API's JSON response and extract
+// parse the API's JSON response and extract
 // the RT score and consensus.
 //
-// if there's no consensus, set it to "No consensus yet."
-// if the score is null, set it to -1
+// if there's no consensus, default to "No consensus yet."
+// if there's no score, default to -1
 function getRTData (json, imdb) {
     function error (msg) {
         throw `error querying data for ${imdb.id}: ${msg}`
@@ -241,14 +231,14 @@ function getRTData (json, imdb) {
         error(`invalid response: ${type}`)
     }
 
-    const movie = $.grep(response, it => it.imdbID === imdb.id)
+    const [movie] = $.grep(response, it => it.imdbID === imdb.id)
 
-    if (movie && movie.length) {
+    if (movie) {
         const title = escape(imdb.title)
         const url = `https://www.rottentomatoes.com/search/?search=${title}`
 
-        let consensus = movie[0].RTConsensus || NO_CONSENSUS
-        let score = movie[0].RTCriticMeter
+        let consensus = movie.RTConsensus || NO_CONSENSUS
+        let score = movie.RTCriticMeter
 
         consensus = consensus.replace(/--/g, '—')
 
@@ -262,74 +252,90 @@ function getRTData (json, imdb) {
     }
 }
 
+function main () {
+    const $type = $('meta[property="og:type"')
+
+    if ($type.attr('content') !== 'video.movie') {
+        return
+    }
+
+    const $titleReviewBar = $('.titleReviewBar')
+    const $starBox = $('.star-box-details')
+    const $target = ($titleReviewBar.length && $titleReviewBar)
+        || ($starBox.length && $starBox)
+
+    if (!$target) {
+        return
+    }
+
+    const $link = $('link[rel=canonical]')
+
+    if (!$link.length) {
+        return
+    }
+
+    purgeCached(NOW)
+
+    const imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
+    const cached = JSON.parse(GM_getValue(imdbId, 'null'))
+
+    if (cached) {
+        if (cached.error) {
+            // couldn't retrieve any RT data so there's nothing
+            // more we can do
+            console.warn(cached.error)
+        } else {
+            affixRT($target, cached.data)
+        }
+
+        return
+    }
+
+    const title = $('meta[property="og:title"]')
+        .attr('content')
+        .match(/^(.+?)\s+\(\d{4}\)$/)[1]
+
+    const imdb = { id: imdbId, title }
+    const imdbYear = 0 | $('meta[property="og:title"]')
+        .attr('content')
+        .match(/\((\d{4})\)$/)[1]
+
+    const expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
+    const version = DATA_VERSION
+
+    // create or replace an { expires, version, data|error } entry in
+    // the cache
+    function store (data) {
+        const cached = Object.assign({ expires, version }, data)
+        const json = JSON.stringify(cached)
+
+        GM_setValue(imdbId, json)
+    }
+
+    const params = JSON.parse(GM_getResourceText('query'))
+    const api = params.api
+
+    delete params.api
+
+    params.title = title
+    params.yearMax = THIS_YEAR
+
+    get(api, params)
+        .then(json => {
+            const data = getRTData(json, imdb)
+            store({ data })
+            affixRT($target, data)
+        })
+        .catch(error => {
+            store({ error })
+            console.error(error)
+        })
+}
+
 // register this first so data can be cleared even if there's an error
-GM_registerMenuCommand(COMMAND_NAME, function () { purgeCached(-1) })
+GM_registerMenuCommand(COMMAND_NAME, () => { purgeCached(-1) })
 
 // make the background color more legible (darker) if the score is N/A
 GM_addStyle('.score_tbd { background-color: #d9d9d9 }')
 
-const $type = $('meta[property="og:type"')
-const $titleReviewBar = $('.titleReviewBar')
-const $starBox = $('.star-box-details')
-const $target = ($titleReviewBar.length && $titleReviewBar) || ($starBox.length && $starBox)
-
-if ($target && $type.attr('content') === 'video.movie') {
-    const $link = $('link[rel=canonical]')
-
-    if ($link.length) {
-        purgeCached(NOW)
-
-        const imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
-        const cached = JSON.parse(GM_getValue(imdbId, 'null'))
-
-        if (cached) {
-            if (cached.error) {
-                // couldn't retrieve any RT data so there's nothing
-                // more we can do
-                console.warn(cached.error)
-            } else {
-                affixRT($target, cached.data)
-            }
-        } else {
-            const title = $('meta[property="og:title"]')
-                .attr('content')
-                .match(/^(.+?)\s+\(\d{4}\)$/)[1]
-
-            const imdb = { id: imdbId, title }
-            const imdbYear = 0 | $('meta[property="og:title"]')
-                .attr('content')
-                .match(/\((\d{4})\)$/)[1]
-
-            const expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
-            const version = DATA_VERSION
-
-            // create or replace an { expires, version, data|error } entry in
-            // the cache
-            function store (data) {
-                const cached = Object.assign({ expires, version }, data)
-                const json = JSON.stringify(cached)
-
-                GM_setValue(imdbId, json)
-            }
-
-            const params = JSON.parse(GM_getResourceText('query'))
-            const api = params.api
-
-            delete params.api
-
-            params.title = title
-            params.yearMax = THIS_YEAR
-
-            get(api, params)
-                .then(json => getRTData(json, imdb))
-                .then(data => {
-                    store({ data })
-                    affixRT($target, data)
-                })
-                .catch(error => {
-                    store({ error })
-                    console.error(error)
-                })
-        }
-    }
-}
+main()
