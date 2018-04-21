@@ -44,6 +44,7 @@ Highlight new stories since the last time a site was visited
 * [Digg](https://greasyfork.org/en/scripts/39308-digg-highlighter "Homepage")
 * [Echo JS](https://greasyfork.org/en/scripts/39309-echo-js-highlighter "Homepage")
 * [Hacker News](https://greasyfork.org/en/scripts/39311-hacker-news-highlighter "Homepage")
+* [Lobsters](https://greasyfork.org/en/scripts/40906-lobsters-highlighter "Homepage")
 * [Reddit](https://greasyfork.org/en/scripts/39312-reddit-highlighter "Homepage")
 
 ## Pagerizers
