@@ -4,40 +4,40 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.2
+// @version       1.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/*
-// @require       https://code.jquery.com/jquery-3.1.0.min.js
-// @require       https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.15.0/moment.min.js
+// @require       https://code.jquery.com/jquery-3.3.1.min.js
+// @require       https://unpkg.com/dayjs@1.5.11/dist/dayjs.min.js
 // @grant         GM_log
 // ==/UserScript==
 
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
-var DELTA = 1, UNIT = 2;
+const DELTA = 1, UNIT = 2
 
-var DATES = $('html').attr('op') === 'user' ?
+const DATES = $('html').attr('op') === 'user' ?
     'table:eq(-1) tr:eq(1) td:eq(-1)' :
-    'span.age a';
+    'span.age a'
 
 function isoDate (ago) {
-    var match = ago.match(/^(\d+)\s+(\w+)\s+ago$/);
-    var date;
+    const match = ago.match(/^(\d+)\s+(\w+)\s+ago$/)
+    let date
 
     if (match) {
-        date = moment().subtract(match[DELTA], match[UNIT]).format('YYYY-MM-DD');
+        date = dayjs().subtract(match[DELTA], match[UNIT]).format('YYYY-MM-DD')
     }
 
-    return date;
+    return date
 }
 
 $(DATES).each(function () {
-    var $this = $(this);
-    var ago   = $.trim($this.text());
-    var date  = isoDate(ago);
+    const $this = $(this)
+    const ago   = $.trim($this.text())
+    const date  = isoDate(ago)
 
     if (date) {
-        $this.attr('title', date);
+        $this.attr('title', date)
     }
-});
+})
