@@ -54,6 +54,7 @@ These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` link
 * [Amazon](https://github.com/chocolateboy/userscripts/raw/master/pagerize_amazon.user.js "Install")
 * [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ars_technica.user.js "Install")
 * [eBay](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ebay.user.js "Install")
+* [Hacker News](https://github.com/chocolateboy/userscripts/raw/master/pagerize_hacker_news.user.js "Install")
 * [Metafilter](https://github.com/chocolateboy/userscripts/raw/master/pagerize_metafilter.user.js "Install")
 
 ## Sites
