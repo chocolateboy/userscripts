@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.13.2
+// @version       0.13.3
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
 // @include       http://www.bbc.com/news
@@ -31,6 +31,13 @@ const MAIN_PAGE_LINKS = {
 
     // bullets under the main story
     '.nw-o-bullet\\+ > a.nw-o-link-split__anchor:visible': '.nw-o-link-split__text',
+
+    // promoted feature-articles hoisted to the left of the third row of
+    // articles
+    'a.nw-c-feature-promo:visible': '.nw-c-feature-promo__line',
+
+    // live-ticker links for breaking news stories
+    'a.lx-c-dynamic-promo__link:visible': '.lx-c-dynamic-promo__title',
 }
 
 // a mapping from item selectors to target selectors on news subpages e.g.
