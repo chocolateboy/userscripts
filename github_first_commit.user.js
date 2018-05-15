@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.3.0
+// @version       2.4.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
 // @include       https://github.com/*
@@ -16,12 +16,11 @@
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
-const COMMIT_BAR = 'div.commit-tease.js-details-container > span.float-right'
+const COMMIT_BAR = 'div.commit-tease.js-details-container'
 
 const FIRST_COMMIT =
     `<span id="first-commit">
-        |&nbsp;
-        <a id="first-commit-link" style="cursor: pointer" class="message">First commit</a>
+        &nbsp;|&nbsp;<a id="first-commit-link" style="cursor: pointer" class="message">First commit</a>
     </span>`
 
 // this function extracts the URL of the repo's first commit and navigates to it.
