@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.11.1
+// @version       0.12.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://digg.com/
 // @include       https://digg.com/
@@ -20,11 +20,15 @@ $.highlight({
     ttl: { days: 4 },
     item: function () {
         return $('article[data-content-id][data-primary-tag-slug]')
+            .not('[data-content-id="2bcqtJ7"]') // [1]
+            .not('[data-primary-tag-display="Gem"]')
+            .not('[data-primary-tag-display="Promotion"]')
+            .not('[data-primary-tag-display="Promotional"]')
             .not('[data-primary-tag-slug="apps-we-digg"]')
             .not('[data-primary-tag-slug="digg-giveaways"]')
+            .not('[data-primary-tag-slug="digg-pick"]')
             .not('[data-primary-tag-slug="digg-picks"]')
             .not('[data-primary-tag-slug="digg-store"]')
-            .not('[data-content-id="2bcqtJ7"]') // [1]
     },
     target: 'a.digg-story__title-link',
     id: 'data-content-id'
