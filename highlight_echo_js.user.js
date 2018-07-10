@@ -4,8 +4,9 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.7.1
+// @version       0.8.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @include       https://echojs.com/
 // @include       http://www.echojs.com/
 // @include       https://www.echojs.com/
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
