@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.4.0
+// @version       1.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
@@ -30,9 +30,31 @@ function onImageLinks ($imageLinks) {
         // interceptor
         $imageLink.attr('href', meta.ou)
 
-        // wrap the text at the bottom of the image (e.g. "800 x 600 - example.com")
-        // in a link and set its href to the site URL
-        $imageLink.find('.rg_ilmbg').wrap($('<a></a>').attr('href', meta.ru))
+        // there are two layouts for image-search results:
+        //
+        // 1) new (?) (private browsing mode seems to trigger it): has a
+        // dimensions tooltip (e.g. "800 x 600") in the bottom left-hand corner
+        // of the image and a footer (link) below the image with the page name
+        // and the domain in separate DIV elements
+        //
+        // 2) legacy (?): no footer below the image, but the tooltip includes
+        // the domain name (e.g. "800 x 600 - example.com")
+        //
+        // in the first case, we only need to fix the existing link (footer)
+        // i.e. we don't need to linkify the tooltip. in the second case, we
+        // wrap the tooltip in a link and assign it the page URL
+
+        const $footerLink = $container.find('a.irc-nic')
+
+        if ($footerLink.length) {
+            // 1) set the footer link's href to the page URL
+            $footerLink.removeAttr('jsaction').attr('href', meta.ru)
+        } else {
+            // 2) wrap the tooltip in a link whose href points to the page URL
+            $imageLink.find('.rg_ilmbg').wrap(
+                $('<a></a>').attr('href', meta.ru)
+            )
+        }
     })
 }
 
