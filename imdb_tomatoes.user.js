@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.7.0
+// @version       2.8.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -12,7 +12,7 @@
 // @include       https://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdn.rawgit.com/urin/jquery.balloon.js/8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @resource      query https://pastebin.com/raw/3FrfvxqX
+// @resource      query https://pastebin.com/raw/Ck86mQXs
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -322,15 +322,11 @@ function main () {
         GM_setValue(imdbId, json)
     }
 
-    const params = JSON.parse(GM_getResourceText('query'))
-    const { api, request } = params._
+    const query = JSON.parse(GM_getResourceText('query'))
 
-    delete params._
+    Object.assign(query.params, { title, yearMax: THIS_YEAR })
 
-    params.title = title
-    params.yearMax = THIS_YEAR
-
-    get(api, { params, request })
+    get(query.api, query)
         .then(json => {
             const data = getRTData(json, imdb)
             store({ data })
