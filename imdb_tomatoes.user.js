@@ -250,7 +250,7 @@ function getRTData (json, imdb) {
         let consensus = movie.RTConsensus || NO_CONSENSUS
         let score = movie.RTCriticMeter
 
-        consensus = consensus.replace(/--/g, '—')
+        consensus = consensus.replace(/--/g, '&#8212;')
 
         if (score == null) {
             score = -1
