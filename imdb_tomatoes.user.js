@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.6.1
+// @version       2.7.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -12,7 +12,7 @@
 // @include       https://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdn.rawgit.com/urin/jquery.balloon.js/8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @resource      query https://pastebin.com/raw/MuuBJebQ
+// @resource      query https://pastebin.com/raw/3FrfvxqX
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -48,7 +48,6 @@
 
 const COMMAND_NAME    = GM_info.script.name + ': clear cache'
 const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
-const DATA_VERSION    = 2 // version of each cached record; updated whenever the schema changes
 const DEBUG           = false
 const NO_CONSENSUS    = 'No consensus yet.'
 const NOW             = Date.now()
@@ -56,6 +55,16 @@ const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
 const THIS_YEAR       = new Date().getFullYear()
+
+// the version of each cached record is a combination of the schema and the
+// <major>.<minor> parts of the script's (SemVer) version e.g. 3 (schema) +
+// 1.7.0 (script version) gives a version of "3/1.7"
+//
+// this means cached records are invalidated either a) when the schema changes
+// or b) when the major or minor version (i.e. not the patch version) of the
+// script changes
+const SCHEMA_VERSION = 3
+const DATA_VERSION = SCHEMA_VERSION + '/' + GM_info.script.version.replace(/\.\d+$/, '') // e.g. 3/1.7
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -76,19 +85,20 @@ function debug (message) {
 }
 
 // promisified cross-origin HTTP requests
-function get (url, params) {
-    if (params) {
-        url = url + '?' + $.param(params)
+function get (url, options = {}) {
+    if (options.params) {
+        url = url + '?' + $.param(options.params)
     }
 
+    const request = Object.assign({ method: 'GET', url }, options.request || {})
+
     return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url,
-            onload: function (res) { resolve(res.responseText) },
-            // XXX the onerror response object doesn't contain any useful info
-            onerror: function (res) { reject(`error loading ${url}`) },
-        })
+        request.onload = res => { resolve(res.responseText) }
+
+        // XXX the onerror response object doesn't contain any useful info
+        request.onerror = res => { reject(`error loading ${url}`) }
+
+        GM_xmlhttpRequest(request)
     })
 }
 
@@ -313,14 +323,14 @@ function main () {
     }
 
     const params = JSON.parse(GM_getResourceText('query'))
-    const api = params.api
+    const { api, request } = params._
 
-    delete params.api
+    delete params._
 
     params.title = title
     params.yearMax = THIS_YEAR
 
-    get(api, params)
+    get(api, { params, request })
         .then(json => {
             const data = getRTData(json, imdb)
             store({ data })
