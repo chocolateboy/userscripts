@@ -49,7 +49,7 @@ Highlight new stories since the last time a site was visited
 
 ## Pagerizers
 
-These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <kbd>[[</kbd> and <kbd>]]</kbd> in [Tridactyl](https://github.com/cmcaine/tridactyl), [Vim Vixen](https://github.com/ueokande/vim-vixen) &c.
+These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <kbd>[[</kbd> and <kbd>]]</kbd> in [Tridactyl](https://github.com/cmcaine/tridactyl), [Vim Vixen](https://github.com/ueokande/vim-vixen) etc.
 
 * [Amazon](https://github.com/chocolateboy/userscripts/raw/master/pagerize_amazon.user.js "Install")
 * [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/pagerize_ars_technica.user.js "Install")
