@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.8.0
+// @version       2.8.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -47,32 +47,37 @@
 'use strict';
 
 const COMMAND_NAME    = GM_info.script.name + ': clear cache'
-const COMPACT_LAYOUT  = '.plot_summary_wrapper .minPlotHeightWithPoster'
 const DEBUG           = false
 const NO_CONSENSUS    = 'No consensus yet.'
 const NOW             = Date.now()
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
+const SCRIPT_VERSION  = GM_info.script.version
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
 const THIS_YEAR       = new Date().getFullYear()
 
-// the version of each cached record is a combination of the schema and the
-// <major>.<minor> parts of the script's (SemVer) version e.g. 3 (schema) +
-// 1.7.0 (script version) gives a version of "3/1.7"
+const COMPACT_LAYOUT = [
+    '.plot_summary_wrapper .minPlotHeightWithPoster',
+    '.plot_summary_wrapper .minPlotHeightWithPosterAndWatchlistButton'
+].join(', ')
+
+// the version of each cached record is a combination of the schema version and
+// the <major>.<minor> parts of the script's (SemVer) version e.g. 3 (schema
+// version) + 1.7.0 (script version) gives a version of "3/1.7"
 //
 // this means cached records are invalidated either a) when the schema changes
 // or b) when the major or minor version (i.e. not the patch version) of the
 // script changes
 const SCHEMA_VERSION = 3
-const DATA_VERSION = SCHEMA_VERSION + '/' + GM_info.script.version.replace(/\.\d+$/, '') // e.g. 3/1.7
+const DATA_VERSION = SCHEMA_VERSION + '/' + SCRIPT_VERSION.replace(/\.\d+$/, '') // e.g. 3/1.7
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
     css: {
-        maxWidth: '500px',
+        maxWidth: '31rem',
         fontFamily: 'sans-serif',
         fontSize: '0.9rem',
-        padding: '12px',
+        padding: '0.75rem',
     },
     html: true,
     position: 'bottom',
@@ -146,26 +151,26 @@ function affixRT ($target, data) {
         // 4 review widgets is too many for the "compact" layout (i.e.
         // a poster but no trailer). it's designed for a maximum of 3.
         // to work around this, we hoist the review bar out of the
-        // movie-info block (plot_summary_wrapper) and float it left
+        // movie-info block (.plot_summary_wrapper) and float it left
         // beneath the poster e.g.:
         //
         // before:
         //
-        // [  [        ] [                   ] ]
-        // [  [        ] [                   ] ]
-        // [  [ Poster ] [        Info       ] ]
-        // [  [        ] [                   ] ]
-        // [  [        ] [ [MC] [IMDb] [&c.] ] ]
+        // [  [        ] [                    ] ]
+        // [  [        ] [                    ] ]
+        // [  [ Poster ] [        Info        ] ]
+        // [  [        ] [                    ] ]
+        // [  [        ] [ [MC] [IMDb] [etc.] ] ]
         //
         // after:
         //
-        // [  [        ] [                   ] ]
-        // [  [        ] [                   ] ]
-        // [  [ Poster ] [        Info       ] ]
-        // [  [        ] [                   ] ]
-        // [  [        ] [                   ] ]
-        // [                                   ]
-        // [  [RT] [MC] [IMDb] [&c.]           ]
+        // [  [        ] [                    ] ]
+        // [  [        ] [                    ] ]
+        // [  [ Poster ] [        Info        ] ]
+        // [  [        ] [                    ] ]
+        // [  [        ] [                    ] ]
+        // [                                    ]
+        // [  [RT] [MC] [IMDb] [etc.]           ]
 
         if ($(COMPACT_LAYOUT).length && $target.find('.titleReviewBarItem').length > 2) {
             const $clear = $('<div class="clear">&nbsp;</div>')
@@ -269,6 +274,13 @@ function main () {
         return
     }
 
+    const imdbId = $('meta[property="pageId"]').attr('content')
+
+    if (!imdbId) {
+        console.warn(`Can't find IMDb ID for: ${location.href}`)
+        return
+    }
+
     const $titleReviewBar = $('.titleReviewBar')
     const $starBox = $('.star-box-details')
     const $target = ($titleReviewBar.length && $titleReviewBar)
@@ -278,15 +290,8 @@ function main () {
         return
     }
 
-    const $link = $('link[rel=canonical]')
-
-    if (!$link.length) {
-        return
-    }
-
     purgeCached(NOW)
 
-    const imdbId = $link.attr('href').match(/\/title\/(tt\d+)\//)[1]
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
     if (cached) {
@@ -315,8 +320,8 @@ function main () {
 
     // create or replace an { expires, version, data|error } entry in
     // the cache
-    function store (data) {
-        const cached = Object.assign({ expires, version }, data)
+    function store (dataOrError) {
+        const cached = Object.assign({ expires, version }, dataOrError)
         const json = JSON.stringify(cached)
 
         GM_setValue(imdbId, json)
