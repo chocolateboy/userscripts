@@ -32,9 +32,9 @@ Where possible, always install (or reinstall) these userscripts from GreasyFork,
 
 Note that these scripts don't currently support the [Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html). Some may work, but none have been tested. For scripts that no longer work with Greasemonkey 4, the following options are available:
 
-* [Violentmonkey](https://violentmonkey.github.io/get-it/)
+* [Violentmonkey](https://violentmonkey.github.io/get-it/) (**recommended**)
 * [Greasemonkey 3](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/versions/?page=1#version-3.17) on versions of Firefox that support legacy addons (e.g. [Waterfox](https://www.waterfoxproject.org/) or [Firefox 52 ESR](https://www.mozilla.org/en-US/firefox/organizations/))
-* [Tampermonkey](https://tampermonkey.net/) ([closed source](https://github.com/Tampermonkey/tampermonkey/issues/214))
+* Tampermonkey ([closed source](https://github.com/Tampermonkey/tampermonkey/issues/214))
 
 ## Highlighters
 
