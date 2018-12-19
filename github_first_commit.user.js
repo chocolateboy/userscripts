@@ -4,13 +4,14 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.4.0
+// @version       2.5.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
 // @include       https://github.com/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdn.rawgit.com/pie6k/jquery.initialize/16342abd3d411a20d35390f3e4c966ceb37ec43e/jquery.initialize.min.js
 // @grant         GM_log
+// @inject-into   content
 // ==/UserScript==
 
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
