@@ -33,15 +33,14 @@ Where possible, always install (or reinstall) these userscripts from GreasyFork,
 
 ### Engines
 
-All of these scripts work on and are tested against [Violentmonkey](https://violentmonkey.github.io/), which is open source, cross platform, actively maintained, and highly recommended. If for some reason you can't use it — or don't want to — the following options are available:
+All of these scripts work in and are tested on [Violentmonkey](https://violentmonkey.github.io/), which is open source, cross browser, actively maintained, and highly recommended. If for some reason you can't use it — or don't want to — the following options are available:
 
-- [Greasemonkey 4](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html) <sup>[1](#fn1)</sup>
-- [Greasemonkey 3](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/versions/?page=1#version-3.17) <sup>[2](#fn2)</sup>
+- [Greasemonkey](https://addons.mozilla.org/firefox/addon/greasemonkey/) <sup>[1](#fn1)</sup>
 - Tampermonkey ([closed source](https://github.com/Tampermonkey/tampermonkey/issues/214))
 
 <a name="fn1"><sup><b>1</b></sup></a> The [Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html) is not [currently](https://github.com/chocolateboy/userscripts/issues/5) supported. Some scripts may work, but none have been tested.
 <br />
-<a name="fn2"><sup><b>2</b></sup></a> This is only available on versions of Firefox which support legacy addons e.g. [Waterfox](https://www.waterfoxproject.org/) or [Firefox 52 ESR](https://www.mozilla.org/en-US/firefox/organizations/).
+
 ## Highlighters
 
 Highlight new stories since the last time a site was visited
