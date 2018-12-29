@@ -27,9 +27,9 @@
 
 ## Installation
 
-Each link below points to the userscript's homepage on [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy). If a userscript doesn't have a homepage (yet), clicking the link installs it directly.
+Unless otherwise noted, each link below points to the userscript's homepage on [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy).
 
-Where possible, always install (or reinstall) these userscripts from GreasyFork, as this repo may contain development versions of these userscripts that aren't ready for release and may not even compile. In addition, the file/directory names here are subject to change, whereas the URLs on GreasyFork will always remain stable.
+Where possible, always install (or reinstall) these userscripts from GreasyFork, as this repo may contain development versions of these scripts that aren't ready for release and may not even compile. In addition, the file/directory names here are subject to change, whereas the URLs on GreasyFork will always remain stable.
 
 ### Engines
 
