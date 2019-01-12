@@ -4,7 +4,7 @@
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.8.1
+// @version       2.9.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
@@ -98,7 +98,7 @@ function get (url, options = {}) {
     const request = Object.assign({ method: 'GET', url }, options.request || {})
 
     return new Promise((resolve, reject) => {
-        request.onload = res => { resolve(res.responseText) }
+        request.onload = resolve
 
         // XXX the onerror response object doesn't contain any useful info
         request.onerror = res => { reject(`error loading ${url}`) }
@@ -119,8 +119,6 @@ function purgeCached (date) {
         } else if (date === -1 || date > value.expires) {
             debug(`purging expired value: ${key}`)
             GM_deleteValue(key)
-        } else {
-            debug(`cached: ${key} => ${json}`)
         }
     }
 }
@@ -224,7 +222,7 @@ function affixRT ($target, data) {
 //
 // if there's no consensus, default to "No consensus yet."
 // if there's no score, default to -1
-function getRTData (json, imdb) {
+async function getRTData (json, imdb) {
     function error (msg) {
         throw `error querying data for ${imdb.id}: ${msg}`
     }
@@ -250,24 +248,46 @@ function getRTData (json, imdb) {
 
     if (movie) {
         const title = escape(imdb.title)
-        const url = `https://www.rottentomatoes.com/search/?search=${title}`
 
-        let consensus = movie.RTConsensus || NO_CONSENSUS
         let score = movie.RTCriticMeter
-
-        consensus = consensus.replace(/--/g, '&#8212;')
 
         if (score == null) {
             score = -1
         }
 
+        let consensus, url = movie.RTUrl
+
+        if (url) {
+            // the new way: the RT URL is provided: scrape the consensus from
+            // that page
+            const { responseText: html } = await get(url)
+            const parser = new DOMParser()
+            const dom = parser.parseFromString(html, 'text/html')
+            const $consensus = $(dom).find('.critic_consensus').last()
+
+            consensus = $consensus
+                .find(':first-child')
+                .remove()
+                .end()
+                .html()
+                .trim()
+        } else {
+            // the old way (XXX probably no longer used): the consensus is provided,
+            // but we must use a search URL rather than a direct link to access
+            // the RT page
+            consensus = movie.RTConsensus
+            url = `https://www.rottentomatoes.com/search/?search=${title}`
+        }
+
+        consensus = consensus ? consensus.replace(/--/g, '&#8212;') : NO_CONSENSUS
+
         return { consensus, score, url }
     } else {
-        throw `No results found for ${imdb.id}`
+        error(`no results found`)
     }
 }
 
-function main () {
+async function main () {
     const $type = $('meta[property="og:type"')
 
     if ($type.attr('content') !== 'video.movie') {
@@ -295,6 +315,8 @@ function main () {
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
     if (cached) {
+        debug(`cached: ${imdbId}`)
+
         if (cached.error) {
             // couldn't retrieve any RT data so there's nothing
             // more we can do
@@ -304,6 +326,8 @@ function main () {
         }
 
         return
+    } else {
+        debug(`not cached: ${imdbId}`)
     }
 
     const title = $('meta[property="og:title"]')
@@ -331,16 +355,15 @@ function main () {
 
     Object.assign(query.params, { title, yearMax: THIS_YEAR })
 
-    get(query.api, query)
-        .then(json => {
-            const data = getRTData(json, imdb)
-            store({ data })
-            affixRT($target, data)
-        })
-        .catch(error => {
-            store({ error })
-            console.error(error)
-        })
+    try {
+        const { responseText: json } = await get(query.api, query)
+        const data = await getRTData(json, imdb)
+        store({ data })
+        affixRT($target, data)
+    } catch (error) {
+        store({ error })
+        console.error(error)
+    }
 }
 
 // register this first so data can be cleared even if there's an error
