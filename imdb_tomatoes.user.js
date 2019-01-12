@@ -46,12 +46,11 @@
 
 'use strict';
 
-const COMMAND_NAME    = GM_info.script.name + ': clear cache'
-const DEBUG           = false
 const NO_CONSENSUS    = 'No consensus yet.'
 const NOW             = Date.now()
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
+const SCRIPT_NAME     = GM_info.script.name
 const SCRIPT_VERSION  = GM_info.script.version
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
 const THIS_YEAR       = new Date().getFullYear()
@@ -68,7 +67,7 @@ const COMPACT_LAYOUT = [
 // this means cached records are invalidated either a) when the schema changes
 // or b) when the major or minor version (i.e. not the patch version) of the
 // script changes
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 4
 const DATA_VERSION = SCHEMA_VERSION + '/' + SCRIPT_VERSION.replace(/\.\d+$/, '') // e.g. 3/1.7
 
 const BALLOON_OPTIONS = {
@@ -83,10 +82,9 @@ const BALLOON_OPTIONS = {
     position: 'bottom',
 }
 
+// log a debug message to the console
 function debug (message) {
-    if (DEBUG) {
-        console.warn(message)
-    }
+    console.debug(message)
 }
 
 // promisified cross-origin HTTP requests
@@ -101,7 +99,7 @@ function get (url, options = {}) {
         request.onload = resolve
 
         // XXX the onerror response object doesn't contain any useful info
-        request.onerror = res => { reject(`error loading ${url}`) }
+        request.onerror = res => { reject(new Error(`error loading ${url}`)) }
 
         GM_xmlhttpRequest(request)
     })
@@ -113,10 +111,15 @@ function purgeCached (date) {
         const json = GM_getValue(key)
         const value = JSON.parse(json)
 
-        if (value.version !== DATA_VERSION) {
-            debug(`purging invalid value (obsolete version): ${key}`)
+        if (value.expires === -1) { // persistent storage (currently unused)
+            if (value.version !== SCHEMA_VERSION) {
+                debug(`purging invalid value (obsolete schema version): ${key}`)
+                GM_deleteValue(key)
+            }
+        } else if (value.version !== DATA_VERSION) {
+            debug(`purging invalid value (obsolete data version): ${key}`)
             GM_deleteValue(key)
-        } else if (date === -1 || date > value.expires) {
+        } else if (date === -1 || (typeof value.expires !== 'number') || (date > value.expires)) {
             debug(`purging expired value: ${key}`)
             GM_deleteValue(key)
         }
@@ -126,13 +129,13 @@ function purgeCached (date) {
 // prepend a widget to the review bar or append a link to the star box
 // XXX the review bar now appears to be the default for all users
 function affixRT ($target, data) {
-    const { consensus, score, url } = data
+    const { consensus, rating, url } = data
 
     let status
 
-    if (score === -1) {
+    if (rating === -1) {
         status = 'N/A'
-    } else if (score < 60) {
+    } else if (rating < 60) {
         status = 'Rotten'
     } else {
         status = 'Fresh'
@@ -182,12 +185,12 @@ function affixRT ($target, data) {
             })
         }
 
-        const rating = score === -1 ? 'N/A' : score
+        const score = rating === -1 ? 'N/A' : rating
 
         const html = `
             <div class="titleReviewBarItem">
                 <a href="${url}"><div
-                    class="rt-consensus metacriticScore score_${style} titleReviewBarSubItem"><span>${rating}</span></div></a>
+                    class="rt-consensus metacriticScore score_${style} titleReviewBarSubItem"><span>${score}</span></div></a>
                <div class="titleReviewBarSubItem">
                    <div>
                        <a href="${url}">Tomatometer</a>
@@ -203,11 +206,11 @@ function affixRT ($target, data) {
         `
         $target.prepend(html)
     } else {
-        const rating = score === -1 ? 'N/A' : `${score}%`
+        const score = rating === -1 ? 'N/A' : `${rating}%`
 
         const html = `
             <span class="ghost">|</span>
-            Rotten Tomatoes:&nbsp;<a class="rt-consensus" href="${url}">${rating}</a>
+            Rotten Tomatoes:&nbsp;<a class="rt-consensus" href="${url}">${score}</a>
         `
         $target.append(html)
     }
@@ -218,13 +221,13 @@ function affixRT ($target, data) {
 }
 
 // parse the API's JSON response and extract
-// the RT score and consensus.
+// the RT rating and consensus.
 //
 // if there's no consensus, default to "No consensus yet."
-// if there's no score, default to -1
+// if there's no rating, default to -1
 async function getRTData (json, imdb) {
     function error (msg) {
-        throw `error querying data for ${imdb.id}: ${msg}`
+        throw new Error(`error querying data for ${imdb.id}: ${msg}`)
     }
 
     let response
@@ -249,21 +252,24 @@ async function getRTData (json, imdb) {
     if (movie) {
         const title = escape(imdb.title)
 
-        let score = movie.RTCriticMeter
-
-        if (score == null) {
-            score = -1
-        }
-
-        let consensus, url = movie.RTUrl
+        let { RTCriticMeter: rating, RTUrl: url } = movie
+        let consensus, updated = false
 
         if (url) {
             // the new way: the RT URL is provided: scrape the consensus from
             // that page
-            const { responseText: html } = await get(url)
+
+            debug(`loading RT URL for ${imdb.id}: ${url}`)
+            const res = await get(url)
+
+            if (res.status !== 200) {
+                debug(`response for ${url}: ${res.status} ${res.statusText}`)
+            }
+
             const parser = new DOMParser()
-            const dom = parser.parseFromString(html, 'text/html')
-            const $consensus = $(dom).find('.critic_consensus').last()
+            const dom = parser.parseFromString(res.responseText, 'text/html')
+            const $rt = $(dom)
+            const $consensus = $rt.find('.critic_consensus').last()
 
             consensus = $consensus
                 .find(':first-child')
@@ -271,33 +277,64 @@ async function getRTData (json, imdb) {
                 .end()
                 .html()
                 .trim()
+
+            // update the rating
+            const meta = $rt.jsonLd(url)
+            const newRating = meta.aggregateRating.ratingValue
+
+            if ((Number(newRating) === newRating) && (newRating !== rating)) {
+                debug(`updating rating for ${url}: ${rating} -> ${newRating}`)
+                rating = newRating
+                updated = true
+            }
         } else {
-            // the old way (XXX probably no longer used): the consensus is provided,
-            // but we must use a search URL rather than a direct link to access
-            // the RT page
+            // the old way: a rating but no RT URL (or consensus).
+            // this is still used by some old and new releases
+            debug(`no Rotten Tomatoes URL (RTUrl) for ${imdb.id}`)
             consensus = movie.RTConsensus
             url = `https://www.rottentomatoes.com/search/?search=${title}`
         }
 
+        if (rating == null) {
+            rating = -1
+        }
+
         consensus = consensus ? consensus.replace(/--/g, '&#8212;') : NO_CONSENSUS
 
-        return { consensus, score, url }
+        return [{ consensus, rating, url }, updated]
     } else {
         error(`no results found`)
     }
 }
 
-async function main () {
-    const $type = $('meta[property="og:type"')
+// extract a property from a META element, or return null if the property is
+// not defined
+function prop (name) {
+    const $meta = $(`meta[property="${name}"]`)
+    return $meta.length ? $meta.attr('content') : null
+}
 
-    if ($type.attr('content') !== 'video.movie') {
+async function main () {
+    const pageType = prop('pageType')
+
+    if (pageType !== 'title') {
+        console.warn(`invalid page type for ${location.href}: ${pageType}`)
         return
     }
 
-    const imdbId = $('meta[property="pageId"]').attr('content')
+    const imdbId = prop('pageId')
 
     if (!imdbId) {
-        console.warn(`Can't find IMDb ID for: ${location.href}`)
+        console.warn(`Can't find IMDb ID for ${location.href}`)
+        return
+    }
+
+    const meta = $(document).jsonLd(imdbId)
+    const title = meta.name
+    const type = meta['@type']
+
+    if (type !== 'Movie') {
+        debug(`invalid type for ${imdbId}: ${type}`)
         return
     }
 
@@ -307,6 +344,7 @@ async function main () {
         || ($starBox.length && $starBox)
 
     if (!$target) {
+        console.warn(`Can't find target for ${imdbId}`)
         return
     }
 
@@ -315,13 +353,14 @@ async function main () {
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
     if (cached) {
-        debug(`cached: ${imdbId}`)
-
         if (cached.error) {
+            debug(`cached (error): ${imdbId}`)
+
             // couldn't retrieve any RT data so there's nothing
             // more we can do
             console.warn(cached.error)
         } else {
+            debug(`cached: ${imdbId}`)
             affixRT($target, cached.data)
         }
 
@@ -330,22 +369,13 @@ async function main () {
         debug(`not cached: ${imdbId}`)
     }
 
-    const title = $('meta[property="og:title"]')
-        .attr('content')
-        .match(/^(.+?)\s+\(\d{4}\)$/)[1]
-
     const imdb = { id: imdbId, title }
-    const imdbYear = 0 | $('meta[property="og:title"]')
-        .attr('content')
-        .match(/\((\d{4})\)$/)[1]
-
-    const expires = NOW + (imdbYear === THIS_YEAR ? ONE_DAY : ONE_WEEK)
     const version = DATA_VERSION
 
     // create or replace an { expires, version, data|error } entry in
     // the cache
-    function store (dataOrError) {
-        const cached = Object.assign({ expires, version }, dataOrError)
+    function store (dataOrError, ttl) {
+        const cached = Object.assign({ expires: NOW + ttl, version }, dataOrError)
         const json = JSON.stringify(cached)
 
         GM_setValue(imdbId, json)
@@ -356,20 +386,55 @@ async function main () {
     Object.assign(query.params, { title, yearMax: THIS_YEAR })
 
     try {
-        const { responseText: json } = await get(query.api, query)
-        const data = await getRTData(json, imdb)
-        store({ data })
+        debug(`querying API for ${imdbId}`)
+        const res = await get(query.api, query)
+
+        if (res.status !== 200) {
+            debug(`response for ${imdbId}: ${res.status} ${res.statusText}`)
+        }
+
+        const [data, updated] = await getRTData(res.responseText, imdb)
+
+        if (updated) {
+            debug(`caching ${imdbId} result for one day`)
+            store({ data }, ONE_DAY)
+        } else {
+            debug(`caching ${imdbId} result for one week`)
+            store({ data }, ONE_WEEK)
+        }
+
         affixRT($target, data)
     } catch (error) {
-        store({ error })
+        debug(`caching ${imdbId} error for one day`)
+        store({ error }, ONE_DAY)
         console.error(error)
     }
 }
 
-// register this first so data can be cleared even if there's an error
-GM_registerMenuCommand(COMMAND_NAME, () => { purgeCached(-1) })
+// register a jQuery plugin which extracts and returns JSON-LD data for
+// the specified document
+$.fn.jsonLd = function jsonLd (id) {
+    const $script = $(this).find('script[type="application/ld+json"]')
 
-// make the background color more legible (darker) if the score is N/A
+    let data
+
+    if ($script.length) {
+        try {
+            data = JSON.parse($script.first().text().trim())
+        } catch (e) {
+            throw new Error(`Can't parse JSON-LD data for ${id}: ${e}`)
+        }
+    } else {
+        throw new Error(`Can't find JSON-LD data for ${id}`)
+    }
+
+    return data
+}
+
+// register this first so data can be cleared even if there's an error
+GM_registerMenuCommand(SCRIPT_NAME + ': clear cache', () => { purgeCached(-1) })
+
+// make the background color more legible (darker) if the rating is N/A
 GM_addStyle('.score_tbd { background-color: #d9d9d9 }')
 
 main()
