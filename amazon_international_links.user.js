@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name          Amazon International Links
+// @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
+// @version       3.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       3.0.2
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
-// @description   Add international links to Amazon product pages
 // @include       https://www.amazon.tld/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
-// @require       https://cdn.rawgit.com/sizzlemctwizzle/GM_config/6a82709680bbeb3bd2041a4345638b628d537c96/gm_config.js
-// @require       https://cdn.rawgit.com/aduth/hijinks/23b74cdb43d3a76f4981c815eb3961c2625c7ae7/hijinks.min.js
+// @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@6a82709680bbeb3bd2041a4345638b628d537c96/gm_config.js
+// @require       https://cdn.jsdelivr.net/gh/aduth/hijinks@23b74cdb43d3a76f4981c815eb3961c2625c7ae7/hijinks.min.js
 // @grant         GM_registerMenuCommand
 // @grant         GM_getValue
 // @grant         GM_setValue

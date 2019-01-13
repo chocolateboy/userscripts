@@ -3,15 +3,15 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
+// @version       2.9.1
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       2.9.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @include       https://*.imdb.tld/title/tt*
 // @include       https://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
-// @require       https://cdn.rawgit.com/urin/jquery.balloon.js/8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
+// @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @resource      query https://pastebin.com/raw/Ck86mQXs
 // @grant         GM_addStyle
 // @grant         GM_deleteValue

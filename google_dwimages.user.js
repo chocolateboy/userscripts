@@ -3,14 +3,14 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
+// @version       1.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
 // @include       https://www.google.tld/*tbm=isch*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
-// @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
+// @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log
 // ==/UserScript==
 

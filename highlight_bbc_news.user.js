@@ -3,8 +3,8 @@
 // @description   Highlight new stories on BBC News
 // @author        chocolateboy
 // @copyright     chocolateboy
+// @version       0.13.5
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.13.4
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
 // @include       https://www.bbc.co.uk/news
@@ -12,8 +12,8 @@
 // @include       https://www.bbc.com/news
 // @include       /https?://www\.bbc\.co(m|\.uk)/news/([^-])+$/
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
-// @require       https://cdn.rawgit.com/eclecto/jQuery-onMutate/79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
-// @require       https://cdn.rawgit.com/chocolateboy/jquery-highlighter/478971a2a6e279f73cc65680e1e25ae0b62a3820/dist/highlighter.min.js
+// @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
+// @require       https://cdn.jsdelivr.net/gh/chocolateboy/jquery-highlighter@478971a2a6e279f73cc65680e1e25ae0b62a3820/dist/highlighter.min.js
 // @grant         GM_deleteValue
 // @grant         GM_getValue
 // @grant         GM_registerMenuCommand

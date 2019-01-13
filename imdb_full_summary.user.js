@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name        IMDb Full Summary
-// @namespace   https://github.com/chocolateboy/userscripts
 // @description Automatically show the full plot summary on IMDb
 // @author      chocolateboy
-// @version     1.5.0
+// @copyright   chocolateboy
+// @version     1.5.1
+// @namespace   https://github.com/chocolateboy/userscripts
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://*.imdb.tld/title/tt*
 // @include     http://*.imdb.tld/*/title/tt*

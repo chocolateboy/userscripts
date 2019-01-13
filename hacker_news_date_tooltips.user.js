@@ -3,8 +3,8 @@
 // @description   Deobfuscate the "n days ago" dates on Hacker News with YYYY-MM-DD tooltips
 // @author        chocolateboy
 // @copyright     chocolateboy
+// @version       1.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       1.0.0
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js

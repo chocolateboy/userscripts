@@ -3,12 +3,12 @@
 // @description   Mark up Hacker News with pager metadata
 // @author        chocolateboy
 // @copyright     chocolateboy
+// @version       0.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
-// @version       0.0.1
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
-// @require       https://cdn.rawgit.com/chocolateboy/jquery-pagerizer/v1.0.0/dist/pagerizer.min.js
+// @require       https://cdn.jsdelivr.net/gh/chocolateboy/jquery-pagerizer@v1.0.0/dist/pagerizer.min.js
 // @grant         GM_log
 // ==/UserScript==
 
