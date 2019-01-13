@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.1
+// @version       2.9.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -220,14 +220,13 @@ function affixRT ($target, data) {
     $target.find('.rt-consensus').balloon(balloonOptions)
 }
 
-// parse the API's JSON response and extract
-// the RT rating and consensus.
+// parse the API's JSON response and extract the RT rating and consensus.
 //
 // if there's no consensus, default to "No consensus yet."
 // if there's no rating, default to -1
-async function getRTData (json, imdb) {
-    function error (msg) {
-        throw new Error(`error querying data for ${imdb.id}: ${msg}`)
+async function getRTData (json, imdbId, title) {
+    function fail (msg) {
+        throw new Error(`error querying data for ${imdbId}: ${msg}`)
     }
 
     let response
@@ -235,76 +234,74 @@ async function getRTData (json, imdb) {
     try {
         response = JSON.parse(JSON.parse(json)) // ಠ_ಠ
     } catch (e) {
-        error(`can't parse response: ${e}`)
+        fail(`can't parse response: ${e}`)
     }
 
     if (!response) {
-        error('no response')
+        fail('no response')
     }
 
     if (!$.isArray(response)) {
         const type = {}.toString.call(response)
-        error(`invalid response: ${type}`)
+        fail(`invalid response: ${type}`)
     }
 
-    const [movie] = $.grep(response, it => it.imdbID === imdb.id)
+    const [movie] = $.grep(response, it => it.imdbID === imdbId)
 
-    if (movie) {
-        const title = escape(imdb.title)
+    if (!movie) {
+        fail('no results found')
+    }
 
-        let { RTCriticMeter: rating, RTUrl: url } = movie
-        let consensus, updated = false
+    let { RTCriticMeter: rating, RTUrl: url } = movie
+    let consensus, updated = false
 
-        if (url) {
-            // the new way: the RT URL is provided: scrape the consensus from
-            // that page
+    if (url) {
+        // the new way: the RT URL is provided: scrape the consensus from
+        // that page
 
-            debug(`loading RT URL for ${imdb.id}: ${url}`)
-            const res = await get(url)
+        debug(`loading RT URL for ${imdbId}: ${url}`)
+        const res = await get(url)
 
-            if (res.status !== 200) {
-                debug(`response for ${url}: ${res.status} ${res.statusText}`)
-            }
-
-            const parser = new DOMParser()
-            const dom = parser.parseFromString(res.responseText, 'text/html')
-            const $rt = $(dom)
-            const $consensus = $rt.find('.critic_consensus').last()
-
-            consensus = $consensus
-                .find(':first-child')
-                .remove()
-                .end()
-                .html()
-                .trim()
-
-            // update the rating
-            const meta = $rt.jsonLd(url)
-            const newRating = meta.aggregateRating.ratingValue
-
-            if ((Number(newRating) === newRating) && (newRating !== rating)) {
-                debug(`updating rating for ${url}: ${rating} -> ${newRating}`)
-                rating = newRating
-                updated = true
-            }
-        } else {
-            // the old way: a rating but no RT URL (or consensus).
-            // this is still used by some old and new releases
-            debug(`no Rotten Tomatoes URL (RTUrl) for ${imdb.id}`)
-            consensus = movie.RTConsensus
-            url = `https://www.rottentomatoes.com/search/?search=${title}`
+        if (res.status !== 200) {
+            debug(`response for ${url}: ${res.status} ${res.statusText}`)
         }
 
-        if (rating == null) {
-            rating = -1
+        const parser = new DOMParser()
+        const dom = parser.parseFromString(res.responseText, 'text/html')
+        const $rt = $(dom)
+        const $consensus = $rt.find('.critic_consensus').last()
+
+        consensus = $consensus
+            .find(':first-child')
+            .remove()
+            .end()
+            .html()
+            .trim()
+
+        // update the rating
+        const meta = $rt.jsonLd(url)
+        const newRating = meta.aggregateRating.ratingValue
+
+        if (Number.isInteger(newRating) && (newRating !== rating)) {
+            debug(`updating rating for ${url}: ${rating} -> ${newRating}`)
+            rating = newRating
+            updated = true
         }
-
-        consensus = consensus ? consensus.replace(/--/g, '&#8212;') : NO_CONSENSUS
-
-        return [{ consensus, rating, url }, updated]
     } else {
-        error(`no results found`)
+        // the old way: a rating but no RT URL (or consensus).
+        // this is still used by some old and new releases
+        debug(`no Rotten Tomatoes URL (RTUrl) for ${imdbId}`)
+        consensus = movie.RTConsensus
+        url = `https://www.rottentomatoes.com/search/?search=${escape(title)}`
     }
+
+    if (rating == null) {
+        rating = -1
+    }
+
+    consensus = consensus ? consensus.replace(/--/g, '&#8212;') : NO_CONSENSUS
+
+    return [{ consensus, rating, url }, updated]
 }
 
 // extract a property from a META element, or return null if the property is
@@ -369,13 +366,13 @@ async function main () {
         debug(`not cached: ${imdbId}`)
     }
 
-    const imdb = { id: imdbId, title }
-    const version = DATA_VERSION
-
-    // create or replace an { expires, version, data|error } entry in
-    // the cache
+    // add an { expires, version, data|error } entry to the cache
     function store (dataOrError, ttl) {
-        const cached = Object.assign({ expires: NOW + ttl, version }, dataOrError)
+        const cached = Object.assign({
+            expires: NOW + ttl,
+            version: DATA_VERSION
+        }, dataOrError)
+
         const json = JSON.stringify(cached)
 
         GM_setValue(imdbId, json)
@@ -393,7 +390,7 @@ async function main () {
             debug(`response for ${imdbId}: ${res.status} ${res.statusText}`)
         }
 
-        const [data, updated] = await getRTData(res.responseText, imdb)
+        const [data, updated] = await getRTData(res.responseText, imdbId, title)
 
         if (updated) {
             debug(`caching ${imdbId} result for one day`)
@@ -405,9 +402,10 @@ async function main () {
 
         affixRT($target, data)
     } catch (error) {
+        const message = error.message || String(error) // stringify
         debug(`caching ${imdbId} error for one day`)
-        store({ error }, ONE_DAY)
-        console.error(error)
+        store({ error: message }, ONE_DAY)
+        console.error(message)
     }
 }
 
