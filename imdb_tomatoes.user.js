@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.2
+// @version       2.10.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -252,8 +252,8 @@ async function getRTData (json, imdbId, title) {
         fail('no results found')
     }
 
-    let { RTCriticMeter: rating, RTUrl: url } = movie
-    let consensus, updated = false
+    let { RTConsensus: consensus, RTCriticMeter: rating, RTUrl: url } = movie
+    let updated = false
 
     if (url) {
         // the new way: the RT URL is provided: scrape the consensus from
@@ -261,22 +261,13 @@ async function getRTData (json, imdbId, title) {
 
         debug(`loading RT URL for ${imdbId}: ${url}`)
         const res = await get(url)
-
-        if (res.status !== 200) {
-            debug(`response for ${url}: ${res.status} ${res.statusText}`)
-        }
+        debug(`response for ${url}: ${res.status} ${res.statusText}`)
 
         const parser = new DOMParser()
         const dom = parser.parseFromString(res.responseText, 'text/html')
         const $rt = $(dom)
-        const $consensus = $rt.find('.critic_consensus').last()
 
-        consensus = $consensus
-            .find(':first-child')
-            .remove()
-            .end()
-            .html()
-            .trim()
+        consensus = $rt.find('.mop-ratings-wrap__text--concensus').html().trim()
 
         // update the rating
         const meta = $rt.jsonLd(url)
@@ -289,9 +280,8 @@ async function getRTData (json, imdbId, title) {
         }
     } else {
         // the old way: a rating but no RT URL (or consensus).
-        // this is still used by some old and new releases
-        debug(`no Rotten Tomatoes URL (RTUrl) for ${imdbId}`)
-        consensus = movie.RTConsensus
+        // this is still used for some old and new releases
+        debug(`no Rotten Tomatoes URL for ${imdbId}`)
         url = `https://www.rottentomatoes.com/search/?search=${escape(title)}`
     }
 
@@ -350,14 +340,16 @@ async function main () {
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
     if (cached) {
+        const expires = new Date(cached.expires).toLocaleString()
+
         if (cached.error) {
-            debug(`cached (error): ${imdbId}`)
+            debug(`cached error (expires: ${expires}): ${imdbId}`)
 
             // couldn't retrieve any RT data so there's nothing
             // more we can do
             console.warn(cached.error)
         } else {
-            debug(`cached: ${imdbId}`)
+            debug(`cached result (expires: ${expires}): ${imdbId}`)
             affixRT($target, cached.data)
         }
 
@@ -385,10 +377,7 @@ async function main () {
     try {
         debug(`querying API for ${imdbId}`)
         const res = await get(query.api, query)
-
-        if (res.status !== 200) {
-            debug(`response for ${imdbId}: ${res.status} ${res.statusText}`)
-        }
+        debug(`response for ${imdbId}: ${res.status} ${res.statusText}`)
 
         const [data, updated] = await getRTData(res.responseText, imdbId, title)
 
