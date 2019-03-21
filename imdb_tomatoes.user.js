@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.10.0
+// @version       2.10.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -99,7 +99,9 @@ function get (url, options = {}) {
         request.onload = resolve
 
         // XXX the onerror response object doesn't contain any useful info
-        request.onerror = res => { reject(new Error(`error loading ${url}`)) }
+        request.onerror = res => {
+            reject(new Error(`error fetching ${options.title || url}`))
+        }
 
         GM_xmlhttpRequest(request)
     })
@@ -376,7 +378,8 @@ async function main () {
 
     try {
         debug(`querying API for ${imdbId}`)
-        const res = await get(query.api, query)
+        const options = Object.assign({}, query, { title: `data for ${imdbId}` })
+        const res = await get(query.api, options)
         debug(`response for ${imdbId}: ${res.status} ${res.statusText}`)
 
         const [data, updated] = await getRTData(res.responseText, imdbId, title)
