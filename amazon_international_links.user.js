@@ -3,7 +3,7 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.3
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.amazon.tld/*
@@ -13,6 +13,7 @@
 // @grant         GM_registerMenuCommand
 // @grant         GM_getValue
 // @grant         GM_setValue
+// @inject-into   content
 // ==/UserScript==
 
 /*
