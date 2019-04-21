@@ -3,7 +3,7 @@
 // @description   Highlight new stories on Digg
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.13.0
+// @version       0.13.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://digg.com/
@@ -29,6 +29,7 @@ $.highlight({
             .not('[data-primary-tag-slug="digg-giveaways"]')
             .not('[data-primary-tag-slug="digg-pick"]')
             .not('[data-primary-tag-slug="digg-picks"]')
+            .not('[data-primary-tag-slug="digg-picks-deprecated"]')
             .not('[data-primary-tag-slug="digg-store"]')
     },
     target: 'a.digg-story__title-link',
