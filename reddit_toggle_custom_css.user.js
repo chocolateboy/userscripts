@@ -3,7 +3,7 @@
 // @description  Persistently disable/re-enable subreddit-specific styles via a userscript command
 // @author       chocolateboy
 // @copyright    chocolateboy
-// @version      1.2.0
+// @version      1.2.1
 // @namespace    https://github.com/chocolateboy/userscripts
 // @license      GPL: http://www.gnu.org/copyleft/gpl.html
 // @include      http://reddit.com/r/*
@@ -32,10 +32,10 @@ function toggle () {
 
     $(CUSTOM_CSS).prop('disabled', disableCss)
 
-    if (disableCss) {
-        GM_setValue(SUBREDDIT, true)
-    } else {
+    if (disableCss === DISABLE_CSS) {
         GM_deleteValue(SUBREDDIT)
+    } else {
+        GM_setValue(SUBREDDIT, disableCss)
     }
 }
 
