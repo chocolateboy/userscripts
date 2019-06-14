@@ -3,12 +3,12 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.5.1
+// @version       2.5.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
 // @include       https://github.com/*
-// @require       https://code.jquery.com/jquery-3.3.1.min.js
+// @require       https://code.jquery.com/jquery-3.4.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/pie6k/jquery.initialize@16342abd3d411a20d35390f3e4c966ceb37ec43e/jquery.initialize.min.js
 // @grant         GM_log
 // @inject-into   content
@@ -21,7 +21,7 @@ const COMMIT_BAR = 'div.commit-tease.js-details-container'
 
 const FIRST_COMMIT =
     `<span id="first-commit">
-        &nbsp;|&nbsp;<a id="first-commit-link" style="cursor: pointer" class="message">First commit</a>
+        &nbsp;|&nbsp;<a id="first-commit-link" style="cursor: pointer" class="message text-inherit">First commit</a>
     </span>`
 
 // this function extracts the URL of the repo's first commit and navigates to it.
