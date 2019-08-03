@@ -3,14 +3,14 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.10.2
+// @version       2.11.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @include       https://*.imdb.tld/title/tt*
 // @include       https://*.imdb.tld/*/title/tt*
-// @require       https://code.jquery.com/jquery-3.3.1.min.js
+// @require       https://code.jquery.com/jquery-3.4.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @resource      query https://pastebin.com/raw/Ck86mQXs
 // @grant         GM_addStyle
@@ -287,7 +287,7 @@ async function getRTData (json, imdbId, title) {
         // the old way: a rating but no RT URL (or consensus).
         // this is still used for some old and new releases
         debug(`no Rotten Tomatoes URL for ${imdbId}`)
-        url = `https://www.rottentomatoes.com/search/?search=${escape(title)}`
+        url = `https://www.rottentomatoes.com/search/?search=${encodeURIComponent(title)}`
     }
 
     if (rating == null) {
@@ -322,8 +322,14 @@ async function main () {
     }
 
     const meta = $(document).jsonLd(imdbId)
-    const title = meta.name
     const type = meta['@type']
+
+    // the original title e.g. "Le fabuleux destin d'Amélie Poulain"
+    const originalTitle = meta.name
+
+    // override with the English language (US) title if available e.g. "Amélie"
+    const enTitle = $('#star-rating-widget').data('title')
+    const title = enTitle || originalTitle
 
     if (type !== 'Movie') {
         debug(`invalid type for ${imdbId}: ${type}`)
