@@ -3,11 +3,12 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @include       https://smile.amazon.tld/*
 // @include       https://www.amazon.tld/*
-// @require       https://code.jquery.com/jquery-3.3.1.min.js
+// @require       https://code.jquery.com/jquery-3.4.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@6a82709680bbeb3bd2041a4345638b628d537c96/gm_config.js
 // @require       https://cdn.jsdelivr.net/gh/aduth/hijinks@23b74cdb43d3a76f4981c815eb3961c2625c7ae7/hijinks.min.js
 // @grant         GM_registerMenuCommand
@@ -43,6 +44,9 @@ const SITES = {
     'co.uk':  'UK', // UK
     'com':    'US', // US
 }
+
+// Amazon TLDs which support the "smile.amazon" subdomain
+const SMILE = { 'com': true, 'co.uk': true, 'de': true }
 
 // a tiny DOM builder to avoid cluttering the code with HTML templates
 // https://github.com/aduth/hijinks
@@ -86,8 +90,16 @@ class Linker {
         // country selection changes
         this.links = []
 
-        // the TLD of the current Amazon site e.g. "co.uk" or "com"
-        this.tld = location.hostname.substr('www.amazon.'.length)
+        // extract and store 1) the subdomain (e.g. "www.amazon") and 2) the TLD
+        // (e.g. "co.uk") of the current site
+        const parts = location.hostname.split('.')
+
+        // 1) the subdomain (part before the TLD) of the current site e.g.
+        // "www.amazon" or "smile.amazon"
+        this.subdomain = parts.slice(0, 2).join('.')
+
+        // 2) the TLD of the current site e.g. "co.uk" or "com"
+        this.tld = parts.slice(2).join('.')
     }
 
     // add a link element to the internal `links` array
@@ -98,13 +110,17 @@ class Linker {
             title: `amazon.${tld}`
         }
 
+        // XXX we can't always preserve the "smile.amazon" subdomain as it's not
+        // available for most Amazon TLDs
+        const subdomain = SMILE[tld] ? this.subdomain : 'www.amazon'
+
         let tag
 
         if (tld === this.tld) {
             tag = 'strong'
         } else {
             tag = 'a'
-            attrs.href = `//www.amazon.${tld}/dp/${this.asin}`
+            attrs.href = `//${subdomain}.${tld}/dp/${this.asin}`
         }
 
         const link = el(tag, attrs, country)
