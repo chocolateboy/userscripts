@@ -3,7 +3,7 @@
 // @description Automatically show the full plot summary on IMDb
 // @author      chocolateboy
 // @copyright   chocolateboy
-// @version     1.5.2
+// @version     1.6.0
 // @namespace   https://github.com/chocolateboy/userscripts
 // @license     GPL: http://www.gnu.org/copyleft/gpl.html
 // @include     http://*.imdb.tld/title/tt*
