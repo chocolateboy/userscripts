@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.11.0
+// @version       2.12.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -13,6 +13,7 @@
 // @require       https://code.jquery.com/jquery-3.4.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @resource      query https://pastebin.com/raw/Ck86mQXs
+// @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -222,39 +223,81 @@ function affixRT ($target, data) {
     $target.find('.rt-consensus').balloon(balloonOptions)
 }
 
-// parse the API's JSON response and extract the RT rating and consensus.
+// take a record (object) from the OMDb fallback data (object) and convert it
+// into the parsed format we expect to get back from the API, e.g.:
+//
+// before:
+//
+//     {
+//         Title: "Example",
+//         Ratings: [
+//             {
+//                 Source: "Rotten Tomatoes",
+//                 Value: "42%"
+//             }
+//         ],
+//         tomatoURL: "https://www.rottentomatoes.com/m/example"
+//     }
+//
+// after:
+//
+//     {
+//         RTConsensus: undefined,
+//         RTCriticMeter: 42,
+//         RTUrl: "https://www.rottentomatoes.com/m/example",
+//     }
+
+function adaptOmdbData (data) {
+    const ratings = data.Ratings || []
+    const rating = ratings.find(it => it.Source === 'Rotten Tomatoes') || {}
+    const score = rating.Value && parseInt(rating.Value)
+
+    return {
+        RTCriticMeter: (Number.isInteger(score) ? score : null),
+        RTUrl: data.tomatoURL,
+        RTConsensus: rating.tomatoConsensus,
+    }
+}
+
+// parse the API's response and extract the RT rating and consensus.
 //
 // if there's no consensus, default to "No consensus yet."
 // if there's no rating, default to -1
-async function getRTData (json, imdbId, title) {
+async function getRTData ({ response, imdbId, title, fallback }) {
     function fail (msg) {
         throw new Error(`error querying data for ${imdbId}: ${msg}`)
     }
 
-    let response
+    let results
 
     try {
-        response = JSON.parse(JSON.parse(json)) // ಠ_ಠ
+        results = JSON.parse(JSON.parse(response)) // ಠ_ಠ
     } catch (e) {
         fail(`can't parse response: ${e}`)
     }
 
-    if (!response) {
+    if (!results) {
         fail('no response')
     }
 
-    if (!$.isArray(response)) {
-        const type = {}.toString.call(response)
+    if (!$.isArray(results)) {
+        const type = {}.toString.call(results)
         fail(`invalid response: ${type}`)
     }
 
-    const [movie] = $.grep(response, it => it.imdbID === imdbId)
+    let movie = results.find(it => it.imdbID === imdbId)
 
     if (!movie) {
-        fail('no results found')
+        if (fallback) {
+            debug(`no results for ${imdbId} - using fallback data`)
+            movie = adaptOmdbData(fallback)
+        } else {
+            fail('no results found')
+        }
     }
 
     let { RTConsensus: consensus, RTCriticMeter: rating, RTUrl: url } = movie
+
     let updated = false
 
     if (url) {
@@ -296,7 +339,7 @@ async function getRTData (json, imdbId, title) {
 
     consensus = consensus ? consensus.replace(/--/g, '&#8212;') : NO_CONSENSUS
 
-    return [{ consensus, rating, url }, updated]
+    return { data: { consensus, rating, url }, updated }
 }
 
 // extract a property from a META element, or return null if the property is
@@ -382,16 +425,22 @@ async function main () {
     }
 
     const query = JSON.parse(GM_getResourceText('query'))
+    const fallback = JSON.parse(GM_getResourceText('fallback'))
 
     Object.assign(query.params, { title, yearMax: THIS_YEAR })
 
     try {
-        debug(`querying API for ${imdbId}`)
-        const options = Object.assign({}, query, { title: `data for ${imdbId}` })
-        const res = await get(query.api, options)
-        debug(`response for ${imdbId}: ${res.status} ${res.statusText}`)
+        debug(`querying API for ${imdbId} (${JSON.stringify(title)})`)
+        const requestOptions = Object.assign({}, query, { title: `data for ${imdbId}` })
+        const response = await get(query.api, requestOptions)
+        debug(`response for ${imdbId}: ${response.status} ${response.statusText}`)
 
-        const [data, updated] = await getRTData(res.responseText, imdbId, title)
+        const { data, updated } = await getRTData({
+            response: response.responseText,
+            imdbId,
+            title,
+            fallback: fallback[imdbId],
+        })
 
         if (updated) {
             debug(`caching ${imdbId} result for one day`)
