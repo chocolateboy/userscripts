@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.12.0
+// @version       2.12.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -28,18 +28,21 @@
 /*
  * OK:
  *
- *     http://www.imdb.com/title/tt0309698/ - 4 widgets
- *     http://www.imdb.com/title/tt0086312/ - 3 widgets
- *     http://www.imdb.com/title/tt0037638/ - 2 widgets
+ *   - http://www.imdb.com/title/tt0309698/ - 4 widgets
+ *   - http://www.imdb.com/title/tt0086312/ - 3 widgets
+ *   - http://www.imdb.com/title/tt0037638/ - 2 widgets
  *
- * Fixed (layout):
+ * Fixed:
  *
- *     http://www.imdb.com/title/tt0162346/ - 4 widgets
- *     http://www.imdb.com/title/tt0159097/ - 4 widgets
+ *   layout:
  *
- * Broken (incorrect RT/OMDb alias [1]):
+ *     - http://www.imdb.com/title/tt0162346/  - 4 widgets
+ *     - http://www.imdb.com/title/tt0159097/  - 4 widgets
+ *     - https://www.imdb.com/title/tt0129387/ - 2 .plot_summary_wrapper DIVs
  *
- *     http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
+ *   RT/OMDb alias [1]:
+ *
+ *     - http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
  */
 
 // [1] unaliased and incorrectly aliased titles are common:
@@ -179,7 +182,15 @@ function affixRT ($target, data) {
         if ($(COMPACT_LAYOUT).length && $target.find('.titleReviewBarItem').length > 2) {
             const $clear = $('<div class="clear">&nbsp;</div>')
 
-            $('.plot_summary_wrapper').after($target.remove())
+            // sometimes there are two Info (.plot_summary_wrapper) DIVs (e.g.
+            // [1]). the first is (currently) empty and the second contains the
+            // actual markup. this may be a transient error in the markup, or
+            // may be used somehow (e.g. for mobile). if targeted, the first one
+            // is displayed above the visible Plot/Info row, whereas the second
+            // one is to the right of the poster, as expected, so we target that
+            //
+            // [1] https://www.imdb.com/title/tt0129387/
+            $('.plot_summary_wrapper:last').after($target.remove())
 
             $target.before($clear).after($clear).css({
                 'float':          'left',
