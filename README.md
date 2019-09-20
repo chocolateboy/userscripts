@@ -1,12 +1,9 @@
 # userscripts
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+<!-- toc -->
 
 - [Installation](#installation)
   - [Engines](#engines)
-- [Highlighters](#highlighters)
-- [Pagerizers](#pagerizers)
 - [Sites](#sites)
   - [Amazon](#amazon)
   - [GitHub](#github)
@@ -16,6 +13,8 @@
   - [Last.fm](#lastfm)
   - [Reddit](#reddit)
   - [Rotten Tomatoes](#rotten-tomatoes)
+- [Highlighters](#highlighters)
+- [Pagerizers](#pagerizers)
 - [Misc](#misc)
 - [See Also](#see-also)
   - [Libraries](#libraries)
@@ -23,7 +22,7 @@
 - [Author](#author)
 - [Copyright and License](#copyright-and-license)
 
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+<!-- tocstop -->
 
 ## Installation
 
@@ -40,29 +39,6 @@ All of these scripts work in and are tested on [Violentmonkey](https://violentmo
 
 <a name="fn1"><sup><b>1</b></sup></a> The [Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html) is not [currently](https://github.com/chocolateboy/userscripts/issues/5) supported. Some scripts may work, but none have been tested.
 <br />
-
-## Highlighters
-
-Highlight new stories since the last time a site was visited
-
-* [BBC News](https://greasyfork.org/en/scripts/39310-bbc-news-highlighter "Homepage")
-* [Digg](https://greasyfork.org/en/scripts/39308-digg-highlighter "Homepage")
-* [Echo JS](https://greasyfork.org/en/scripts/39309-echo-js-highlighter "Homepage")
-* [Hacker News](https://greasyfork.org/en/scripts/39311-hacker-news-highlighter "Homepage")
-* [Lobsters](https://greasyfork.org/en/scripts/40906-lobsters-highlighter "Homepage")
-* [Reddit](https://greasyfork.org/en/scripts/39312-reddit-highlighter "Homepage")
-
-## Pagerizers
-
-These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <kbd>[[</kbd> and <kbd>]]</kbd> in [Tridactyl](https://github.com/cmcaine/tridactyl), [Vim Vixen](https://github.com/ueokande/vim-vixen) etc.
-
-The following are all direct links i.e. clicking them installs the script.
-
-* [Amazon](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_amazon.user.js "Install")
-* [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_ars_technica.user.js "Install")
-* [eBay](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_ebay.user.js "Install")
-* [Hacker News](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_hacker_news.user.js "Install")
-* [Metafilter](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_metafilter.user.js "Install")
 
 ## Sites
 
@@ -98,6 +74,29 @@ The following are all direct links i.e. clicking them installs the script.
 ### Rotten Tomatoes
 
 * [More Tomatoes](https://greasyfork.org/scripts/23435-more-tomatoes/ "Homepage") - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
+
+## Highlighters
+
+Highlight new stories since the last time a site was visited
+
+* [BBC News](https://greasyfork.org/en/scripts/39310-bbc-news-highlighter "Homepage")
+* [Digg](https://greasyfork.org/en/scripts/39308-digg-highlighter "Homepage")
+* [Echo JS](https://greasyfork.org/en/scripts/39309-echo-js-highlighter "Homepage")
+* [Hacker News](https://greasyfork.org/en/scripts/39311-hacker-news-highlighter "Homepage")
+* [Lobsters](https://greasyfork.org/en/scripts/40906-lobsters-highlighter "Homepage")
+* [Reddit](https://greasyfork.org/en/scripts/39312-reddit-highlighter "Homepage")
+
+## Pagerizers
+
+These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <kbd>[[</kbd> and <kbd>]]</kbd> in [Tridactyl](https://github.com/cmcaine/tridactyl), [Vim Vixen](https://github.com/ueokande/vim-vixen) etc.
+
+The following are all direct links i.e. clicking them installs the script.
+
+* [Amazon](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_amazon.user.js "Install")
+* [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_ars_technica.user.js "Install")
+* [eBay](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_ebay.user.js "Install")
+* [Hacker News](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_hacker_news.user.js "Install")
+* [Metafilter](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_metafilter.user.js "Install")
 
 ## Misc
 
