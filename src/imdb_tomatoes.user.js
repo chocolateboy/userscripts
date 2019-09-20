@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.12.1
+// @version       2.12.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -190,7 +190,7 @@ function affixRT ($target, data) {
             // one is to the right of the poster, as expected, so we target that
             //
             // [1] https://www.imdb.com/title/tt0129387/
-            $('.plot_summary_wrapper:last').after($target.remove())
+            $('.plot_summary_wrapper').last().after($target.remove())
 
             $target.before($clear).after($clear).css({
                 'float':          'left',
