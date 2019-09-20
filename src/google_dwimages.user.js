@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.0
+// @version       1.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -17,21 +17,23 @@
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
-function onLinks ($links) {
-    $links.each(function () {
-        const $link = $(this)
+function onResults ($results) {
+    $results.each(function () {
+        const $result = $(this)
 
         // remove the actions from this DIV and all its descendant elements to
         // prevent events on these elements being intercepted
-        $link.find('*').addBack().removeAttr('jsaction')
+        $result.find('*').addBack().removeAttr('jsaction')
 
         // parse the JSON out of the attached metadata element
-        const meta = JSON.parse($link.find('.rg_meta').text())
+        const meta = JSON.parse($result.find('.rg_meta').text())
 
         // assign the correct URIs to the image and page links
-        $link.find('a:first').attr('href', meta.ou) // image
-        $link.find('a:last').attr('href', meta.ru)  // page
+        const $links = $result.find('a')
+
+        $links.first().attr('href', meta.ou) // image
+        $links.last().attr('href', meta.ru)  // page
     })
 }
 
-$.onCreate('div[data-ri][data-ved]', onLinks, true /* multi */)
+$.onCreate('div[data-ri][data-ved]', onResults, true /* multi */)
