@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.1
+// @version       1.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -31,8 +31,8 @@ function onResults ($results) {
         // assign the correct URIs to the image and page links
         const $links = $result.find('a')
 
-        $links.first().attr('href', meta.ou) // image
-        $links.last().attr('href', meta.ru)  // page
+        $links.eq(0).attr('href', meta.ou) // image
+        $links.eq(1).attr('href', meta.ru) // page
     })
 }
 
