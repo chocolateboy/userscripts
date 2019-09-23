@@ -69,7 +69,7 @@ All of these scripts work in and are tested on [Violentmonkey](https://violentmo
 
 ### Reddit
 
-* [Toggle Custom CSS](https://greasyfork.org/scripts/23434-reddit-toggle-custom-css/ "Homepage") - adds a userscript command to persistently toggle custom styles off/on on subreddits
+* [Toggle Custom CSS](https://greasyfork.org/scripts/23434-reddit-toggle-custom-css/ "Homepage") - persistently disable/re-enable custom subreddit styles via a userscript command
 
 ### Rotten Tomatoes
 

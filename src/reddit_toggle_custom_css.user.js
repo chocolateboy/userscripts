@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Reddit - Toggle Custom CSS
-// @description  Persistently disable/re-enable subreddit-specific styles via a userscript command
+// @description  Persistently disable/re-enable custom subreddit styles via a userscript command
 // @author       chocolateboy
 // @copyright    chocolateboy
-// @version      1.2.1
+// @version      1.2.2
 // @namespace    https://github.com/chocolateboy/userscripts
 // @license      GPL: http://www.gnu.org/copyleft/gpl.html
 // @include      http://reddit.com/r/*
@@ -44,7 +44,7 @@ function toggle () {
 // styled content (FOSC) on subreddits with a custom background color and/or
 // image)
 //
-// XXX hide the html element rather than the body element as the latter still
+// XXX hide the HTML element rather than the BODY element as the latter still
 // results in a FOSC on some subreddits e.g. /r/firefox
 function hidePage () {
     GM_addStyle('html { display: none !important }')
