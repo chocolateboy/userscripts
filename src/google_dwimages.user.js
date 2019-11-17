@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.0
+// @version       1.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -42,9 +42,9 @@ function onResults ($results) {
 
         // compensate for the removed style
         $imageLink.css({
-            'display':  'inline-block',
-            'position': 'relative',
-            'overflow': 'hidden',
+            display:  'inline-block',
+            position: 'relative',
+            overflow: 'hidden',
         })
     })
 }
