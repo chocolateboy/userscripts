@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.12.2
+// @version       2.12.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -308,7 +308,6 @@ async function getRTData ({ response, imdbId, title, fallback }) {
     }
 
     let { RTConsensus: consensus, RTCriticMeter: rating, RTUrl: url } = movie
-
     let updated = false
 
     if (url) {
@@ -332,7 +331,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         const meta = $rt.jsonLd(url)
         const newRating = meta.aggregateRating.ratingValue
 
-        if (Number.isInteger(newRating) && (newRating !== rating)) {
+        if (newRating !== rating) {
             debug(`updating rating for ${url}: ${rating} -> ${newRating}`)
             rating = newRating
             updated = true
