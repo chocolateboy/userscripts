@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.12.3
+// @version       2.12.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -60,8 +60,9 @@ const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable
 const THIS_YEAR       = new Date().getFullYear()
 
 const COMPACT_LAYOUT = [
-    '.plot_summary_wrapper .minPlotHeightWithPoster',
-    '.plot_summary_wrapper .minPlotHeightWithPosterAndWatchlistButton'
+    '.plot_summary_wrapper .minPlotHeightWithPoster', // XXX probably obsolete
+    '.plot_summary_wrapper .minPlotHeightWithPosterAndWatchlistButton', // XXX probably obsolete
+    '.minPosterWithPlotSummaryHeight .plot_summary_wrapper',
 ].join(', ')
 
 // the version of each cached record is a combination of the schema version and
