@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.12.4
+// @version       2.13.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -12,7 +12,7 @@
 // @include       https://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.4.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @resource      query https://pastebin.com/raw/Ck86mQXs
+// @resource      query https://pastebin.com/raw/t5nHU6Le
 // @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
@@ -92,10 +92,29 @@ function debug (message) {
     console.debug(message)
 }
 
+// URL-encode the supplied query parameter, replacing encoded spaces ("%20")
+// with plus signs ("+")
+function encodeParam (param) {
+    return encodeURIComponent(param).replace(/%20/g, '+')
+}
+
+// encode a dictionary of params as a query parameter string. this is similar to
+// jQuery.params, but we additionally replace spaces ("%20") with plus signs
+// ("+")
+function encodeParams (params) {
+    const pairs = []
+
+    for (const [key, value] of Object.entries(params)) {
+        pairs.push(`${encodeParam(key)}=${encodeParam(value)}`)
+    }
+
+    return pairs.join('&')
+}
+
 // promisified cross-origin HTTP requests
 function get (url, options = {}) {
     if (options.params) {
-        url = url + '?' + $.param(options.params)
+        url = url + '?' + encodeParams(options.params)
     }
 
     const request = Object.assign({ method: 'GET', url }, options.request || {})
@@ -254,8 +273,8 @@ function affixRT ($target, data) {
 // after:
 //
 //     {
+//         CriticRating: 42,
 //         RTConsensus: undefined,
-//         RTCriticMeter: 42,
 //         RTUrl: "https://www.rottentomatoes.com/m/example",
 //     }
 
@@ -265,7 +284,7 @@ function adaptOmdbData (data) {
     const score = rating.Value && parseInt(rating.Value)
 
     return {
-        RTCriticMeter: (Number.isInteger(score) ? score : null),
+        CriticRating: (Number.isInteger(score) ? score : null),
         RTUrl: data.tomatoURL,
         RTConsensus: rating.tomatoConsensus,
     }
@@ -308,7 +327,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         }
     }
 
-    let { RTConsensus: consensus, RTCriticMeter: rating, RTUrl: url } = movie
+    let { RTConsensus: consensus, CriticRating: rating, RTUrl: url } = movie
     let updated = false
 
     if (url) {
@@ -438,7 +457,7 @@ async function main () {
     const query = JSON.parse(GM_getResourceText('query'))
     const fallback = JSON.parse(GM_getResourceText('fallback'))
 
-    Object.assign(query.params, { title, yearMax: THIS_YEAR })
+    Object.assign(query.params, { searchTerm: title, yearMax: THIS_YEAR })
 
     try {
         debug(`querying API for ${imdbId} (${JSON.stringify(title)})`)
