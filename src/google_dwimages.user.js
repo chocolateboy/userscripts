@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.1
+// @version       2.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -17,36 +17,142 @@
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
+let INITIALIZED = false, METADATA
+
+// return the image metadata subtree (array) of the full metadata tree
+function imageMetadata (tree) {
+    return tree[31][0][12][2]
+}
+
+// register the listener for metadata requests and parse the data for the first ≈
+// 100 images out of the SCRIPT element embedded in the page
+function init () {
+    window.XMLHttpRequest.prototype.open = hookXHROpen(window.XMLHttpRequest.prototype.open)
+
+    const scripts = Array.from(document.scripts)
+    const callbacks = scripts.filter(script => /^AF_initDataCallback\b/.test(script.text))
+
+    try {
+        const callback = callbacks.pop().text
+        METADATA = imageMetadata(parseMetadata(callback))
+    } finally {
+        INITIALIZED = true
+    }
+}
+
+// determine whether an XHR request is for another batch of image metadata
+function isImageDataRequest (args) {
+    return (args.length >= 2)
+        && (args[0] === 'POST')
+        && /\/batchexecute\?rpcids=/.test(String(args[1]))
+}
+
+// return the URL for the nth image (0-based)
+function nthImageUrl (index) {
+    return METADATA[index][1][3][0]
+}
+
+// return a version of XmlHttpRequest#open which checks for and intercepts image
+// metadata requests before delegating to the original method
+//
+// if the URL matches, we append the new metadata to a global store
+function hookXHROpen (oldOpen) {
+    return function open (...args) {
+        if (isImageDataRequest(args)) {
+            this.addEventListener('load', () => {
+                let parsed
+
+                try {
+                    const stringified = this.responseText.match(/("\[[\s\S]+\](?:\\n)?")/)[1]
+                    const json = JSON.parse(stringified)
+                    parsed = JSON.parse(json)
+                } catch (e) {
+                    console.error("Can't parse response:", e)
+                    return
+                }
+
+                try {
+                    METADATA = METADATA.concat(imageMetadata(parsed))
+
+                    // run once against the new images
+                    $.onCreate('div[data-ri][data-ved][jsaction]', onResults)
+                } catch (e) {
+                    console.error("Can't merge new metadata:", e)
+                }
+            })
+        }
+
+        return oldOpen.apply(this, args)
+    }
+}
+
+// process a new batch of results (DIVs), assigning the image URL to the first
+// link and disabling trackers
+//
+// used to process the original batch of results as well as the lazily-loaded
+// updates
 function onResults ($results) {
     $results.each(function () {
-        const $result = $(this)
+        if (!INITIALIZED) {
+            try {
+                init()
+            } catch (e) {
+                console.error("Can't parse metadata:", e)
+                return false // i.e. break out of the +each+ loop
+            }
+        }
 
-        // remove the actions from this DIV and all its descendant elements to
-        // prevent events on these elements being intercepted
+        if (!METADATA) {
+            return false // break
+        }
+
+        // grab the metadata for this result
+        const $result = $(this)
+        const index = $result.data('ri') // 0-based index of the result
+
+        let imageUrl
+
+        try {
+            imageUrl = nthImageUrl(index)
+        } catch (e) {
+            console.warn(`Can't find image URL for image #${index + 1}`)
+            return // continue
+        }
+
+        // prevent new trackers being registered on this DIV and its descendant
+        // elements
         $result.find('*').addBack().removeAttr('jsaction')
 
-        // parse the JSON out of the attached metadata element
-        const meta = JSON.parse($result.find('.rg_meta').text())
-
-        // assign the correct URIs to the image and page links
+        // assign the correct/missing URI to the image link
         const $links = $result.find('a')
         const $imageLink = $links.eq(0)
         const $pageLink = $links.eq(1)
 
-        $pageLink.attr('href', meta.ru) // page URL
+        $imageLink.attr('href', imageUrl)
 
-        // remove another hook: links with this class automatically revert
-        // changes to the href
-        $imageLink.removeClass('rg_l')
-        $imageLink.attr('href', meta.ou) // image URL
+        // pre-empt the existing trackers on elements which don't already have
+        // direct listeners (the result element and the image link)
+        $result.on('click focus mousedown', stopPropagation)
+        $imageLink.on('click focus mousedown', stopPropagation)
 
-        // compensate for the removed style
-        $imageLink.css({
-            display:  'inline-block',
-            position: 'relative',
-            overflow: 'hidden',
-        })
+        // and blast the trackers off the element which does (the page link)
+        $pageLink.replaceWith($pageLink.clone())
     })
 }
 
-$.onCreate('div[data-ri][data-ved]', onResults, true /* multi */)
+// extract the image metadata for the original batch of results from the
+// contents of the SCRIPT tag
+function parseMetadata (fragment) {
+    // XXX not all browsers support the ES2018 /s (matchAll) flag
+    // const json = callback.match(/(\[.+\])/s)[1]
+    const json = fragment.match(/(\[[\s\S]+\])/)[1]
+    return JSON.parse(json)
+}
+
+// event handler for images links, page links and results which prevents their
+// click/mousedown events being hijacked for tracking
+function stopPropagation (e) {
+    e.stopPropagation()
+}
+
+$.onCreate('div[data-ri][data-ved]', onResults) // run once against the initial images
