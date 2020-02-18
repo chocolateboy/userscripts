@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.13.0
+// @version       2.13.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -92,7 +92,7 @@ function debug (message) {
     console.debug(message)
 }
 
-// URL-encode the supplied query parameter, replacing encoded spaces ("%20")
+// URL-encode the supplied query parameter and replace encoded spaces ("%20")
 // with plus signs ("+")
 function encodeParam (param) {
     return encodeURIComponent(param).replace(/%20/g, '+')
@@ -285,8 +285,8 @@ function adaptOmdbData (data) {
 
     return {
         CriticRating: (Number.isInteger(score) ? score : null),
-        RTUrl: data.tomatoURL,
         RTConsensus: rating.tomatoConsensus,
+        RTUrl: data.tomatoURL,
     }
 }
 
@@ -358,7 +358,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         }
     } else {
         // the old way: a rating but no RT URL (or consensus).
-        // this is still used for some old and new releases
+        // may still be used for some old and new releases
         debug(`no Rotten Tomatoes URL for ${imdbId}`)
         url = `https://www.rottentomatoes.com/search/?search=${encodeURIComponent(title)}`
     }
@@ -455,7 +455,6 @@ async function main () {
     }
 
     const query = JSON.parse(GM_getResourceText('query'))
-    const fallback = JSON.parse(GM_getResourceText('fallback'))
 
     Object.assign(query.params, { searchTerm: title, yearMax: THIS_YEAR })
 
@@ -463,6 +462,7 @@ async function main () {
         debug(`querying API for ${imdbId} (${JSON.stringify(title)})`)
         const requestOptions = Object.assign({}, query, { title: `data for ${imdbId}` })
         const response = await get(query.api, requestOptions)
+        const fallback = JSON.parse(GM_getResourceText('fallback'))
         debug(`response for ${imdbId}: ${response.status} ${response.statusText}`)
 
         const { data, updated } = await getRTData({
