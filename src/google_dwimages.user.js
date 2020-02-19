@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -19,13 +19,22 @@
 
 let INITIALIZED = false, METADATA
 
+// extract the image metadata for the original batch of results from the
+// content of the SCRIPT tag
+function extractMetadata (source) {
+    // XXX not all browsers support the ES2018 /s (matchAll) flag
+    // const json = callback.match(/(\[.+\])/s)[1]
+    const json = source.match(/(\[[\s\S]+\])/)[1]
+    return JSON.parse(json)
+}
+
 // return the image metadata subtree (array) of the full metadata tree
 function imageMetadata (tree) {
     return tree[31][0][12][2]
 }
 
-// register the listener for metadata requests and parse the data for the first ≈
-// 100 images out of the SCRIPT element embedded in the page
+// register a listener for metadata requests and extract the data for the first
+// ≈ 100 images out of the SCRIPT element embedded in the page
 function init () {
     window.XMLHttpRequest.prototype.open = hookXHROpen(window.XMLHttpRequest.prototype.open)
 
@@ -34,13 +43,13 @@ function init () {
 
     try {
         const callback = callbacks.pop().text
-        METADATA = imageMetadata(parseMetadata(callback))
+        METADATA = imageMetadata(extractMetadata(callback))
     } finally {
         INITIALIZED = true
     }
 }
 
-// determine whether an XHR request is for another batch of image metadata
+// determine whether an XHR request is an image-metadata request
 function isImageDataRequest (args) {
     return (args.length >= 2)
         && (args[0] === 'POST')
@@ -52,37 +61,41 @@ function nthImageUrl (index) {
     return METADATA[index][1][3][0]
 }
 
-// return a version of XmlHttpRequest#open which checks for and intercepts image
-// metadata requests before delegating to the original method
+// return a version of XmlHttpRequest#open which checks for and intercepts
+// image-metadata requests before delegating to the original method
 //
-// if the URL matches, we append the new metadata to a global store
+// if the URL matches, we append the new metadata to our metadata store (array)
 function hookXHROpen (oldOpen) {
     return function open (...args) {
-        if (isImageDataRequest(args)) {
-            this.addEventListener('load', () => {
-                let parsed
+        oldOpen.apply(this, args) // there's no return value
 
-                try {
-                    const stringified = this.responseText.match(/("\[[\s\S]+\](?:\\n)?")/)[1]
-                    const json = JSON.parse(stringified)
-                    parsed = JSON.parse(json)
-                } catch (e) {
-                    console.error("Can't parse response:", e)
-                    return
-                }
-
-                try {
-                    METADATA = METADATA.concat(imageMetadata(parsed))
-
-                    // run once against the new images
-                    $.onCreate('div[data-ri][data-ved][jsaction]', onResults)
-                } catch (e) {
-                    console.error("Can't merge new metadata:", e)
-                }
-            })
+        if (!isImageDataRequest(args)) {
+            return
         }
 
-        return oldOpen.apply(this, args)
+        // a new XHR instance is created for each metadata request, so we need
+        // to register a new listener
+        this.addEventListener('load', () => {
+            let parsed
+
+            try {
+                const stringified = this.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)[0]
+                const json = JSON.parse(stringified)
+                parsed = JSON.parse(json)
+            } catch (e) {
+                console.error("Can't parse response:", e)
+                return
+            }
+
+            try {
+                METADATA = METADATA.concat(imageMetadata(parsed))
+
+                // run once against the new images
+                $.onCreate('div[data-ri][data-ved][jsaction]', onResults)
+            } catch (e) {
+                console.error("Can't merge new metadata:", e)
+            }
+        })
     }
 }
 
@@ -140,19 +153,11 @@ function onResults ($results) {
     })
 }
 
-// extract the image metadata for the original batch of results from the
-// contents of the SCRIPT tag
-function parseMetadata (fragment) {
-    // XXX not all browsers support the ES2018 /s (matchAll) flag
-    // const json = callback.match(/(\[.+\])/s)[1]
-    const json = fragment.match(/(\[[\s\S]+\])/)[1]
-    return JSON.parse(json)
-}
-
-// event handler for images links, page links and results which prevents their
+// event handler for image links, page links and results which prevents their
 // click/mousedown events being hijacked for tracking
 function stopPropagation (e) {
     e.stopPropagation()
 }
 
-$.onCreate('div[data-ri][data-ved]', onResults) // run once against the initial images
+// run once against the initial images
+$.onCreate('div[data-ri][data-ved]', onResults)
