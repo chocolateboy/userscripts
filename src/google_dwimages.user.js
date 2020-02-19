@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.2
+// @version       2.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -17,7 +17,7 @@
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
-let INITIALIZED = false, METADATA
+let METADATA
 
 /******************************** helper functions ****************************/
 
@@ -93,20 +93,16 @@ function stopPropagation (e) {
 
 /************************************* main ************************************/
 
-// register a listener for metadata requests and extract the data for the first
-// ≈ 100 images out of the SCRIPT element embedded in the page
+// extract the data for the first ≈ 100 images out of the SCRIPT element
+// embedded in the page and register a listener for the requests for
+// additional data
 function init () {
-    window.XMLHttpRequest.prototype.open = hookXHROpen(window.XMLHttpRequest.prototype.open)
-
     const scripts = Array.from(document.scripts)
     const callbacks = scripts.filter(script => /^AF_initDataCallback\b/.test(script.text))
+    const callback = callbacks.pop().text
 
-    try {
-        const callback = callbacks.pop().text
-        METADATA = imageMetadata(extractMetadata(callback))
-    } finally {
-        INITIALIZED = true
-    }
+    METADATA = imageMetadata(extractMetadata(callback))
+    window.XMLHttpRequest.prototype.open = hookXHROpen(window.XMLHttpRequest.prototype.open)
 }
 
 // process a new batch of results (DIVs), assigning the image URL to the first
@@ -116,19 +112,6 @@ function init () {
 // updates
 function onResults ($results) {
     $results.each(function () {
-        if (!INITIALIZED) {
-            try {
-                init()
-            } catch (e) {
-                console.error("Can't parse metadata:", e)
-                return false // i.e. break out of the +each+ loop
-            }
-        }
-
-        if (!METADATA) {
-            return false // break
-        }
-
         // grab the metadata for this result
         const $result = $(this)
         const index = $result.data('ri') // 0-based index of the result
@@ -158,10 +141,15 @@ function onResults ($results) {
         $result.on('click focus mousedown', stopPropagation)
         $imageLink.on('click focus mousedown', stopPropagation)
 
-        // and blast the trackers off the element which does (the page link)
+        // forcibly remove trackers from the remaining element (the page link)
         $pageLink.replaceWith($pageLink.clone())
     })
 }
 
-// run once against the initial images
-$.onCreate('div[data-ri][data-ved]', onResults)
+try {
+    init()
+    // run once against the initial images
+    $.onCreate('div[data-ri][data-ved]', onResults)
+} catch (e) {
+    console.error("Can't parse metadata:", e)
+}
