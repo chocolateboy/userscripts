@@ -3,13 +3,12 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.3
+// @version       2.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
 // @require       https://code.jquery.com/jquery-3.4.1.min.js
-// @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log
 // @inject-into   content
 // ==/UserScript==
@@ -25,15 +24,13 @@ let METADATA
 // content of the SCRIPT tag
 function extractMetadata (source) {
     // XXX not all browsers support the ES2018 /s (matchAll) flag
-    // const json = callback.match(/(\[.+\])/s)[1]
+    // const json = source.match(/(\[.+\])/s)[1]
     const json = source.match(/(\[[\s\S]+\])/)[1]
     return JSON.parse(json)
 }
 
-// return a version of XmlHttpRequest#open which checks for and intercepts
-// image-metadata requests before delegating to the original method
-//
-// if the URL matches, we append the new metadata to our metadata store (array)
+// return a wrapper for XmlHttpRequest#open which intercepts image-metadata
+// requests and appends the results to our metadata store (array)
 function hookXHROpen (oldOpen) {
     return function open (...args) {
         oldOpen.apply(this, args) // there's no return value
@@ -48,9 +45,9 @@ function hookXHROpen (oldOpen) {
             let parsed
 
             try {
-                const stringified = this.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)[0]
-                const json = JSON.parse(stringified)
-                parsed = JSON.parse(json)
+                const cooked = this.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)[0] // '"[...]\n"'
+                const raw = JSON.parse(cooked) // '[...]'
+                parsed = JSON.parse(raw) // [...]
             } catch (e) {
                 console.error("Can't parse response:", e)
                 return
@@ -58,9 +55,8 @@ function hookXHROpen (oldOpen) {
 
             try {
                 METADATA = METADATA.concat(imageMetadata(parsed))
-
-                // run once against the new images
-                $.onCreate('div[data-ri][data-ved][jsaction]', onResults)
+                // process the new images
+                $('div[data-ri][data-ved][jsaction]').each(onResult)
             } catch (e) {
                 console.error("Can't merge new metadata:", e)
             }
@@ -76,8 +72,8 @@ function imageMetadata (tree) {
 // determine whether an XHR request is an image-metadata request
 function isImageDataRequest (args) {
     return (args.length >= 2)
-        && (args[0] === 'POST')
-        && /\/batchexecute\?rpcids=/.test(String(args[1]))
+        && (args[0].toUpperCase() === 'POST')
+        && /\/batchexecute\?rpcids=/.test(args[1])
 }
 
 // return the URL for the nth image (0-based)
@@ -105,51 +101,49 @@ function init () {
     window.XMLHttpRequest.prototype.open = hookXHROpen(window.XMLHttpRequest.prototype.open)
 }
 
-// process a new batch of results (DIVs), assigning the image URL to the first
-// link and disabling trackers
+// process an image result (DIV), assigning the image URL to its first link and
+// disabling trackers
 //
 // used to process the original batch of results as well as the lazily-loaded
 // updates
-function onResults ($results) {
-    $results.each(function () {
-        // grab the metadata for this result
-        const $result = $(this)
-        const index = $result.data('ri') // 0-based index of the result
+function onResult () {
+    // grab the metadata for this result
+    const $result = $(this)
+    const index = $result.data('ri') // 0-based index of the result
 
-        let imageUrl
+    let imageUrl
 
-        try {
-            imageUrl = nthImageUrl(index)
-        } catch (e) {
-            console.warn(`Can't find image URL for image #${index + 1}`)
-            return // continue
-        }
+    try {
+        imageUrl = nthImageUrl(index)
+    } catch (e) {
+        console.warn(`Can't find image URL for image #${index + 1}`)
+        return // continue
+    }
 
-        // prevent new trackers being registered on this DIV and its descendant
-        // elements
-        $result.find('*').addBack().removeAttr('jsaction')
+    // prevent new trackers being registered on this DIV and its descendant
+    // elements
+    $result.find('*').addBack().removeAttr('jsaction')
 
-        // assign the correct/missing URI to the image link
-        const $links = $result.find('a')
-        const $imageLink = $links.eq(0)
-        const $pageLink = $links.eq(1)
+    // assign the correct/missing URI to the image link
+    const $links = $result.find('a')
+    const $imageLink = $links.eq(0)
+    const $pageLink = $links.eq(1)
 
-        $imageLink.attr('href', imageUrl)
+    $imageLink.attr('href', imageUrl)
 
-        // pre-empt the existing trackers on elements which don't already have
-        // direct listeners (the result element and the image link)
-        $result.on('click focus mousedown', stopPropagation)
-        $imageLink.on('click focus mousedown', stopPropagation)
+    // pre-empt the existing trackers on elements which don't already have
+    // direct listeners (the result element and the image link)
+    $result.on('click focus mousedown', stopPropagation)
+    $imageLink.on('click focus mousedown', stopPropagation)
 
-        // forcibly remove trackers from the remaining element (the page link)
-        $pageLink.replaceWith($pageLink.clone())
-    })
+    // forcibly remove trackers from the remaining element (the page link)
+    $pageLink.replaceWith($pageLink.clone())
 }
 
 try {
     init()
-    // run once against the initial images
-    $.onCreate('div[data-ri][data-ved]', onResults)
+    // process the initial images
+    $('div[data-ri][data-ved]').each(onResult)
 } catch (e) {
     console.error("Can't parse metadata:", e)
 }
