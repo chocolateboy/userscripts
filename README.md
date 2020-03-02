@@ -34,7 +34,7 @@ Where possible, always install (or reinstall) these userscripts from GreasyFork,
 
 All of these scripts work in and are tested on [Violentmonkey](https://violentmonkey.github.io/), which is open source, cross browser, actively maintained, and highly recommended. If for some reason you can't use it — or don't want to — the following options are available:
 
-- [Greasemonkey](https://addons.mozilla.org/firefox/addon/greasemonkey/) <sup>[1](#fn1)</sup>
+- [Greasemonkey](https://addons.mozilla.org/firefox/addon/greasemonkey/)<sup>[1](#fn1)</sup>
 - Tampermonkey ([closed source](https://github.com/Tampermonkey/tampermonkey/issues/214))
 
 <a name="fn1"><sup><b>1</b></sup></a> The [Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html) is not [currently](https://github.com/chocolateboy/userscripts/issues/5) supported. Some scripts may work, but none have been tested.
