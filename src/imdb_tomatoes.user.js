@@ -10,7 +10,7 @@
 // @include       http://*.imdb.tld/*/title/tt*
 // @include       https://*.imdb.tld/title/tt*
 // @include       https://*.imdb.tld/*/title/tt*
-// @require       https://code.jquery.com/jquery-3.4.1.min.js
+// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @resource      query https://pastebin.com/raw/1RgBguDM
 // @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json

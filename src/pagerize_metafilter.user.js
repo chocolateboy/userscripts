@@ -3,14 +3,14 @@
 // @description   Mark up MetaFilter with pager metadata
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.6.1
+// @version       0.6.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.metafilter.com/*
 // @include       http://metafilter.com/*
 // @include       https://*.metafilter.com/*
 // @include       https://metafilter.com/*
-// @require       https://code.jquery.com/jquery-3.3.1.min.js
+// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/jquery-pagerizer@v1.0.0/dist/pagerizer.min.js
 // @grant         GM_log
 // ==/UserScript==

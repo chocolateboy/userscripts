@@ -1,17 +1,17 @@
 // ==UserScript==
-// @name        IMDb Full Summary
-// @description Automatically show the full plot summary on IMDb
-// @author      chocolateboy
-// @copyright   chocolateboy
-// @version     1.6.0
-// @namespace   https://github.com/chocolateboy/userscripts
-// @license     GPL: https://www.gnu.org/copyleft/gpl.html
-// @include     http://*.imdb.tld/title/tt*
-// @include     http://*.imdb.tld/*/title/tt*
-// @include     https://*.imdb.tld/title/tt*
-// @include     https://*.imdb.tld/*/title/tt*
-// @require     https://code.jquery.com/jquery-3.4.1.min.js
-// @grant       GM_log
+// @name          IMDb Full Summary
+// @description   Automatically show the full plot summary on IMDb
+// @author        chocolateboy
+// @copyright     chocolateboy
+// @version       1.6.1
+// @namespace     https://github.com/chocolateboy/userscripts
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
+// @include       http://*.imdb.tld/title/tt*
+// @include       http://*.imdb.tld/*/title/tt*
+// @include       https://*.imdb.tld/title/tt*
+// @include       https://*.imdb.tld/*/title/tt*
+// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
+// @grant         GM_log
 // ==/UserScript==
 
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:

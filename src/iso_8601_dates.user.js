@@ -3,7 +3,7 @@
 // @description    Display US dates in the ISO 8601 YYYY-MM-DD format
 // @author         chocolateboy
 // @copyright      chocolateboy
-// @version        1.2.2
+// @version        1.2.3
 // @namespace      https://github.com/chocolateboy/userscripts
 // @license        GPL: https://www.gnu.org/copyleft/gpl.html
 // @exclude        *

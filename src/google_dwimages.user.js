@@ -3,12 +3,12 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.0
+// @version       2.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
-// @require       https://code.jquery.com/jquery-3.4.1.min.js
+// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @grant         GM_log
 // @inject-into   content
 // ==/UserScript==

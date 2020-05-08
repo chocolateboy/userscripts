@@ -3,12 +3,12 @@
 // @description   Mark up Amazon search results with pager metadata
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.1.1
+// @version       0.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.amazon.tld/*
 // @include       https://*.amazon.tld/*
-// @require       https://code.jquery.com/jquery-3.3.1.min.js
+// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/jquery-pagerizer@v1.0.0/dist/pagerizer.min.js
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log
