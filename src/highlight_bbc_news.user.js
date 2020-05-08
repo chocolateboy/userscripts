@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       0.14.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://www.bbc.co.uk/news
 // @include       https://www.bbc.co.uk/news
 // @include       http://www.bbc.com/news
@@ -22,7 +22,7 @@
 // ==/UserScript==
 
 // a mapping from item selectors to target selectors on the main news page
-// e.g. http://www.bbc.co.uk/news
+// e.g. https://www.bbc.co.uk/news
 const MAIN_PAGE_LINKS = {
     // almost all links apart from the (static) "Watch Live"/"Listen Live"
     // links
@@ -43,7 +43,7 @@ const MAIN_PAGE_LINKS = {
 }
 
 // a mapping from item selectors to target selectors on news subpages e.g.
-// http://www.bbc.co.uk/news/world
+// https://www.bbc.co.uk/news/world
 const SUBPAGE_LINKS = {
     // almost all links on subpages, apart from the bulleted lists of links
     // under main stories, which are captured by the 'a.links-list__link'

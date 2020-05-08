@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       1.2.2
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.last.fm/*
 // @include       https://*.last.fm/*
 // @include       http://*.lastfm.tld/*

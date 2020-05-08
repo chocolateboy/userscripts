@@ -5,7 +5,7 @@
 // @copyright   chocolateboy
 // @version     1.2.0
 // @namespace   https://github.com/chocolateboy/userscripts
-// @license     GPL: http://www.gnu.org/copyleft/gpl.html
+// @license     GPL: https://www.gnu.org/copyleft/gpl.html
 // @include     http://rottentomatoes.com/m/*
 // @include     http://*.rottentomatoes.com/m/*
 // @include     https://rottentomatoes.com/m/*

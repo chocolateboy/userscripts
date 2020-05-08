@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       0.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.ebay.tld/*
 // @include       https://*.ebay.tld/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js

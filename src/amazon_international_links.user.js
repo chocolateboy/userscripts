@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://smile.amazon.tld/*
 // @include       https://www.amazon.tld/*
 // @require       https://code.jquery.com/jquery-3.4.1.min.js
@@ -21,13 +21,13 @@
  *
  * further reading:
  *
- *     http://helpful.knobs-dials.com/index.php/Amazon_notes#Links
+ *     https://helpful.knobs-dials.com/index.php/Amazon_notes#Links
  */
 
 /*********************** Constants ********************************/
 
 // a map from the Amazon TLD to the corresponding two-letter country code
-// XXX technically, UK should be GB: http://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+// XXX technically, UK should be GB: https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
 const SITES = {
     'com.au': 'AU', // Australia
     'com.br': 'BR', // Brazil

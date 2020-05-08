@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       0.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/*
 // @require       https://code.jquery.com/jquery-3.3.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/jquery-pagerizer@v1.0.0/dist/pagerizer.min.js

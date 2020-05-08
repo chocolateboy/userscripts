@@ -5,7 +5,7 @@
 // @copyright   chocolateboy
 // @version     1.6.0
 // @namespace   https://github.com/chocolateboy/userscripts
-// @license     GPL: http://www.gnu.org/copyleft/gpl.html
+// @license     GPL: https://www.gnu.org/copyleft/gpl.html
 // @include     http://*.imdb.tld/title/tt*
 // @include     http://*.imdb.tld/*/title/tt*
 // @include     https://*.imdb.tld/title/tt*

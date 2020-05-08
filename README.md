@@ -112,7 +112,7 @@ The following are all direct links i.e. clicking them installs the script.
 ### Links
 
 * [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy)
-* [USO Mirror](http://userscripts-mirror.org/users/3169/scripts)
+* [USO Mirror](https://userscripts-mirror.org/users/3169/scripts)
 
 ## Author
 
@@ -123,4 +123,4 @@ The following are all direct links i.e. clicking them installs the script.
 Copyright © 2011-2020 by chocolateboy.
 
 These userscripts are free software; you can redistribute and/or modify them under the
-terms of the [GPL](http://www.gnu.org/copyleft/gpl.html).
+terms of the [GPL](https://www.gnu.org/copyleft/gpl.html).

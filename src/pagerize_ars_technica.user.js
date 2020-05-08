@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       0.6.2
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://arstechnica.com/*
 // @include       http://*.arstechnica.com/*
 // @include       https://arstechnica.com/*
@@ -19,7 +19,7 @@
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
 /*
-    http://arstechnica.com/information-technology/2010/01/video-editing-in-linux-a-look-at-pitivi-and-kdenlive/2/
+    https://arstechnica.com/information-technology/2010/01/video-editing-in-linux-a-look-at-pitivi-and-kdenlive/2/
 
     <nav class="page-numbers">
         Page:

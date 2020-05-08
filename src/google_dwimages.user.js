@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       2.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
 // @require       https://code.jquery.com/jquery-3.4.1.min.js

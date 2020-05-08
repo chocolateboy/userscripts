@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       1.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://news.ycombinator.com/
 // @include       /^https://news\.ycombinator\.com/(active|ask|best|front|newest|news|noobstories|show|shownew)\b/
 // @require       https://code.jquery.com/jquery-3.5.0.min.js

@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       2.14.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @include       https://*.imdb.tld/title/tt*
@@ -28,21 +28,21 @@
 /*
  * OK:
  *
- *   - http://www.imdb.com/title/tt0309698/ - 4 widgets
- *   - http://www.imdb.com/title/tt0086312/ - 3 widgets
- *   - http://www.imdb.com/title/tt0037638/ - 2 widgets
+ *   - https://www.imdb.com/title/tt0309698/ - 4 widgets
+ *   - https://www.imdb.com/title/tt0086312/ - 3 widgets
+ *   - https://www.imdb.com/title/tt0037638/ - 2 widgets
  *
  * Fixed:
  *
  *   layout:
  *
- *     - http://www.imdb.com/title/tt0162346/  - 4 widgets
- *     - http://www.imdb.com/title/tt0159097/  - 4 widgets
+ *     - https://www.imdb.com/title/tt0162346/  - 4 widgets
+ *     - https://www.imdb.com/title/tt0159097/  - 4 widgets
  *     - https://www.imdb.com/title/tt0129387/ - 2 .plot_summary_wrapper DIVs
  *
  *   RT/OMDb alias [1]:
  *
- *     - http://www.imdb.com/title/tt0120755/ - Mission: Impossible II
+ *     - https://www.imdb.com/title/tt0120755/ - Mission: Impossible II
  */
 
 // [1] unaliased and incorrectly aliased titles are common:

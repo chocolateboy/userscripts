@@ -5,7 +5,7 @@
 // @copyright     chocolateboy
 // @version       1.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://echojs.com/
 // @include       http://www.echojs.com/
 // @include       https://www.echojs.com/
