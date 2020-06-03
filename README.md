@@ -13,6 +13,7 @@
   - [Last.fm](#lastfm)
   - [Reddit](#reddit)
   - [Rotten Tomatoes](#rotten-tomatoes)
+  - [Twitter](#twitter)
 - [Highlighters](#highlighters)
 - [Pagerizers](#pagerizers)
 - [Misc](#misc)
@@ -74,6 +75,10 @@ All of these scripts work in and are tested on [Violentmonkey](https://violentmo
 ### Rotten Tomatoes
 
 - [More Tomatoes](https://greasyfork.org/scripts/23435-more-tomatoes/ "Homepage") - automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
+
+### Twitter
+
+- [Twitter Direct](https://greasyfork.org/en/scripts/404632-twitter-direct) - Remove t.co tracking links from Twitter
 
 ## Highlighters
 
