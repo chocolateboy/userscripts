@@ -3,13 +3,13 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.1
+// @version       0.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @run-at        document-start
-// @inject-into   content
+// @inject-into   auto
 // ==/UserScript==
 
 /*
@@ -21,7 +21,7 @@ const PATTERN = /^https:\/\/api\.twitter\.com\/([^/]+\/[^.]+\.json)\?/
  * compatibility shim needed for Violentmonkey:
  * https://github.com/violentmonkey/violentmonkey/issues/997#issuecomment-637700732
  */
-const Compat = {}
+const Compat = { unsafeWindow }
 
 /*
  * replace t.co URLs with the original URL in all locations within the document
@@ -93,7 +93,6 @@ function onReadyStateChange (xhr, url) {
     const match = url.match(PATTERN)
 
     if (!match) {
-        console.debug("can't match URL:", url)
         return
     }
 
@@ -135,21 +134,24 @@ function hookXHRSend (oldSend) {
  * XXX the functions are only needed for Violentmonkey, and are effectively
  * no-ops in other engines
  */
-if (GM_info.scriptHandler === 'Violentmonkey') {
-    Compat.unsafeWindow = unsafeWindow.wrappedJSObject
-    Compat.cloneInto = cloneInto
-    Compat.exportFunction = exportFunction
+if ((typeof cloneInto === 'function') && (typeof exportFunction === 'function')) {
+    // Greasemonkey 4 (Firefox) and Violentmonkey (Firefox + Chrome)
+    Object.assign(Compat, { cloneInto, exportFunction })
+
+    // Violentmonkey for Firefox
+    if (unsafeWindow.wrappedJSObject) {
+        Compat.unsafeWindow = unsafeWindow.wrappedJSObject
+    }
 } else {
     Compat.cloneInto = Compat.exportFunction = value => value
-    Compat.unsafeWindow = unsafeWindow
 }
-
-console.debug('hooking XHR#send:', Compat.unsafeWindow.XMLHttpRequest.prototype.send)
 
 /*
  * replace the default XHR#send with our custom version, which scans responses
  * for tweets and expands their URLs
  */
+console.debug('hooking XHR#send:', Compat.unsafeWindow.XMLHttpRequest.prototype.send)
+
 Compat.unsafeWindow.XMLHttpRequest.prototype.send = Compat.exportFunction(
     hookXHRSend(window.XMLHttpRequest.prototype.send),
     Compat.unsafeWindow
