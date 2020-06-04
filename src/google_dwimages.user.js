@@ -3,18 +3,24 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.1
+// @version       2.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
 // @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @grant         GM_log
-// @inject-into   content
+// @inject-into   auto
 // ==/UserScript==
 
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
+
+/*
+ * compatibility shim needed for Violentmonkey:
+ * https://github.com/violentmonkey/violentmonkey/issues/997#issuecomment-637700732
+ */
+const Compat = { unsafeWindow }
 
 let METADATA
 
@@ -98,7 +104,11 @@ function init () {
     const callback = callbacks.pop().text
 
     METADATA = imageMetadata(extractMetadata(callback))
-    window.XMLHttpRequest.prototype.open = hookXHROpen(window.XMLHttpRequest.prototype.open)
+
+    Compat.unsafeWindow.XMLHttpRequest.prototype.open = Compat.exportFunction(
+        hookXHROpen(window.XMLHttpRequest.prototype.open),
+        Compat.unsafeWindow
+    )
 }
 
 // process an image result (DIV), assigning the image URL to its first link and
@@ -138,6 +148,25 @@ function onResult () {
 
     // forcibly remove trackers from the remaining element (the page link)
     $pageLink.replaceWith($pageLink.clone())
+}
+
+/*
+ * set up a cross-engine API to shield us from differences between engines so we
+ * don't have to clutter the code with conditionals.
+ *
+ * XXX the functions are only needed by Violentmonkey for Firefox, and are
+ * effectively no-ops in other engines
+ */
+if ((typeof cloneInto === 'function') && (typeof exportFunction === 'function')) {
+    // Greasemonkey 4 (Firefox) and Violentmonkey (Firefox + Chrome)
+    Object.assign(Compat, { cloneInto, exportFunction })
+
+    // Violentmonkey for Firefox
+    if (unsafeWindow.wrappedJSObject) {
+        Compat.unsafeWindow = unsafeWindow.wrappedJSObject
+    }
+} else {
+    Compat.cloneInto = Compat.exportFunction = value => value
 }
 
 try {

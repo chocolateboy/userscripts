@@ -131,8 +131,8 @@ function hookXHRSend (oldSend) {
  * set up a cross-engine API to shield us from differences between engines so we
  * don't have to clutter the code with conditionals.
  *
- * XXX the functions are only needed for Violentmonkey, and are effectively
- * no-ops in other engines
+ * XXX the functions are only needed by Violentmonkey for Firefox, and are
+ * effectively no-ops in other engines
  */
 if ((typeof cloneInto === 'function') && (typeof exportFunction === 'function')) {
     // Greasemonkey 4 (Firefox) and Violentmonkey (Firefox + Chrome)
