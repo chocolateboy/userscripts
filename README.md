@@ -18,8 +18,9 @@
 - [Pagerizers](#pagerizers)
 - [Misc](#misc)
 - [See Also](#see-also)
+  - [Addons](#addons)
   - [Libraries](#libraries)
-  - [Links](#links)
+  - [Sites](#sites-1)
 - [Author](#author)
 - [Copyright and License](#copyright-and-license)
 
@@ -27,19 +28,29 @@
 
 ## Installation
 
-Unless otherwise noted, each link below points to the userscript's homepage on [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy).
+Unless otherwise noted, each link below points to the userscript's homepage on
+[GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy).
 
-Where possible, always install (or reinstall) these userscripts from GreasyFork, as this repo may contain development versions of these scripts that aren't ready for release and may not even compile. In addition, the file/directory names here are subject to change, whereas the URLs on GreasyFork will always remain stable.
+Where possible, always install (or reinstall) these userscripts from
+GreasyFork, as this repo may contain development versions of these scripts that
+aren't ready for release and may not even compile. In addition, the
+file/directory names here are subject to change, whereas the URLs on GreasyFork
+will always remain stable.
 
 ### Engines
 
-All of these scripts work in and are tested on [Violentmonkey](https://violentmonkey.github.io/), which is open source, cross browser, actively maintained, and highly recommended. If for some reason you can't use it — or don't want to — the following options are available:
+All of these scripts work in and are tested on
+[Violentmonkey](https://violentmonkey.github.io/), which is open source, cross
+browser, actively maintained, and highly recommended. If for some reason you
+can't use it — or don't want to — the following options are available:
 
 - [Greasemonkey](https://addons.mozilla.org/firefox/addon/greasemonkey/)<sup>[1](#fn1)</sup>
 - Tampermonkey ([closed source](https://github.com/Tampermonkey/tampermonkey/issues/214))
 
-<a name="fn1"><sup><b>1</b></sup></a> The [Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html) is not [currently](https://github.com/chocolateboy/userscripts/issues/5) supported. Some scripts may work, but none have been tested.
-<br />
+<a name="fn1"><sup><b>1</b></sup></a> The
+[Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html)
+is not [currently](https://github.com/chocolateboy/userscripts/issues/5)
+supported. Some scripts work, but most haven't been tested. <br />
 
 ## Sites
 
@@ -78,7 +89,7 @@ All of these scripts work in and are tested on [Violentmonkey](https://violentmo
 
 ### Twitter
 
-- [Twitter Direct](https://greasyfork.org/en/scripts/404632-twitter-direct) - Remove t.co tracking links from Twitter
+- [Twitter Direct](https://greasyfork.org/en/scripts/404632-twitter-direct) - remove t.co tracking links from Twitter
 
 ## Highlighters
 
@@ -93,7 +104,10 @@ Highlight new stories since the last time a site was visited
 
 ## Pagerizers
 
-These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"` links which can be consumed by a pager e.g. <kbd>[[</kbd> and <kbd>]]</kbd> in [Tridactyl](https://github.com/cmcaine/tridactyl), [Vim Vixen](https://github.com/ueokande/vim-vixen) etc.
+These scripts mark up pages with missing/sane `rel="prev"` and `rel="next"`
+links which can be consumed by a pager e.g. <kbd>[[</kbd> and <kbd>]]</kbd> in
+[Tridactyl](https://github.com/cmcaine/tridactyl), [Vim Vixen](https://github.com/ueokande/vim-vixen)
+etc.
 
 The following are all direct links i.e. clicking them installs the script.
 
@@ -109,12 +123,16 @@ The following are all direct links i.e. clicking them installs the script.
 
 ## See Also
 
+### Addons
+
+- [Google Direct](https://github.com/chocolateboy/google-direct) - a Firefox addon which removes tracking links from Google Search results
+
 ### Libraries
 
 - [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - a jQuery plugin to highlight new items since the last time a site was visited
 - [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - a jQuery plugin to mark up web pages with next/previous page annotations
 
-### Links
+### Sites
 
 - [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy)
 - [USO Mirror](https://userscripts-mirror.org/users/3169/scripts)
@@ -127,5 +145,5 @@ The following are all direct links i.e. clicking them installs the script.
 
 Copyright © 2011-2020 by chocolateboy.
 
-These userscripts are free software; you can redistribute and/or modify them under the
-terms of the [GPL](https://www.gnu.org/copyleft/gpl.html).
+These userscripts are free software; you can redistribute and/or modify them
+under the terms of the [GPL](https://www.gnu.org/copyleft/gpl.html).
