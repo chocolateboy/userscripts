@@ -91,6 +91,7 @@ supported. Some scripts work, but most haven't been tested. <br />
 
 - [Linkify Twitter Trends](https://greasyfork.org/en/scripts/405103-linkify-twitter-trends) - make Twitter trends links (again)
 - [Twitter Direct](https://greasyfork.org/en/scripts/404632-twitter-direct) - remove t.co tracking links from Twitter
+- [Twitter Time Tooltip](https://greasyfork.org/en/scripts/405154-twitter-time-tooltip) - restore timestamp tooltips when hovering over post dates on Twitter
 
 ## Highlighters
 
