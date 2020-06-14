@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.1
+// @version       0.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/*
@@ -75,15 +75,27 @@ function filterStats ($stats) {
 
         // console.debug('stats:', $el.attr('aria-label'))
 
+        // we need to locate the stats bar in the previous-sibling element, but
+        // the element's structure can vary: sometimes (e.g. in threads) the
+        // widgets are its direct children; at other times, they're its
+        // grandchildren. in either case, the stats bar is the great grandparent
+        // of the Retweets/Likes links, so we use that to locate it
+        let $statsBar
+
         const { length } = $el.prev().find('a[href]').filter(function () {
-            const href = $(this).attr('href').toLowerCase()
-            return hrefs.has(href)
+            const $link = $(this)
+            const href = $link.attr('href').toLowerCase()
+
+            if (hrefs.has(href)) {
+                $statsBar = $statsBar || $link.parent().parent().parent()
+                return true
+            }
         })
 
         // console.debug('length:', length)
 
         if (length > 0) {
-            onStats($el, path)
+            onStats($el, $statsBar, path)
         }
     }
 }
@@ -126,10 +138,7 @@ function onModify ($stats, $count, $label) {
  * 5) use a mutation observer to sync the element's reply count to the widget
  * 6) prepend the new widget to the stats bar
  */
-function onStats ($stats, path) {
-    // locate the stats bar, which contains the Retweets and/or Likes widgets
-    const $statsBar = $stats.prev().children() // there's only 1 child
-
+function onStats ($stats, $statsBar, path) {
     // XXX override the "column" layout if there's only one widget
     $statsBar.css('flex-direction', 'row')
 
