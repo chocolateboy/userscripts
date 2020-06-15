@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.2
+// @version       0.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/*
@@ -114,18 +114,15 @@ function onModify ($stats, $count, $label) {
     }
 
     const { label, replies } = stats
-    const old = $count.text()
 
-    if (replies === old) {
-        return
-    }
-
-    if ($label.text() !== label) {
+    if (label !== $label.text()) {
         $label.text(label)
     }
 
-    // TODO (re-)investigate (re-)implementing the animation
-    $count.text(replies)
+    if (replies !== $count.text()) {
+        // TODO (re-)investigate (re-)implementing the animation
+        $count.text(replies)
+    }
 }
 
 /*
