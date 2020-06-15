@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.3
+// @version       0.0.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/*
@@ -31,6 +31,10 @@
 // might not be a tweet page, so the matching is done in the filter via this
 // pattern rather than the @include pattern
 const PATH = /^(\/\w+\/status\/\d+)/
+
+// pattern used to extract the reply count and its label from the stats string.
+// guards against mangled stats such as "2 Retweets, 3 likes, Liked"
+const STATS = /^(\d+)\s+(.+?),\s+\d+\s+.+?,\s+\d+\s+.+$/
 
 /*
  * given a jQuery collection containing one or more stats elements (see above),
@@ -181,13 +185,8 @@ function onStats ($stats, $statsBar, path) {
  *   { count: 1500, label: 'replies', replies: '1.5K' }
  */
 function parseStats ($stats) {
-    const stats = $stats.attr('aria-label').split(', ')
-
-    if (stats.length !== 3) {
-        return false
-    }
-
-    const match = stats[0].match(/^(\d+)\s+(.+)$/)
+    const stats = $stats.attr('aria-label')
+    const match = stats.match(STATS)
 
     if (!match) {
         return false
