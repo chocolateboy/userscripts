@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.4
+// @version       0.0.5
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/*
@@ -31,10 +31,6 @@
 // might not be a tweet page, so the matching is done in the filter via this
 // pattern rather than the @include pattern
 const PATH = /^(\/\w+\/status\/\d+)/
-
-// pattern used to extract the reply count and its label from the stats string.
-// guards against mangled stats such as "2 Retweets, 3 likes, Liked"
-const STATS = /^(\d+)\s+(.+?),\s+\d+\s+.+?,\s+\d+\s+.+$/
 
 /*
  * given a jQuery collection containing one or more stats elements (see above),
@@ -70,13 +66,6 @@ function filterStats ($stats) {
 
     for (const el of $stats) {
         const $el = $(el)
-        const parsed = parseStats($el)
-
-        if (!parsed) {
-            // console.debug('invalid stats:', $el.attr('aria-label'))
-            continue
-        }
-
         // console.debug('stats:', $el.attr('aria-label'))
 
         // we need to locate the stats bar in the previous-sibling element, but
@@ -86,7 +75,7 @@ function filterStats ($stats) {
         // of the Retweets/Likes links, so we use that to locate it
         let $statsBar
 
-        const { length } = $el.prev().find('a[href]').filter(function () {
+        const { length: nLinks } = $el.prev().find('a[href]').filter(function () {
             const $link = $(this)
             const href = $link.attr('href').toLowerCase()
 
@@ -96,10 +85,17 @@ function filterStats ($stats) {
             }
         })
 
-        // console.debug('length:', length)
+        // console.debug('nLinks:', nLinks)
 
-        if (length > 0) {
-            onStats($el, $statsBar, path)
+        if (nLinks > 0) {
+            const parsed = parseStats($el, nLinks)
+
+            if (!parsed) {
+                // console.debug('XXX invalid stats:', $el.attr('aria-label'))
+                continue
+            }
+
+            onStats($el, $statsBar, path, nLinks)
         }
     }
 }
@@ -108,10 +104,10 @@ function filterStats ($stats) {
  * callback fired when the stats element's aria-label attribute is updated:
  * update the count in the Replies widget if it differs from the current value
  */
-function onModify ($stats, $count, $label) {
+function onModify ($stats, $count, $label, nLinks) {
     // console.debug('update:', $stats.attr('aria-label'))
 
-    const stats = parseStats($stats)
+    const stats = parseStats($stats, nLinks)
 
     if (!stats) {
         return
@@ -139,7 +135,7 @@ function onModify ($stats, $count, $label) {
  * 5) use a mutation observer to sync the element's reply count to the widget
  * 6) prepend the new widget to the stats bar
  */
-function onStats ($stats, $statsBar, path) {
+function onStats ($stats, $statsBar, path, nLinks) {
     // XXX override the "column" layout if there's only one widget
     $statsBar.css('flex-direction', 'row')
 
@@ -161,13 +157,13 @@ function onStats ($stats, $statsBar, path) {
 
     const $count = $leaves.eq(0)
     const $label = $leaves.eq(1)
-    const callback = $stats => onModify($stats, $count, $label)
+    const callback = $stats => onModify($stats, $count, $label, nLinks)
 
     // display "replies" as "Replies"
     $label.css('text-transform', 'capitalize')
 
     // initialize
-    onModify($stats, $count, $label)
+    onModify($stats, $count, $label, nLinks)
 
     // observe changes to the aria-label attribute
     $stats.onModify('aria-label', callback, true /* multi */)
@@ -184,16 +180,23 @@ function onStats ($stats, $statsBar, path) {
  *
  *   { count: 1500, label: 'replies', replies: '1.5K' }
  */
-function parseStats ($stats) {
+function parseStats ($stats, nLinks) {
     const stats = $stats.attr('aria-label')
-    const match = stats.match(STATS)
 
-    if (!match) {
+    // parse the stats into an array of count (number) => label (string) pairs.
+    // exclude mangled stats, e.g. "Liked" in "2 Retweets, 3 likes, Liked"
+    const pairs = stats.split(', ').flatMap(pair => {
+        const match = pair.match(/^(\d+)\s+(.+)$/)
+        return match ? [[Number(match[1]), match[2]]] : []
+    })
+
+    // the number of stats must exceed the number of links (and the number of
+    // links (i.e. widgets) must be at least 1 (so we can clone it))
+    if (pairs.length <= nLinks) {
         return false
     }
 
-    const count = Number(match[1])
-    const label = match[2]
+    const [count, label] = pairs[0]
     const replies = (count > 1000) ? Number((count / 1000).toFixed(1)) + 'K' : String(count)
 
     return { count, label, replies }
