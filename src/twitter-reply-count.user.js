@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.5
+// @version       0.0.6
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/*
@@ -62,10 +62,18 @@ function filterStats ($stats) {
     // to be case insensitive
 
     const lcPath = path.toLowerCase()
-    const hrefs = new Set([`${lcPath}/likes`, `${lcPath}/retweets/with_comments`])
+
+    // NOTE the Retweets link sometimes (usually?) has a "/with_comments"
+    // suffix
+    const hrefs = new Set([
+        `${lcPath}/likes`,
+        `${lcPath}/retweets`,
+        `${lcPath}/retweets/with_comments`
+    ])
 
     for (const el of $stats) {
         const $el = $(el)
+
         // console.debug('stats:', $el.attr('aria-label'))
 
         // we need to locate the stats bar in the previous-sibling element, but
