@@ -132,8 +132,10 @@ The following are all direct links i.e. clicking them installs the script.
 
 ### Libraries
 
+- [gm-storage](https://github.com/chocolateboy/gm-storage) - an ES6 Map wrapper for the synchronous userscript storage API
 - [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - a jQuery plugin to highlight new items since the last time a site was visited
 - [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - a jQuery plugin to mark up web pages with next/previous page annotations
+- [UnCommonJS](https://github.com/chocolateboy/uncommonjs) - a minimum viable shim for `module.exports`
 
 ### Sites
 
