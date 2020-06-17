@@ -33,7 +33,7 @@ Unless otherwise noted, each link below points to the userscript's homepage on
 
 Where possible, always install (or reinstall) these userscripts from
 GreasyFork, as this repo may contain development versions of these scripts that
-aren't ready for release and may not even compile. In addition, the
+aren't ready for release and which may not even compile. In addition, the
 file/directory names here are subject to change, whereas the URLs on GreasyFork
 will always remain stable.
 
@@ -81,7 +81,7 @@ supported. Some scripts work, but most haven't been tested. <br />
 
 ### Reddit
 
-- [Toggle Custom CSS](https://greasyfork.org/scripts/23434-reddit-toggle-custom-css/ "Homepage") - persistently disable/re-enable custom subreddit styles via a userscript command
+- [Reddit Toggle Custom CSS](https://greasyfork.org/scripts/23434-reddit-toggle-custom-css/ "Homepage") - persistently disable/re-enable custom subreddit styles via a userscript command
 
 ### Rotten Tomatoes
 
