@@ -3,11 +3,13 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.2
+// @version       0.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
+// @include       https://mobile.twitter.com/
+// @include       https://mobile.twitter.com/*
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==

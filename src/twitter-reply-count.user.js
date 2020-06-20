@@ -3,10 +3,13 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.6
+// @version       0.0.7
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
+// @include       https://twitter.com/
 // @include       https://twitter.com/*
+// @include       https://mobile.twitter.com/
+// @include       https://mobile.twitter.com/*
 // @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log

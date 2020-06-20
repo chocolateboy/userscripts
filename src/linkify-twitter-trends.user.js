@@ -3,10 +3,13 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.2
+// @version       0.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @include       https://twitter.com/
 // @include       https://twitter.com/*
+// @include       https://mobile.twitter.com/
+// @include       https://mobile.twitter.com/*
 // @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log
