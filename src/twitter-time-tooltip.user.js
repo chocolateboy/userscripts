@@ -3,7 +3,7 @@
 // @description   Restore timestamp tooltips when hovering over post dates on Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.2
+// @version       0.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -28,8 +28,15 @@
 //
 // [1] https://unpkg.com/browse/dayjs@1.8.28/
 // [2] https://unpkg.com/browse/moment@2.26.0/min/
-
 const FORMAT = 'h:mm A - D MMM YYYY'
+
+// there were no timestamp tooltips when this was created (2020-06-12), but
+// there have been tooltips before and after this date [1], and it's not clear
+// what causes them to go AWOL (A/B testing? a bug?), so rather than adding them
+// unconditionally, we only add them if they're missing.
+//
+// [1] https://github.com/chocolateboy/userscripts/issues/10#issuecomment-650631903
+const SELECTOR = 'a[href]:not([title]) > time[datetime]:only-child'
 
 function onLinks ($links) {
     for (const el of $links) {
@@ -42,4 +49,4 @@ function onLinks ($links) {
     }
 }
 
-$.onCreate('a[href] > time[datetime]:only-child', onLinks, true /* multi */)
+$.onCreate(SELECTOR, onLinks, true /* multi */)
