@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.6.0
+// @version       2.6.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
@@ -44,7 +44,7 @@ function openFirstCommit (user, repo) {
                 //     rel="last"
 
                 // extract the URL of the last page (commits are ordered in
-                // reverse chronological order, like the CLI, so the oldest
+                // reverse chronological order, like the git CLI, so the oldest
                 // commit is on the last page)
                 const lastPage = link.match(/^.+?<([^>]+)>;/)[1]
 
@@ -56,15 +56,35 @@ function openFirstCommit (user, repo) {
             return commits
         })
 
-        // get the last commit and extract the target URL
-        .then(commits => commits[commits.length - 1].html_url)
-
-        // navigate there
-        .then(url => location.href = url)
+        // get the last commit and navigate to its target URL
+        .then(commits => {
+            location.href = commits[commits.length - 1].html_url
+        })
 }
 
 // add the "First commit" link as the last child of the commit bar
+//
+// XXX on most sites, hitting the back button takes you back to a snapshot of
+// the previous DOM tree, e.g. navigating away from a page on Hacker News
+// highlighted via Hacker News Highlighter [1], then back to the highlighted
+// page, retains the DOM changes (the highlighting). that isn't the case on
+// GitHub, which triggers network requests and fragment/page reloads when
+// navigating (back) to any (SPA) page, even when not logged in. this means, for
+// example, we don't need to check if the first-commit widget already exists (it
+// never does), and don't need to restore its old label when navigating away
+// from a page (since the widget will always be created from scratch rather than
+// reused)
+//
+// this has not always been the case, and may not be the case in the future (and
+// may not be the case in some scenarios I haven't tested, e.g. on mobile), so
+// rather than taking it for granted, we assume the site behaves like every
+// other site in this respect and code to that (defensive coding). this costs
+// nothing (apart from this explanation) and saves us having to scramble for a
+// fix if the implementation changes.
+//
+// [1] https://greasyfork.org/en/scripts/39311-hacker-news-highlighter
 function addLink ($commitBar) {
+    // bail if it already exists
     let $firstCommit = $commitBar.find('#first-commit')
 
     if ($firstCommit.length) {
@@ -107,11 +127,11 @@ function addLink ($commitBar) {
         .attr('content')
         .split('/')
 
-    const oldLabelHtml = $label.html()
-
     // restore the original label so it has the correct value if we navigate
     // back to the repo page without making a new request (e.g. via the back
     // button)
+    const oldLabelHtml = $label.html()
+
     $(window).on('unload', () => {
         $label.html(oldLabelHtml)
     })
@@ -119,7 +139,7 @@ function addLink ($commitBar) {
     $link.on('click', () => {
         $label.text('Loading...')
         openFirstCommit(user, repo)
-        return false
+        return false // stop processing the click
     })
 
     $commitBar.append($firstCommit)
