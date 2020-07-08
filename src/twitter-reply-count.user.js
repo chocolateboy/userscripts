@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.7
+// @version       0.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -33,7 +33,7 @@
 // NOTE we run on tweet pages, but need to be activated on the entry page, which
 // might not be a tweet page, so the matching is done in the filter via this
 // pattern rather than the @include pattern
-const PATH = /^(\/\w+\/status\/\d+)/
+const PATH = /^\/(?:i\/web|\w+)\/status\/(\d+)/i
 
 /*
  * given a jQuery collection containing one or more stats elements (see above),
@@ -41,54 +41,68 @@ const PATH = /^(\/\w+\/status\/\d+)/
  * handler
  */
 function filterStats ($stats) {
-    // the canonical ID (path) of the tweet, e.g. /twitter/status/123456
+    // extract the ID of the tweet from the path, e.g. the "123456" in
+    // "/twitter/status/123456"
     //
     // NOTE we determine the path dynamically because Twitter is a SPA, i.e.
     // this userscript is loaded once for multiple pages
 
-    // if the path matches, clean it up, e.g. remove trailing slashes
-    const match = location.pathname.match(PATH)
+    const path = location.pathname
+    const match = path.match(PATH)
 
     if (!match) {
         return
     }
 
-    const path = match[1]
-
     // console.debug('inside filterStats for:', path)
 
-    // find the stats bar for the current tweet
+    const tweetId = match[1] // e.g. 123456
+
+    // we need to locate the stats bar in the previous-sibling element, but
+    // the element's structure can vary: sometimes (e.g. in threads) the
+    // widgets are its direct children; at other times, they're its
+    // grandchildren. in either case, the stats bar is the great grandparent
+    // of the Retweets/Likes links, so we use that to locate it
+
+    // the supported paths for a tweet page are:
     //
-    // XXX the HTML uses the canonical case for the account name in the links
-    // (e.g. /Twitter/status/1234), but users can use any case for the path (and
-    // the domain), e.g. /twitter/Status/1234. so we need the attribute matches
-    // to be case insensitive
-
-    const lcPath = path.toLowerCase()
-
-    // NOTE the Retweets link sometimes (usually?) has a "/with_comments"
-    // suffix
+    //   - /i/web/status/123456
+    //   - /twitter/status/123456
+    //
+    // tweet IDs are unique, so these are equivalent. however, the
+    // Retweets/Likes links use the canonical path in both cases, e.g.:
+    //
+    //   - /Twitter/status/123456/likes
+    //
+    // (note the account name is not always lower case). if we land on a tweet
+    // page via /i/web/status/*, we can't infer the account name from the URI
+    // (and there's no canonical reference to it in the HTML), so we just strip
+    // the account name before matching the links, e.g.:
+    //
+    //   - /status/123456/likes
+    //   - /status/123456/retweets
+    //
+    // NOTE the Retweets link sometimes (usually?) has a "/with_comments" suffix
     const hrefs = new Set([
-        `${lcPath}/likes`,
-        `${lcPath}/retweets`,
-        `${lcPath}/retweets/with_comments`
+        `/status/${tweetId}/likes`,
+        `/status/${tweetId}/retweets`,
+        `/status/${tweetId}/retweets/with_comments`
     ])
 
+    // find the stats bar for the current tweet
     for (const el of $stats) {
         const $el = $(el)
 
         // console.debug('stats:', $el.attr('aria-label'))
 
-        // we need to locate the stats bar in the previous-sibling element, but
-        // the element's structure can vary: sometimes (e.g. in threads) the
-        // widgets are its direct children; at other times, they're its
-        // grandchildren. in either case, the stats bar is the great grandparent
-        // of the Retweets/Likes links, so we use that to locate it
         let $statsBar
 
         const { length: nLinks } = $el.prev().find('a[href]').filter(function () {
             const $link = $(this)
-            const href = $link.attr('href').toLowerCase()
+
+            // extract the link's href and strip the account name, e.g.
+            // "/Twitter/status/123456/likes" -> "/status/123456/likes"
+            const href = $link.attr('href').replace(/^\/\w+/, '')
 
             if (hrefs.has(href)) {
                 $statsBar = $statsBar || $link.parent().parent().parent()
