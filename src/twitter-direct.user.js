@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.1.0
+// @version       0.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -51,14 +51,17 @@ const USER_PATHS = [
  */
 const SCHEMAS = [
     {
+        match: /\/users\/lookup\.json$/,
+        root: [], // returns self
+    },
+    {
         // this is needed to expand links in hovercards
         // e.g. /graphql/abc-123/UserByScreenName
         root: 'data.user.legacy',
         collect: Array.of,
-        paths: USER_PATHS,
     },
-    { root: 'globalObjects.tweets' },
-    { root: 'globalObjects.users', paths: USER_PATHS },
+    { root: 'globalObjects.tweets', paths: TWEET_PATHS },
+    { root: 'globalObjects.users' },
 ]
 
 /*
@@ -74,18 +77,42 @@ const CONTENT_TYPE = /^application\/json\b/
 const Compat = { unsafeWindow }
 
 /*
+ * helper function which returns the type of a JS value, e.g.:
+ *
+ *     typeOf([])  ⇒ "Array"
+ *     typeOf(/./) ⇒ "RegExp"
+ */
+const typeOf = (function () {
+    const toString = {}.toString
+
+    return function typeOf (value) {
+        return toString.call(value).slice(8, -1)
+    }
+})()
+
+/*
  * replace t.co URLs with the original URL in all locations within the document
  * which contain URL data
  */
 function transformLinks (data, uri) {
     for (const schema of SCHEMAS) {
+        const want = schema.match
+
+        if (want) {
+            const match = typeOf(want) === 'RegExp' ? want.test(uri) : uri === want
+
+            if (!match) {
+                continue
+            }
+        }
+
         const root = get(data, schema.root)
 
-        if (!root || (typeof root !== 'object')) {
+        if (!(root && (typeof root === 'object'))) { // may be an array (e.g. lookup.json)
             continue
         }
 
-        const { collect = Object.values, paths = TWEET_PATHS } = schema
+        const { collect = Object.values, paths = USER_PATHS } = schema
         const contexts = collect(root)
 
         let count = 0
