@@ -3,21 +3,69 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.0.3
+// @version       0.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@0.2.0
+// @require       https://cdn.jsdelivr.net/npm/just-safe-get@2.0.0
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
 
+const { get } = module.exports // grab the default export from just-safe-get
+
 /*
- * scan a JSON response for tweets if its URL matches this pattern
+ * the domain we expect metadata (JSON) to come from. if responses come from
+ * this domain, we strip it before passing the document's URI to the transformer.
  */
-const PATTERN = /^https:\/\/api\.twitter\.com\/([^/]+\/[^.]+\.json)\?/
+const TWITTER_API = 'api.twitter.com'
+
+/*
+ * default locations to search for URL metadata (arrays of objects) within tweet
+ * nodes
+ */
+const TWEET_PATHS = [
+    'entities.media',
+    'entities.urls',
+    'extended_entities.media',
+    'extended_entities.urls',
+]
+
+/*
+ * default locations to search for URL metadata (arrays of objects) within
+ * user/profile nodes
+ */
+const USER_PATHS = [
+    'entities.description.urls',
+    'entities.url.urls',
+]
+
+/*
+ * paths into the JSON data in which we can find context objects, i.e. objects
+ * which have an `entities` (and/or `extended_entities`) property which contains
+ * URL metadata
+ */
+const SCHEMAS = [
+    {
+        // this is needed to expand links in hovercards
+        // e.g. /graphql/abc-123/UserByScreenName
+        root: 'data.user.legacy',
+        collect: Array.of,
+        paths: USER_PATHS,
+    },
+    { root: 'globalObjects.tweets' },
+    { root: 'globalObjects.users', paths: USER_PATHS },
+]
+
+/*
+ * a pattern which matches the content-type header of responses we scan for
+ * tweets: "application/json" or "application/json; charset=utf-8"
+ */
+const CONTENT_TYPE = /^application\/json\b/
 
 /*
  * compatibility shim needed for Violentmonkey:
@@ -27,33 +75,35 @@ const Compat = { unsafeWindow }
 
 /*
  * replace t.co URLs with the original URL in all locations within the document
- * which contain tweets
+ * which contain URL data
  */
-function transformLinks (path, data) {
-    // XXX avoid using the optional-chaining operator for now because GreasyFork
-    // can't parse it:
-    //
-    // const tweets = (data.globalObjects || data.twitter_objects)?.tweets
-    const objects = data.globalObjects || data.twitter_objects
-    const tweets = objects ? objects.tweets : objects
+function transformLinks (data, uri) {
+    for (const schema of SCHEMAS) {
+        const root = get(data, schema.root)
 
-    if (!tweets) {
-        console.debug("can't find tweets in:", path)
-        return
-    }
+        if (!root || (typeof root !== 'object')) {
+            continue
+        }
 
-    console.info(`scanning links in ${path}:`, data)
+        const { collect = Object.values, paths = TWEET_PATHS } = schema
+        const contexts = collect(root)
 
-    for (const tweet of Object.values(tweets)) {
-        const { entities, extended_entities = {} } = tweet
-        const { urls = [], media = [] } = entities
-        const { urls: extendedUrls = [], media: extendedMedia = [] } = extended_entities
-        const locations = [urls, media, extendedUrls, extendedMedia]
+        let count = 0
 
-        for (const location of locations) {
-            for (const item of location) {
-                item.url = item.expanded_url
+        for (const context of contexts) {
+            for (const path of paths) {
+                const items = get(context, path, [])
+
+                for (const item of items) {
+                    item.url = item.expanded_url
+                    ++count
+                }
             }
+        }
+
+        if (count) {
+            const quantity = count === 1 ? '1 URL' : `${count} URLs`
+            console.debug(`replaced ${quantity} in ${uri}`)
         }
     }
 
@@ -61,8 +111,8 @@ function transformLinks (path, data) {
 }
 
 /*
- * parse and transform the JSON response, handling (catching and reporting) any
- * parse or processing errors
+ * parse and transform the JSON response, handling (catching and logging) any
+ * errors
  */
 function transformResponse (json, path) {
     let parsed
@@ -77,7 +127,7 @@ function transformResponse (json, path) {
     let transformed
 
     try {
-        transformed = transformLinks(path, parsed)
+        transformed = transformLinks(parsed, path)
     } catch (e) {
         console.error('error transforming JSON:', e)
         return
@@ -87,18 +137,18 @@ function transformResponse (json, path) {
 }
 
 /*
- * replacement for Twitter's default response handler which transforms the
- * response if it's a) JSON and b) contains tweet data; otherwise, we leave it
- * unchanged
+ * replacement for Twitter's default response handler. we transform the response
+ * if it's a) JSON and b) contains tweet data; otherwise, we leave it unchanged
  */
 function onReadyStateChange (xhr, url) {
-    const match = url.match(PATTERN)
+    const contentType = xhr.getResponseHeader('Content-Type')
 
-    if (!match) {
+    if (!CONTENT_TYPE.test(contentType)) {
         return
     }
 
-    const path = match[1]
+    const parsed = new URL(url)
+    const path = parsed.hostname === TWITTER_API ? parsed.pathname : parsed.origin + parsed.pathname
     const transformed = transformResponse(xhr.responseText, path)
 
     if (transformed) {
@@ -118,7 +168,7 @@ function hookXHRSend (oldSend) {
         const oldOnReadyStateChange = this.onreadystatechange
 
         this.onreadystatechange = function () {
-            if (this.readyState === 4 && this.responseURL && this.status === 200) {
+            if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
                 onReadyStateChange(this, this.responseURL)
             }
 
@@ -134,7 +184,7 @@ function hookXHRSend (oldSend) {
  * don't have to clutter the code with conditionals.
  *
  * XXX the functions are only needed by Violentmonkey for Firefox, and are
- * effectively no-ops in other engines
+ * no-ops in other engines
  */
 if ((typeof cloneInto === 'function') && (typeof exportFunction === 'function')) {
     // Greasemonkey 4 (Firefox) and Violentmonkey (Firefox + Chrome)
