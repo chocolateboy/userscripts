@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.1.1
+// @version       0.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -55,13 +55,24 @@ const SCHEMAS = [
         root: [], // returns self
     },
     {
-        // this is needed to expand links in hovercards
-        // e.g. /graphql/abc-123/UserByScreenName
+        // found in /graphql/<query-id>/UserByScreenName
+        // used for hovercard data
         root: 'data.user.legacy',
         collect: Array.of,
     },
-    { root: 'globalObjects.tweets', paths: TWEET_PATHS },
-    { root: 'globalObjects.users' },
+    {
+        root: 'globalObjects.tweets',
+        paths: TWEET_PATHS
+    },
+    {
+        // spotted in list.json (used for hovercard data).
+        // may exist in some/all other tweet objects
+        root: 'globalObjects.tweets',
+        collect: fetchTweetUsers,
+    },
+    {
+        root: 'globalObjects.users'
+    },
 ]
 
 /*
@@ -77,18 +88,24 @@ const CONTENT_TYPE = /^application\/json\b/
 const Compat = { unsafeWindow }
 
 /*
- * helper function which returns the type of a JS value, e.g.:
+ * given a root node located at:
  *
- *     typeOf([])  ⇒ "Array"
- *     typeOf(/./) ⇒ "RegExp"
+ *     globalObjects.tweets // { tweet ID => tweet, ... }
+ *
+ * return an array of its nested user objects located at:
+ *
+ *    globalObjects.tweets.*.card.users.* // { user ID => user, ... }
+ *
+ * if the subtree doesn't exist, return an empty array
  */
-const typeOf = (function () {
-    const toString = {}.toString
+function fetchTweetUsers (root, _uri) {
+    const tweets = Object.values(root)
 
-    return function typeOf (value) {
-        return toString.call(value).slice(8, -1)
-    }
-})()
+    return tweets.flatMap(tweet => {
+        const users = get(tweet, 'card.users', {})
+        return Object.values(users)
+    })
+}
 
 /*
  * replace t.co URLs with the original URL in all locations within the document
@@ -99,7 +116,7 @@ function transformLinks (data, uri) {
         const want = schema.match
 
         if (want) {
-            const match = typeOf(want) === 'RegExp' ? want.test(uri) : uri === want
+            const match = (typeof want === 'string') ? uri === want : want.test(uri)
 
             if (!match) {
                 continue
