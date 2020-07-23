@@ -3,20 +3,16 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.1.2
+// @version       0.1.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@0.2.0
-// @require       https://cdn.jsdelivr.net/npm/just-safe-get@2.0.0
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
-
-const { get } = module.exports // grab the default export from just-safe-get
 
 /*
  * the domain we expect metadata (JSON) to come from. if responses come from
@@ -55,6 +51,14 @@ const SCHEMAS = [
         root: [], // returns self
     },
     {
+        match: /\/Following$/,
+        root: 'data.user.following_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
+    },
+    {
+        match: /\/Followers$/,
+        root: 'data.user.followers_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
+    },
+    {
         // found in /graphql/<query-id>/UserByScreenName
         // used for hovercard data
         root: 'data.user.legacy',
@@ -65,10 +69,9 @@ const SCHEMAS = [
         paths: TWEET_PATHS
     },
     {
-        // spotted in list.json (used for hovercard data).
-        // may exist in some/all other tweet objects
-        root: 'globalObjects.tweets',
-        collect: fetchTweetUsers,
+        // spotted in list.json and all.json (used for hovercard data).
+        // may exist in other documents
+        root: 'globalObjects.tweets.*.card.users.*'
     },
     {
         root: 'globalObjects.users'
@@ -88,30 +91,82 @@ const CONTENT_TYPE = /^application\/json\b/
 const Compat = { unsafeWindow }
 
 /*
- * given a root node located at:
+ * a function which takes an object and a path into that object (a string of
+ * dot-separated property names or an array of property names) and returns the
+ * value at that position within the object, or the (optional) default value if
+ * it can't be reached.
  *
- *     globalObjects.tweets // { tweet ID => tweet, ... }
+ * based on just-safe-get by Angus Croll [1] (which in turn is an implementation
+ * of Lodash's function of the same name), but with added support for
+ * wildcard props, e.g.:
  *
- * return an array of its nested user objects located at:
+ *    foo.*.bar.baz.*.quux
  *
- *    globalObjects.tweets.*.card.users.* // { user ID => user, ... }
+ * is roughly equivalent to:
  *
- * if the subtree doesn't exist, return an empty array
+ *    obj.foo
+ *        |> Object.values(#)
+ *        |> #.flatMap(value => get(value, "bar.baz", []))
+ *        |> Object.values(#)
+ *        |> #.flatMap(value => get(value, "quux", []))
+ *
+ * [1] https://www.npmjs.com/package/just-safe-get
  */
-function fetchTweetUsers (root, _uri) {
-    const tweets = Object.values(root)
+const get = (function () {
+    const emptyArray = []
 
-    return tweets.flatMap(tweet => {
-        const users = get(tweet, 'card.users', {})
-        return Object.values(users)
-    })
-}
+    // TODO release as an NPM module (just-safe-get is ES5 only, but this
+    // requires ES6 for Array#flatMap and Object.values, though both could be
+    // polyfilled
+    return function get (obj, path, $default) {
+        if (!obj) {
+            return $default
+        }
+
+        let props, prop
+
+        if (Array.isArray(path)) {
+            props = Array.from(path) // clone
+        } else if (typeof path === 'string') {
+            props = path.split('.')
+        } else {
+            throw new Error('path must be an array or string')
+        }
+
+        while (props.length) {
+            if (!obj) {
+                return $default
+            }
+
+            prop = props.shift()
+
+            if (prop === '*') {
+                // Object.values is very forgiving and works with anything that
+                // can be turned into an object via Object(...), i.e. everything
+                // but undefined and null, which we've guarded against above.
+                return Object.values(obj).flatMap(value => {
+                    return get(value, Array.from(props), emptyArray)
+                })
+            }
+
+            obj = obj[prop]
+
+            if (obj === undefined) {
+                return $default
+            }
+        }
+
+        return obj
+    }
+})()
 
 /*
  * replace t.co URLs with the original URL in all locations within the document
  * which contain URL data
  */
 function transformLinks (data, uri) {
+    const seen = new Map()
+
     for (const schema of SCHEMAS) {
         const want = schema.match
 
@@ -132,23 +187,27 @@ function transformLinks (data, uri) {
         const { collect = Object.values, paths = USER_PATHS } = schema
         const contexts = collect(root)
 
-        let count = 0
-
         for (const context of contexts) {
             for (const path of paths) {
                 const items = get(context, path, [])
 
                 for (const item of items) {
                     item.url = item.expanded_url
-                    ++count
+                    const oldCount = seen.get(schema.root) || 0
+                    seen.set(schema.root, oldCount + 1)
                 }
             }
         }
+    }
 
-        if (count) {
+    if (seen.size) {
+        // format: "expanded 1 URL in "a.b" and 2 URLs in "c.d" in /2/example.json"
+        const stats = Array.from(seen).map(([path, count]) => {
             const quantity = count === 1 ? '1 URL' : `${count} URLs`
-            console.debug(`replaced ${quantity} in ${uri}`)
-        }
+            return `${quantity} in ${JSON.stringify(path)}`
+        }).join(' and ')
+
+        console.debug(`expanded ${stats} in ${uri}`)
     }
 
     return data
