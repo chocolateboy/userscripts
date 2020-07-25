@@ -3,16 +3,20 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.1.3
+// @version       0.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@0.2.0
+// @require       https://cdn.jsdelivr.net/npm/just-safe-set@2.1.0
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
+
+const { set } = module.exports // grab the default export from just-safe-set
 
 /*
  * the domain we expect metadata (JSON) to come from. if responses come from
@@ -41,21 +45,44 @@ const USER_PATHS = [
 ]
 
 /*
+ * an immutable array used in various places as a default value. reused to avoid
+ * unnecessary allocations.
+ */
+const EMPTY_ARRAY = []
+
+/*
  * paths into the JSON data in which we can find context objects, i.e. objects
  * which have an `entities` (and/or `extended_entities`) property which contains
  * URL metadata
+ *
+ * options:
+ *
+ *   - uri: optional URI filter: string (equality) or regex (match)
+ *
+ *   - root: a path (string or array) into the document under which to begin
+ *     searching (required)
+ *
+ *   - collect: a function which takes a root node and turns it into an array of
+ *     context nodes to scan for URL data (default: Object.values)
+ *
+ *   - scan: an array of paths to probe for arrays of { url, expanded_url }
+ *     pairs in a context node (default: USER_PATHS)
+ *
+ *   - assign: an array of paths to string nodes in the context containing
+ *     unexpanded URLs (e.g. for cards inside tweets). these are replaced with
+ *     expanded URLs gathered during the scan (default: EMPTY_ARRAY)
  */
-const SCHEMAS = [
+const QUERIES = [
     {
-        match: /\/users\/lookup\.json$/,
+        uri: /\/users\/lookup\.json$/,
         root: [], // returns self
     },
     {
-        match: /\/Following$/,
+        uri: /\/Following$/,
         root: 'data.user.following_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
     },
     {
-        match: /\/Followers$/,
+        uri: /\/Followers$/,
         root: 'data.user.followers_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
     },
     {
@@ -66,15 +93,19 @@ const SCHEMAS = [
     },
     {
         root: 'globalObjects.tweets',
-        paths: TWEET_PATHS
+        scan: TWEET_PATHS,
+        assign: [
+            'card.binding_values.card_url.string_value',
+            'card.url',
+        ],
     },
     {
         // spotted in list.json and all.json (used for hovercard data).
         // may exist in other documents
-        root: 'globalObjects.tweets.*.card.users.*'
+        root: 'globalObjects.tweets.*.card.users.*',
     },
     {
-        root: 'globalObjects.users'
+        root: 'globalObjects.users',
     },
 ]
 
@@ -112,102 +143,127 @@ const Compat = { unsafeWindow }
  *
  * [1] https://www.npmjs.com/package/just-safe-get
  */
-const get = (function () {
-    const emptyArray = []
 
-    // TODO release as an NPM module (just-safe-get is ES5 only, but this
-    // requires ES6 for Array#flatMap and Object.values, though both could be
-    // polyfilled
-    return function get (obj, path, $default) {
+// TODO release as an NPM module (just-safe-get is ES5 only, but this
+// requires ES6 for Array#flatMap and Object.values, though both could be
+// polyfilled
+function get (obj, path, $default) {
+    if (!obj) {
+        return $default
+    }
+
+    let props, prop
+
+    if (Array.isArray(path)) {
+        props = Array.from(path) // clone
+    } else if (typeof path === 'string') {
+        props = path.split('.')
+    } else {
+        throw new Error('path must be an array or string')
+    }
+
+    while (props.length) {
         if (!obj) {
             return $default
         }
 
-        let props, prop
+        prop = props.shift()
 
-        if (Array.isArray(path)) {
-            props = Array.from(path) // clone
-        } else if (typeof path === 'string') {
-            props = path.split('.')
-        } else {
-            throw new Error('path must be an array or string')
+        if (prop === '*') {
+            // Object.values is very forgiving and works with anything that
+            // can be turned into an object via Object(...), i.e. everything
+            // but undefined and null, which we've guarded against above.
+            return Object.values(obj).flatMap(value => {
+                return get(value, Array.from(props), EMPTY_ARRAY)
+            })
         }
 
-        while (props.length) {
-            if (!obj) {
-                return $default
-            }
+        obj = obj[prop]
 
-            prop = props.shift()
-
-            if (prop === '*') {
-                // Object.values is very forgiving and works with anything that
-                // can be turned into an object via Object(...), i.e. everything
-                // but undefined and null, which we've guarded against above.
-                return Object.values(obj).flatMap(value => {
-                    return get(value, Array.from(props), emptyArray)
-                })
-            }
-
-            obj = obj[prop]
-
-            if (obj === undefined) {
-                return $default
-            }
+        if (obj === undefined) {
+            return $default
         }
-
-        return obj
     }
-})()
+
+    return obj
+}
 
 /*
  * replace t.co URLs with the original URL in all locations within the document
- * which contain URL data
+ * which contain URLs
  */
 function transformLinks (data, uri) {
-    const seen = new Map()
+    const stats = new Map()
 
-    for (const schema of SCHEMAS) {
-        const want = schema.match
+    for (const query of QUERIES) {
+        const wantUri = query.uri
 
-        if (want) {
-            const match = (typeof want === 'string') ? uri === want : want.test(uri)
+        if (wantUri) {
+            const match = (typeof wantUri === 'string')
+                ? uri === wantUri
+                : wantUri.test(uri)
 
             if (!match) {
                 continue
             }
         }
 
-        const root = get(data, schema.root)
+        const root = get(data, query.root)
 
-        if (!(root && (typeof root === 'object'))) { // may be an array (e.g. lookup.json)
+        // may be an array (e.g. lookup.json)
+        if (!(root && (typeof root === 'object'))) {
             continue
         }
 
-        const { collect = Object.values, paths = USER_PATHS } = schema
+        const {
+            collect = Object.values,
+            scan = USER_PATHS,
+            assign = EMPTY_ARRAY,
+        } = query
+
         const contexts = collect(root)
 
         for (const context of contexts) {
-            for (const path of paths) {
+            const cache = new Map()
+
+            // scan the context nodes for { url, expanded_url } pairs, replace
+            // each t.co URL with its expansion, and cache the mappings
+            for (const path of scan) {
                 const items = get(context, path, [])
 
                 for (const item of items) {
+                    cache.set(item.url, item.expanded_url)
                     item.url = item.expanded_url
-                    const oldCount = seen.get(schema.root) || 0
-                    seen.set(schema.root, oldCount + 1)
+                    stats.set(query.root, (stats.get(query.root) || 0) + 1)
+                }
+            }
+
+            // now pinpoint isolated URLs in the context which don't have a
+            // corresponding expansion, and replace them using the mappings we
+            // created during the scan
+            for (const path of assign) {
+                const url = get(context, path)
+
+                if (typeof url === 'string') {
+                    const expandedUrl = cache.get(url)
+
+                    if (expandedUrl) {
+                        set(context, path, expandedUrl)
+                        stats.set(query.root, (stats.get(query.root) || 0) + 1)
+                    }
                 }
             }
         }
     }
 
-    if (seen.size) {
+    if (stats.size) {
         // format: "expanded 1 URL in "a.b" and 2 URLs in "c.d" in /2/example.json"
-        const stats = Array.from(seen).map(([path, count]) => {
+        const summary = Array.from(stats).map(([path, count]) => {
             const quantity = count === 1 ? '1 URL' : `${count} URLs`
             return `${quantity} in ${JSON.stringify(path)}`
         }).join(' and ')
 
-        console.debug(`expanded ${stats} in ${uri}`)
+        console.debug(`expanded ${summary} in ${uri}`)
     }
 
     return data
@@ -232,7 +288,7 @@ function transformResponse (json, path) {
     try {
         transformed = transformLinks(parsed, path)
     } catch (e) {
-        console.error('error transforming JSON:', e)
+        console.error('Error transforming JSON:', e)
         return
     }
 
@@ -241,7 +297,7 @@ function transformResponse (json, path) {
 
 /*
  * replacement for Twitter's default response handler. we transform the response
- * if it's a) JSON and b) contains tweet data; otherwise, we leave it unchanged
+ * if it's a) JSON and b) contains URL data; otherwise, we leave it unchanged
  */
 function onReadyStateChange (xhr, url) {
     const contentType = xhr.getResponseHeader('Content-Type')
