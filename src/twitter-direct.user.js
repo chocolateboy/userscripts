@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.2.0
+// @version       0.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -19,8 +19,8 @@
 const { set } = module.exports // grab the default export from just-safe-set
 
 /*
- * the domain we expect metadata (JSON) to come from. if responses come from
- * this domain, we strip it before passing the document's URI to the transformer.
+ * the domain we expect data (JSON) to come from. responses that aren't from
+ * this domain are ignored.
  */
 const TWITTER_API = 'api.twitter.com'
 
@@ -45,10 +45,10 @@ const USER_PATHS = [
 ]
 
 /*
- * an immutable array used in various places as a default value. reused to avoid
- * unnecessary allocations.
+ * an immutable array used in various places as a way to indicate "no values".
+ * static to avoid unnecessary allocations.
  */
-const EMPTY_ARRAY = []
+const NONE = []
 
 /*
  * paths into the JSON data in which we can find context objects, i.e. objects
@@ -68,9 +68,10 @@ const EMPTY_ARRAY = []
  *   - scan: an array of paths to probe for arrays of { url, expanded_url }
  *     pairs in a context node (default: USER_PATHS)
  *
- *   - assign: an array of paths to string nodes in the context containing
- *     unexpanded URLs (e.g. for cards inside tweets). these are replaced with
- *     expanded URLs gathered during the scan (default: EMPTY_ARRAY)
+ *   - targets: an array of paths to string nodes in the context containing
+ *     standalone unexpanded URLs (i.e. no corresponding expanded_url), e.g. for
+ *     cards inside tweets. these are replaced with expanded URLs gathered
+ *     during the scan (default: NONE)
  */
 const QUERIES = [
     {
@@ -92,14 +93,6 @@ const QUERIES = [
         collect: Array.of,
     },
     {
-        root: 'globalObjects.tweets',
-        scan: TWEET_PATHS,
-        assign: [
-            'card.binding_values.card_url.string_value',
-            'card.url',
-        ],
-    },
-    {
         // spotted in list.json and all.json (used for hovercard data).
         // may exist in other documents
         root: 'globalObjects.tweets.*.card.users.*',
@@ -107,6 +100,31 @@ const QUERIES = [
     {
         root: 'globalObjects.users',
     },
+    {
+        root: 'globalObjects.tweets',
+        scan: TWEET_PATHS,
+        targets: [
+            'card.binding_values.card_url.string_value',
+            'card.url',
+        ],
+    },
+    {
+        // DMs (/dm/conversation/<id>.json)
+        root: 'conversation_timeline.entries.*.message.message_data',
+        scan: TWEET_PATHS,
+        targets: [
+            'attachment.card.binding_values.card_url.string_value',
+            'attachment.card.url',
+        ],
+    },
+    {   // DMs (/dm/user_updates.json and /dm/inbox_initial_state.json)
+        root: 'inbox_initial_state.entries.*.message.message_data',
+        scan: TWEET_PATHS,
+        targets: [
+            'attachment.card.binding_values.card_url.string_value',
+            'attachment.card.url',
+        ],
+    }
 ]
 
 /*
@@ -116,10 +134,10 @@ const QUERIES = [
 const CONTENT_TYPE = /^application\/json\b/
 
 /*
- * compatibility shim needed for Violentmonkey:
+ * compatibility shim needed for Violentmonkey for Firefox and Greasemonkey 4:
  * https://github.com/violentmonkey/violentmonkey/issues/997#issuecomment-637700732
  */
-const Compat = { unsafeWindow }
+const GMCompat = { unsafeWindow }
 
 /*
  * a function which takes an object and a path into that object (a string of
@@ -155,7 +173,7 @@ function get (obj, path, $default) {
     let props, prop
 
     if (Array.isArray(path)) {
-        props = Array.from(path) // clone
+        props = path.slice(0) // clone
     } else if (typeof path === 'string') {
         props = path.split('.')
     } else {
@@ -174,7 +192,7 @@ function get (obj, path, $default) {
             // can be turned into an object via Object(...), i.e. everything
             // but undefined and null, which we've guarded against above.
             return Object.values(obj).flatMap(value => {
-                return get(value, Array.from(props), EMPTY_ARRAY)
+                return get(value, props.slice(0), NONE)
             })
         }
 
@@ -189,7 +207,7 @@ function get (obj, path, $default) {
 }
 
 /*
- * replace t.co URLs with the original URL in all locations within the document
+ * replace t.co URLs with the original URL in all locations in the document
  * which contain URLs
  */
 function transformLinks (data, uri) {
@@ -218,7 +236,7 @@ function transformLinks (data, uri) {
         const {
             collect = Object.values,
             scan = USER_PATHS,
-            assign = EMPTY_ARRAY,
+            targets = NONE,
         } = query
 
         const contexts = collect(root)
@@ -229,7 +247,7 @@ function transformLinks (data, uri) {
             // scan the context nodes for { url, expanded_url } pairs, replace
             // each t.co URL with its expansion, and cache the mappings
             for (const path of scan) {
-                const items = get(context, path, [])
+                const items = get(context, path, NONE)
 
                 for (const item of items) {
                     cache.set(item.url, item.expanded_url)
@@ -240,8 +258,8 @@ function transformLinks (data, uri) {
 
             // now pinpoint isolated URLs in the context which don't have a
             // corresponding expansion, and replace them using the mappings we
-            // created during the scan
-            for (const path of assign) {
+            // collected during the scan
+            for (const path of targets) {
                 const url = get(context, path)
 
                 if (typeof url === 'string') {
@@ -270,7 +288,7 @@ function transformLinks (data, uri) {
 }
 
 /*
- * parse and transform the JSON response, handling (catching and logging) any
+ * parse and transform a JSON response, handling (catching and logging) any
  * errors
  */
 function transformResponse (json, path) {
@@ -307,13 +325,19 @@ function onReadyStateChange (xhr, url) {
     }
 
     const parsed = new URL(url)
-    const path = parsed.hostname === TWITTER_API ? parsed.pathname : parsed.origin + parsed.pathname
-    const transformed = transformResponse(xhr.responseText, path)
+
+    // exclude e.g. the config-<date>.json file from pbs.twimg.com, which is the
+    // second biggest document (~500K) after home_latest.json (~700K)
+    if (parsed.hostname !== TWITTER_API) {
+        return
+    }
+
+    const transformed = transformResponse(xhr.responseText, parsed.pathname)
 
     if (transformed) {
         const descriptor = { value: JSON.stringify(transformed) }
-        const clone = Compat.cloneInto(descriptor, Compat.unsafeWindow)
-        Compat.unsafeWindow.Object.defineProperty(xhr, 'responseText', clone)
+        const clone = GMCompat.cloneInto(descriptor, GMCompat.unsafeWindow)
+        GMCompat.unsafeWindow.Object.defineProperty(xhr, 'responseText', clone)
     }
 }
 
@@ -342,28 +366,41 @@ function hookXHRSend (oldSend) {
  * set up a cross-engine API to shield us from differences between engines so we
  * don't have to clutter the code with conditionals.
  *
- * XXX the functions are only needed by Violentmonkey for Firefox, and are
- * no-ops in other engines
+ * XXX the functions are only needed by Violentmonkey for Firefox and
+ * Greasemonkey 4, though Violentmonkey for Chrome also defines them (as
+ * identity functions) for compatibility
  */
 if ((typeof cloneInto === 'function') && (typeof exportFunction === 'function')) {
-    // Greasemonkey 4 (Firefox) and Violentmonkey (Firefox + Chrome)
-    Object.assign(Compat, { cloneInto, exportFunction })
+    Object.assign(GMCompat, { cloneInto, exportFunction })
 
     // Violentmonkey for Firefox
     if (unsafeWindow.wrappedJSObject) {
-        Compat.unsafeWindow = unsafeWindow.wrappedJSObject
+        GMCompat.unsafeWindow = unsafeWindow.wrappedJSObject
     }
 } else {
-    Compat.cloneInto = Compat.exportFunction = value => value
+    GMCompat.cloneInto = value => value
+
+    // we don't use the third argument, but may as well define this correctly in
+    // case we break this out into a separate helper.
+    //
+    // this is the same implementation as Violentmonkey's compatibility shim for
+    // Chrome: https://git.io/JJziH
+    GMCompat.exportFunction = (fn, target, { defineAs } = {}) => {
+        if (defineAs) {
+            target[defineAs] = fn
+        }
+
+        return fn
+    }
 }
 
 /*
  * replace the default XHR#send with our custom version, which scans responses
  * for tweets and expands their URLs
  */
-console.debug('hooking XHR#send:', Compat.unsafeWindow.XMLHttpRequest.prototype.send)
+console.debug('hooking XHR#send:', GMCompat.unsafeWindow.XMLHttpRequest.prototype.send)
 
-Compat.unsafeWindow.XMLHttpRequest.prototype.send = Compat.exportFunction(
+GMCompat.unsafeWindow.XMLHttpRequest.prototype.send = GMCompat.exportFunction(
     hookXHRSend(window.XMLHttpRequest.prototype.send),
-    Compat.unsafeWindow
+    GMCompat.unsafeWindow
 )
