@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.6.1
+// @version       2.6.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
@@ -127,9 +127,9 @@ function addLink ($commitBar) {
         .attr('content')
         .split('/')
 
-    // restore the original label so it has the correct value if we navigate
-    // back to the repo page without making a new request (e.g. via the back
-    // button)
+    // before navigating away from the page, restore the original label. this
+    // ensures it has the correct value if we navigate back to the repo page
+    // without making a new request (e.g. via the back button)
     const oldLabelHtml = $label.html()
 
     $(window).on('unload', () => {
