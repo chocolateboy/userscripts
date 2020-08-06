@@ -3,20 +3,18 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.3.0
+// @version       0.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@0.2.0
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@0.3.2
 // @require       https://cdn.jsdelivr.net/npm/just-safe-set@2.1.0
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
-
-const { set } = module.exports // grab the default export from just-safe-set
 
 /*
  * the domain we expect data (JSON) to come from. responses that aren't from
@@ -129,7 +127,7 @@ const QUERIES = [
 
 /*
  * a pattern which matches the content-type header of responses we scan for
- * tweets: "application/json" or "application/json; charset=utf-8"
+ * URLs: "application/json" or "application/json; charset=utf-8"
  */
 const CONTENT_TYPE = /^application\/json\b/
 
@@ -266,7 +264,7 @@ function transformLinks (data, uri) {
                     const expandedUrl = cache.get(url)
 
                     if (expandedUrl) {
-                        set(context, path, expandedUrl)
+                        exports.set(context, path, expandedUrl)
                         stats.set(query.root, (stats.get(query.root) || 0) + 1)
                     }
                 }
@@ -277,8 +275,8 @@ function transformLinks (data, uri) {
     if (stats.size) {
         // format: "expanded 1 URL in "a.b" and 2 URLs in "c.d" in /2/example.json"
         const summary = Array.from(stats).map(([path, count]) => {
-            const quantity = count === 1 ? '1 URL' : `${count} URLs`
-            return `${quantity} in ${JSON.stringify(path)}`
+            const urls = count === 1 ? '1 URL' : `${count} URLs`
+            return `${urls} in ${JSON.stringify(path)}`
         }).join(' and ')
 
         console.debug(`expanded ${summary} in ${uri}`)
