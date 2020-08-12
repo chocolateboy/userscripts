@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.15.1
+// @version       2.15.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -492,7 +492,7 @@ async function main () {
 // register a jQuery plugin which extracts and returns JSON-LD data for
 // the specified document
 $.fn.jsonLd = function jsonLd (id) {
-    const $script = $(this).find('script[type="application/ld+json"]')
+    const $script = this.find('script[type="application/ld+json"]')
 
     let data
 
