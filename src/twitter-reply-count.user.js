@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.0.0
+// @version       1.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -74,7 +74,7 @@ function isLeaf () {
  * callback fired when the stats element's aria-label attribute is updated:
  * update the count and the label if they differ from the current values
  */
-function onModify ($stats, $count, $label, nWidgets) {
+function onUpdate ($stats, $count, $label, nWidgets) {
     const stats = parseStats($stats, nWidgets)
 
     if (!stats) {
@@ -123,10 +123,10 @@ function onStats ($stats, $statsBar, nWidgets, path) {
     $label.css('text-transform', 'capitalize')
 
     // initialize the target elements
-    onModify($stats, $count, $label, nWidgets)
+    onUpdate($stats, $count, $label, nWidgets)
 
     // pipe updates to the target elements
-    const callback = $stats => onModify($stats, $count, $label, nWidgets)
+    const callback = $stats => onUpdate($stats, $count, $label, nWidgets)
     $stats.onModify('aria-label', callback, true /* multi */)
 
     // add the widget to the stats bar
@@ -159,19 +159,22 @@ function parseStats ($stats, nWidgets) {
     }
 
     const [count, label] = pairs[0]
-    const replies = (count > 1000) ? Number((count / 1000).toFixed(1)) + 'K' : String(count)
+
+    const replies = (count > 1000)
+        ? Number((count / 1000).toFixed(1)) + 'K'
+        : String(count)
 
     return { replies, label, replies }
 }
 
 /*
- * returns the count and label element from a widget's link element
+ * extract the count and label elements from a widget's link element
  */
 function targets ($link) {
     /*
         NOTE if the cloned widget was in the process of updating its count, we
-        may have an extra (transient) SPAN: the before and after states of the
-        rollover animation
+        may have an extra (transient) SPAN representing the before and after
+        states of the rollover animation
 
         it's possible the same technique is used to update the label, e.g.
 
