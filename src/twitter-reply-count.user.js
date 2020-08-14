@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.0.1
+// @version       1.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -81,15 +81,15 @@ function onUpdate ($stats, $count, $label, nWidgets) {
         return
     }
 
-    const { label, replies } = stats
+    const { displayCount, label } = stats
+
+    if ($count.text() !== displayCount) {
+        // TODO (re-)investigate (re-)implementing the animation
+        $count.text(displayCount)
+    }
 
     if ($label.text() !== label) {
         $label.text(label)
-    }
-
-    if ($count.text() !== replies) {
-        // TODO (re-)investigate (re-)implementing the animation
-        $count.text(replies)
     }
 }
 
@@ -103,7 +103,7 @@ function onUpdate ($stats, $count, $label, nWidgets) {
  * 5) prepend the new widget to the stats bar
  */
 function onStats ($stats, $statsBar, nWidgets, path) {
-    // XXX override the "column" layout used when there's only one widget
+    // override the "column" layout used when there's only one widget
     $statsBar.css('flex-direction', 'row')
 
     // create the Replies widget, initially a clone of the first widget
@@ -140,7 +140,7 @@ function onStats ($stats, $statsBar, nWidgets, path) {
  *
  * yields:
  *
- *   { count: 1500, label: 'replies', replies: '1.5K' }
+ *   { count: 1500, displayCount: '1.5K', label: 'replies' }
  */
 function parseStats ($stats, nWidgets) {
     const stats = $stats.attr('aria-label')
@@ -160,11 +160,11 @@ function parseStats ($stats, nWidgets) {
 
     const [count, label] = pairs[0]
 
-    const replies = (count > 1000)
+    const displayCount = (count > 1000)
         ? Number((count / 1000).toFixed(1)) + 'K'
         : String(count)
 
-    return { replies, label, replies }
+    return { count, displayCount, label }
 }
 
 /*
@@ -224,7 +224,7 @@ function targets ($link) {
         // remove all but the first child of each child of the link
         $child.children().filter(index => index > 0).remove()
 
-        // grab a target element
+        // grab the target element
         targets.push($child.find('span').filter(isLeaf))
     })
 
