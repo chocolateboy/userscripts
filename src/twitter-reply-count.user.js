@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.0
+// @version       1.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -40,14 +40,12 @@ class RepliesManager {
      * parse the reply count and localized label from the stats string, e.g.:
      *
      *   "1500 replies, 1000 Retweets, 500 likes"
-     *
-     * and:
-     *
      *   "1500 réponses, 1000 Retweets, 500 j'aime"
      *
      * yield:
      *
      *   { count: 1500, displayCount: '1.5K', label: 'replies' }
+     *   { count: 1500, displayCount: '1.5K', label: 'réponses' }
      */
     parse () {
         // if there are replies, the reply count is always first, but:
@@ -122,7 +120,7 @@ class RepliesManager {
  *
  *  - the stats bar (the parent element of the Retweets/Likes widgets)
  *  - an updater for the Replies widget
- *  - the path of the current page (used as a dummy URL for the replies widget)
+ *  - the path of the current page (used as a dummy URL for the Replies widget)
  */
 function filterStats ($results) {
     // NOTE we need to determine the path dynamically because Twitter is a SPA,
@@ -141,7 +139,7 @@ function filterStats ($results) {
     //
     //   https://twitter.com/example/status/1234
     //
-    // then its stats bar will contain links which include this ID, e.g.:
+    // then its stats bar will contain subpages of this tweet, e.g.:
     //
     //   https://twitter.com/example/status/1234/likes
     //   https://twitter.com/example/status/1234/retweets
