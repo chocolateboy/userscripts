@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.3.1
+// @version       0.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -66,15 +66,38 @@ const NONE = []
  *   - scan: an array of paths to probe for arrays of { url, expanded_url }
  *     pairs in a context node (default: USER_PATHS)
  *
- *   - targets: an array of paths to string nodes in the context containing
- *     standalone unexpanded URLs (i.e. no corresponding expanded_url), e.g. for
- *     cards inside tweets. these are replaced with expanded URLs gathered
- *     during the scan (default: NONE)
+ *   - targets: an array of locators for standalone URLs (URLs that don't have
+ *     an accompanying expansion), e.g. for URLs in cards embedded in tweets.
+ *     these URLs are replaced by expanded URLs gathered during the scan. a
+ *     target node can be supplied as a path (i.e. string or array of steps) or
+ *     an object with a "path" property and optional "key" and "target"
+ *     properties. the path points to an array under the context; the optional
+ *     key (default: "card_url") is used to select an object from the array; and
+ *     the target (default: "value.string_value") specifies the path to the URL
+ *     within the selected object (default: NONE)
  */
 const QUERIES = [
     {
         uri: /\/users\/lookup\.json$/,
         root: [], // returns self
+    },
+    {
+        uri: /\/Conversation$/,
+        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.legacy',
+        scan: TWEET_PATHS,
+        targets: [
+            { path: 'card.binding_values' },
+            'card.url',
+        ],
+    },
+    {
+        uri: /\/Conversation$/,
+        root: 'data.conversation_timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.legacy',
+        scan: TWEET_PATHS,
+    },
+    {
+        uri: /\/Conversation$/,
+        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.core.user.legacy',
     },
     {
         uri: /\/Following$/,
@@ -257,14 +280,31 @@ function transformLinks (data, uri) {
             // now pinpoint isolated URLs in the context which don't have a
             // corresponding expansion, and replace them using the mappings we
             // collected during the scan
-            for (const path of targets) {
-                const url = get(context, path)
+            for (const target of targets) {
+                let url, $context = context, $target = target
+
+                if (typeof target === 'string' || Array.isArray(target)) {
+                    url = get(context, target)
+                } else { // { path, key?, target? }
+                    const objects = get(context, target.path)
+
+                    if (objects) {
+                        const wantKey = target.key || 'card_url'
+                        const object = objects.find(it => it.key === wantKey)
+
+                        if (object) {
+                            $target = target.target || 'value.string_value'
+                            $context = object
+                            url = get(object, $target)
+                        }
+                    }
+                }
 
                 if (typeof url === 'string') {
                     const expandedUrl = cache.get(url)
 
                     if (expandedUrl) {
-                        exports.set(context, path, expandedUrl)
+                        exports.set($context, $target, expandedUrl)
                         stats.set(query.root, (stats.get(query.root) || 0) + 1)
                     }
                 }
