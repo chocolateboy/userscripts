@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.0
+// @version       1.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -19,6 +19,8 @@
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
+/*********************************** constants ********************************/
+
 // only URLs whose paths match this pattern are used to scan for widgets
 //
 // NOTE we run on tweet pages, but need to be activated on the entry page, which
@@ -26,14 +28,230 @@
 // pattern rather than the @include pattern
 const PATH = /^\/(?:i\/web|\w+)\/status\/(\d+)/i
 
+// a pattern which matches valid stats-bar URLs and extracts some data
+const STATS_BAR_URL = /^(\/\w+\/status\/\d+)\/(likes|retweets)(?:\/with_comments)?$/
+
+/*********************************** functions ********************************/
+
 /*
- * a helper class which encapsulates a) reading reply counts and b) syncing
- * reply counts to the Replies widget's count and label elements
+ * given a jQuery wrapper containing one or more stats elements, select the ones
+ * which have a correspoding stats bar and instantiate and start a
+ * Replies controller to sync the stats to the bar
  */
-class RepliesManager {
-    constructor ($stats, nConsumed) {
+function filterStats ($results) {
+    // NOTE we need to determine the path dynamically because Twitter is a SPA,
+    // i.e. this userscript is loaded once for multiple pages
+
+    if (!location.pathname.match(PATH)) {
+        return
+    }
+
+    // reduce the list of candidate elements down to the ones whose previous
+    // sibling is a stats bar
+    filter: for (const el of $results) {
+        const $stats = $(el)
+        const $links = $stats.prev().find('a[href][href!=""]')
+
+        // the number of widgets must be at least 1 (so we can clone it)
+        if (!$links.length) {
+            continue
+        }
+
+        // confirm that all links are valid and extract some extra info
+
+        // count the number of consumed stats. this is roughly equal to the
+        // number of links/widgets, with the qualification that the retweets
+        // stat may be consumed by 2 separate widgets
+        //
+        // XXX for now we assume that the number of widgets/links doesn't
+        // change, e.g. we assume that the Likes widget isn't removed from
+        // the DOM if its count goes down to 0
+        const consumed = new Set() // dedup
+
+        let repliesLink
+
+        for (const link of $links.get()) {
+            const match = $(link).attr('href').match(STATS_BAR_URL)
+
+            if (!match) {
+                continue filter
+            }
+
+            if (!repliesLink) {
+                repliesLink = match[1]
+            }
+
+            // the first part of the tweet's subpage, e.g. "retweets" or "likes"
+            consumed.add(match[2])
+        }
+
+        // we need to locate the stats bar in the previous sibling, but its
+        // structure can vary: sometimes (e.g. in threads) the widgets are
+        // its direct children; at other times, they're its grandchildren.
+        // in both cases, however, the stats bar is the great grandparent of
+        // the Retweets/Likes links, so we use that to find it
+        const $statsBar = $links.first().parent().parent().parent()
+
+        const replies = new Replies($stats, consumed.size, repliesLink)
+
+        if (replies.parse()) {
+            replies.connect($statsBar)
+        } else {
+            const stats = JSON.stringify($stats.attr('aria-label'))
+            console.warn(`Can't parse stats for ${path}: ${stats}`)
+        }
+    }
+}
+
+/*
+ * a helper function used to filter jQuery collections
+ *
+ * return true if an element has no children, false otherwise
+ */
+function isLeaf () {
+    return this.children.length == 0
+}
+
+/************************************ classes *********************************/
+
+/*
+ * a helper class which encapsulates a) reading reply counts from the stats
+ * element and b) syncing reply counts to the Replies widget's count and label
+ * elements
+ */
+class Replies {
+    constructor ($stats, nConsumed, path) {
         this._$stats = $stats
         this._nConsumed = nConsumed
+        this._path = path
+    }
+
+    /*
+     * extract the count and label elements from a widget's link element
+     */
+    _targets ($link) {
+        /*
+            NOTE if the cloned widget was in the process of updating its count, we
+            may have an extra (transient) SPAN representing the before and after
+            states of the rollover animation
+
+            it's possible the same technique is used to update the label, e.g.
+
+                "0 Likes" -> "1 Like" -> "2 Likes"
+
+            - so we normalize both:
+
+            before:
+
+                <a href="/status/1234/retweets">
+                    <div>
+                        <span>
+                            <span>1</span>
+                        </span>
+
+                        <span> <!-- XXX incoming -->
+                            <span>2</span>
+                        </span>
+                    </div>
+
+                    <span>
+                        <span>Retweet</span>
+                        <span>Retweets</span> <!-- XXX maybe? -->
+                    </span>
+                </a>
+
+            after (the text values don't matter since we're going to change them):
+
+                <a href="status/1234/retweets">
+                    <div>
+                        <span>
+                            <span>1</span>
+                        </span>
+                    </div>
+
+                    <span>
+                        <span>Retweet</span>
+                    </span>
+                </a>
+        */
+
+        const targets = []
+
+        $link.children().each(function () {
+            const $child = $(this)
+
+            // remove all but the first child of each child of the link
+            $child.children().filter(index => index > 0).remove()
+
+            // grab the target element
+            targets.push($child.find('span').filter(isLeaf))
+        })
+
+        return targets
+    }
+
+    /*
+     * callback fired when the stats element's aria-label attribute is updated:
+     * update the Replies widget's count and the label if they differ from the
+     * current values
+     */
+    _update ($count, $label) {
+        const stats = this.parse()
+
+        if (!stats) {
+            return
+        }
+
+        const { displayCount, label } = stats
+
+        if ($count.text() !== displayCount) {
+            // TODO (re-)investigate (re-)implementing the animation
+            $count.text(displayCount)
+        }
+
+        if ($label.text() !== label) {
+            $label.text(label)
+        }
+    }
+
+    /*
+     * process the stats element for a tweet:
+     *
+     * 1) create a Replies widget cloned from one of the existing widgets
+     * 2) set the new widget's label to "Replies"
+     * 3) set the widget's count to the initial number of replies
+     * 4) use a mutation observer to sync the stats to the widget
+     * 5) prepend the new widget to the stats bar
+     */
+    connect ($statsBar) {
+        // override the "column" layout used when there's only one widget
+        $statsBar.css('flex-direction', 'row')
+
+        // create the Replies widget, initially a clone of the first widget
+        const $replies = $statsBar.children().first().clone()
+
+        // copy the inter-widget gap from the first widget's right margin
+        $replies.css('margin-right', '20px')
+
+        // keep the link so the appearance remains consistent, but just link back to
+        // the current page
+        const $link = $replies.find('a[href]').attr('href', this._path)
+
+        // grab the widget's target elements
+        const [$count, $label] = this._targets($link)
+
+        // display "replies" as "Replies"
+        $label.css('text-transform', 'capitalize')
+
+        // initialize the target elements
+        this._update($count, $label)
+
+        // pipe updates to the target elements
+        const callback = () => this._update($count, $label)
+        this._$stats.onModify('aria-label', callback, true /* multi */)
+
+        // add the widget to the stats bar
+        $statsBar.prepend($replies)
     }
 
     /*
@@ -87,254 +305,28 @@ class RepliesManager {
 
         return { count, displayCount, label }
     }
-
-    /*
-     * callback fired when the stats element's aria-label attribute is updated:
-     * update the Replies widget's count and the label if they differ from the
-     * current values
-     */
-    update ($count, $label) {
-        const stats = this.parse()
-
-        if (!stats) {
-            return
-        }
-
-        const { displayCount, label } = stats
-
-        if ($count.text() !== displayCount) {
-            // TODO (re-)investigate (re-)implementing the animation
-            $count.text(displayCount)
-        }
-
-        if ($label.text() !== label) {
-            $label.text(label)
-        }
-    }
 }
 
-/*
- * given a jQuery wrapper containing one or more stats elements (see below),
- * find the first one that's valid (if any) and forward it and the following
- * values to the handler:
- *
- *  - the stats bar (the parent element of the Retweets/Likes widgets)
- *  - an updater for the Replies widget
- *  - the path of the current page (used as a dummy URL for the Replies widget)
- */
-function filterStats ($results) {
-    // NOTE we need to determine the path dynamically because Twitter is a SPA,
-    // i.e. this userscript is loaded once for multiple pages
+/************************************* main ***********************************/
 
-    const path = location.pathname
-    const match = path.match(PATH)
-
-    if (!match) {
-        return
-    }
-
-    // reduce the list of candidate stats-elements down to the first/only one
-    // with a stats bar (previous sibling) whose links match this tweet ID. e.g.
-    // if the tweet is:
-    //
-    //   https://twitter.com/example/status/1234
-    //
-    // then its stats bar will contain subpages of this tweet, e.g.:
-    //
-    //   https://twitter.com/example/status/1234/likes
-    //   https://twitter.com/example/status/1234/retweets
-    //   https://twitter.com/example/status/1234/retweets/with_comments
-    //
-    // while we're filtering, we can also gather the selected element and its
-    // sibling, rather than retrieving them again after we've found a match
-
-    const tweetId = match[1]
-
-    // gather these while we're filtering
-    let nConsumed, $stats, $statsBar
-
-    for (const el of $results) {
-        $stats = $(el)
-
-        const $links = $stats.prev().find(`a[href*="/status/${tweetId}/"]`)
-
-        // the number of widgets must be at least 1 (so we can clone it)
-        if (!$links.length) {
-            continue
-        }
-
-        // we need to locate the stats bar in the previous sibling, but its
-        // structure can vary: sometimes (e.g. in threads) the widgets are
-        // its direct children; at other times, they're its grandchildren.
-        // in both cases, however, the stats bar is the great grandparent of
-        // the Retweets/Likes links, so we use that to find it
-        $statsBar = $links.first().parent().parent().parent()
-
-        // count the number of consumed stats. this is roughly equal to the
-        // number of links/widgets, with the qualification that the retweets
-        // stat may be consumed by 2 separate widgets
-        //
-        // XXX for now we assume that the number of widgets/links doesn't
-        // change, e.g. we assume that the Likes widget isn't removed from
-        // the DOM if its count goes down to 0
-        const consumed = $links.get().map(link => {
-            return $(link).attr('href').match(/\/status\/\d+\/([^/]+)/)[1]
-        })
-
-        nConsumed = new Set(consumed).size // dedup
-
-        break
-    }
-
-    if ($statsBar) {
-        const replies = new RepliesManager($stats, nConsumed)
-
-        if (replies.parse()) {
-            onStats($stats, $statsBar, replies, path)
-        } else {
-            const stats = JSON.stringify($stats.attr('aria-label'))
-            console.warn(`Can't parse stats for ${path}: ${stats}`)
-        }
-    }
-}
-
-/*
- * a helper function used to filter jQuery collections
- *
- * return true if an element has no children, false otherwise
- */
-function isLeaf () {
-    return this.children.length == 0
-}
-
-/*
- * process the stats element for a tweet:
- *
- * 1) create a Replies widget cloned from one of the existing widgets
- * 2) set the new widget's label to "Replies"
- * 3) set the widget's count to the initial number of replies
- * 4) use a mutation observer to sync the stats to the widget
- * 5) prepend the new widget to the stats bar
- */
-function onStats ($stats, $statsBar, replies, path) {
-    // override the "column" layout used when there's only one widget
-    $statsBar.css('flex-direction', 'row')
-
-    // create the Replies widget, initially a clone of the first widget
-    const $replies = $statsBar.children().first().clone()
-
-    // copy the inter-widget gap from the first widget's right margin
-    $replies.css('margin-right', '20px')
-
-    // keep the link so the appearance remains consistent, but just link back to
-    // the current page
-    const $link = $replies.find('a[href]').attr('href', path)
-
-    // grab the widget's target elements
-    const [$count, $label] = targets($link)
-
-    // display "replies" as "Replies"
-    $label.css('text-transform', 'capitalize')
-
-    // initialize the target elements
-    replies.update($count, $label)
-
-    // pipe updates to the target elements
-    const callback = () => replies.update($count, $label)
-    $stats.onModify('aria-label', callback, true /* multi */)
-
-    // add the widget to the stats bar
-    $statsBar.prepend($replies)
-}
-
-/*
- * extract the count and label elements from a widget's link element
- */
-function targets ($link) {
-    /*
-        NOTE if the cloned widget was in the process of updating its count, we
-        may have an extra (transient) SPAN representing the before and after
-        states of the rollover animation
-
-        it's possible the same technique is used to update the label, e.g.
-
-            "0 Likes" -> "1 Like" -> "2 Likes"
-
-        - so we normalize both:
-
-        before:
-
-            <a href="/status/1234/retweets">
-                <div>
-                    <span>
-                        <span>1</span>
-                    </span>
-
-                    <span> <!-- XXX incoming -->
-                        <span>2</span>
-                    </span>
-                </div>
-
-                <span>
-                    <span>Retweet</span>
-                    <span>Retweets</span> <!-- XXX maybe? -->
-                </span>
-            </a>
-
-        after (the text values don't matter since we're going to change them):
-
-            <a href="status/1234/retweets">
-                <div>
-                    <span>
-                        <span>1</span>
-                    </span>
-                </div>
-
-                <span>
-                    <span>Retweet</span>
-                </span>
-            </a>
-    */
-
-    const targets = []
-
-    $link.children().each(function () {
-        const $child = $(this)
-
-        // remove all but the first child of each child of the link
-        $child.children().filter(index => index > 0).remove()
-
-        // grab the target element
-        targets.push($child.find('span').filter(isLeaf))
-    })
-
-    return targets
-}
-
-// locate the DIV which contains the tweet's stats, e.g.:
+// locate the DIVs which contain stats, e.g.:
 //
 //    <div aria-label="1234 replies, 2345 Retweets, 3456 likes" role="group">...</div>
 //
-// there are DIVs like this under each tweet on a page, and the tweet might not
-// be the first on its page (it might be a reply), so we need to select the
-// right one.
+// there are DIVs like this under each tweet on a page; we only want to match
+// the ones with a corresponding stats bar.
 //
-// the filter selects the right (only) stats element for the page by scanning
-// its previous sibling, so we could feed it the candidate elements under every
-// tweet on a page and let it match the right one, but this would be hugely
-// wasteful given that there's only one matching element per page, while there
-// could be hundreds (or even thousands) of replies. we avoid this inefficiency
-// [1] by pre-filtering here to limit the candidates based on whatever static
-// properties we can use to identify the right element.
+// the filter selects the correct stats elements by scanning their previous
+// siblings, so in theory we could feed it the candidate elements under every
+// tweet on a page and let it match the right ones, but this would be hugely
+// wasteful given that there are only one or two matching elements per page,
+// while there could be hundreds (or even thousands) of replies.
 //
-// this can be tricky because the class names are auto-generated (and therefore
-// fragile) and the markup is otherwise almost entirely free of any kind of
-// semantic hooks or hints...
-//
-// [1] though not entirely, since we're using `:has()` which isn't supported
-// natively by browsers (yet [2])
-//
-// [2] https://developer.mozilla.org/en-US/docs/Web/CSS/:has
+// we avoid this inefficiency by pre-filtering here to limit the candidates
+// based on whatever static properties we can use to identify the right
+// elements. this can be tricky because the class names are auto-generated (and
+// therefore fragile) and the markup is otherwise almost entirely free of any
+// kind of semantic hooks or hints...
 
 $.onCreate(
     'div[role="group"][aria-label][aria-label!=""]:not(.r-156q2ks)',
