@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.1
+// @version       1.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -315,21 +315,29 @@ function targets ($link) {
 //
 //    <div aria-label="1234 replies, 2345 Retweets, 3456 likes" role="group">...</div>
 //
-// there are DIVs like this under each tweet on a page, and the tweet may not be
-// the first on its page (it may be a reply), so we need to select the right
-// one.
+// there are DIVs like this under each tweet on a page, and the tweet might not
+// be the first on its page (it might be a reply), so we need to select the
+// right one.
 //
-// currently, we identify the element by a unique (generated) class name.
-// this looks fragile, but something like it has reportedly been stable since
-// the last major redesign (over a year ago) [1]
+// the filter selects the right (only) stats element for the page by scanning
+// its previous sibling, so we could feed it the candidate elements under every
+// tweet on a page and let it match the right one, but this would be hugely
+// wasteful given that there's only one matching element per page, while there
+// could be hundreds (or even thousands) of replies. we avoid this inefficiency
+// [1] by pre-filtering here to limit the candidates based on whatever static
+// properties we can use to identify the right element.
 //
-// [1] https://greasyfork.org/en/scripts/405335-twitter-reply-count/discussions/59090
+// this can be tricky because the class names are auto-generated (and therefore
+// fragile) and the markup is otherwise almost entirely free of any kind of
+// semantic hooks or hints...
 //
-// the filter itself is structural (i.e. it verifies the DIV by scanning its
-// previous sibling), so this works without the class. the class just reduces
-// the number of elements we test per page from potentially hundreds to 1
+// [1] though not entirely, since we're using `:has()` which isn't supported
+// natively by browsers (yet [2])
+//
+// [2] https://developer.mozilla.org/en-US/docs/Web/CSS/:has
+
 $.onCreate(
-    'div.r-a2tzq0[role="group"][aria-label][aria-label!=""]',
+    'div[role="group"][aria-label][aria-label!=""]:not(.r-156q2ks)',
     filterStats,
     true /* multi */
 )
