@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.4.1
+// @version       0.4.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -57,24 +57,21 @@ const NONE = []
  *
  *   - uri: optional URI filter: string (equality) or regex (match)
  *
- *   - root: a path (string or array) into the document under which to begin
- *     searching (required)
+ *   - root (required): a path (string or array) into the document under which
+ *     to begin searching
  *
- *   - collect: a function which takes a root node and turns it into an array of
- *     context nodes to scan for URL data (default: Object.values)
+ *   - collect (default: Object.values): a function which takes a root node and
+ *     turns it into an array of context nodes to scan for URL data
  *
- *   - scan: an array of paths to probe for arrays of { url, expanded_url }
- *     pairs in a context node (default: USER_PATHS)
+ *   - scan (default: USER_PATHS): an array of paths to probe for arrays of
+ *     { url, expanded_url } pairs in a context node
  *
- *   - targets: an array of locators for standalone URLs (URLs that don't have
- *     an accompanying expansion), e.g. for URLs in cards embedded in tweets.
- *     these URLs are replaced by expanded URLs gathered during the scan. a
- *     target node can be supplied as a path (i.e. string or array of steps) or
- *     an object with a "path" property and optional "key" and "target"
- *     properties. the path points to an array under the context; the optional
- *     key (default: "card_url") is used to select an object from the array; and
- *     the target (default: "value.string_value") specifies the path to the URL
- *     within the selected object (default: NONE)
+ *   - targets (default: NONE): an array of paths to standalone URLs (URLs that
+ *     don't have an accompanying expansion), e.g. for URLs in cards embedded in
+ *     tweets. these URLs are replaced by expanded URLs gathered during the
+ *     scan. target paths can point directly to a URL node (string) or to an
+ *     array of objects. in the latter case, we find the URL object in the array
+ *     (.key == "card_url") and replace its URL node (obj.value.string_value)
  */
 const QUERIES = [
     {
@@ -83,12 +80,19 @@ const QUERIES = [
     },
     {
         uri: /\/Conversation$/,
-        root: 'data.conversation_timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.legacy',
-        scan: TWEET_PATHS,
+        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.core.user.legacy',
     },
     {
         uri: /\/Conversation$/,
-        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.core.user.legacy',
+        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.legacy',
+        scan: TWEET_PATHS,
+        targets: ['card.binding_values', 'card.url'],
+    },
+    {
+        uri: /\/Conversation$/,
+        root: 'data.conversation_timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.legacy',
+        scan: TWEET_PATHS,
+        targets: ['card.binding_values', 'card.url'],
     },
     {
         uri: /\/Following$/,
@@ -115,10 +119,7 @@ const QUERIES = [
     {
         root: 'globalObjects.tweets',
         scan: TWEET_PATHS,
-        targets: [
-            'card.binding_values.card_url.string_value',
-            'card.url',
-        ],
+        targets: ['card.binding_values.card_url.string_value', 'card.url'],
     },
     {
         // DMs (/dm/conversation/<id>.json)
@@ -135,15 +136,6 @@ const QUERIES = [
         targets: [
             'attachment.card.binding_values.card_url.string_value',
             'attachment.card.url',
-        ],
-    },
-    {
-        uri: /\/Conversation$/,
-        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.legacy',
-        scan: TWEET_PATHS,
-        targets: [
-            { path: 'card.binding_values' },
-            'card.url',
         ],
     },
 ]
@@ -283,20 +275,17 @@ function transformLinks (data, uri) {
             for (const target of targets) {
                 let url, $context = context, $target = target
 
-                if (typeof target === 'string' || Array.isArray(target)) {
-                    url = get(context, target)
-                } else { // { path, key?, target? }
-                    const objects = get(context, target.path)
+                const node = get(context, target)
 
-                    if (objects) {
-                        const wantKey = target.key || 'card_url'
-                        const object = objects.find(it => it.key === wantKey)
-
-                        if ($context = object) {
-                            $target = target.target || 'value.string_value'
-                            url = get($context, $target)
-                        }
+                // if the target points to an array rather than a string, locate
+                // the URL object within the array automatically
+                if (Array.isArray(node)) {
+                    if ($context = node.find(it => it.key === 'card_url')) {
+                        $target = 'value.string_value'
+                        url = get($context, $target)
                     }
+                } else {
+                    url = node
                 }
 
                 if (typeof url === 'string') {
@@ -435,8 +424,6 @@ if ((typeof cloneInto === 'function') && (typeof exportFunction === 'function'))
  * replace the default XHR#send with our custom version, which scans responses
  * for tweets and expands their URLs
  */
-console.debug('hooking XHR#send:', GMCompat.unsafeWindow.XMLHttpRequest.prototype.send)
-
 GMCompat.unsafeWindow.XMLHttpRequest.prototype.send = GMCompat.exportFunction(
     hookXHRSend(window.XMLHttpRequest.prototype.send),
     GMCompat.unsafeWindow
