@@ -3,14 +3,14 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.4.0
+// @version       0.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@0.3.2
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1
 // @require       https://cdn.jsdelivr.net/npm/just-safe-set@2.1.0
 // @run-at        document-start
 // @inject-into   auto
@@ -83,15 +83,6 @@ const QUERIES = [
     },
     {
         uri: /\/Conversation$/,
-        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.legacy',
-        scan: TWEET_PATHS,
-        targets: [
-            { path: 'card.binding_values' },
-            'card.url',
-        ],
-    },
-    {
-        uri: /\/Conversation$/,
         root: 'data.conversation_timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.legacy',
         scan: TWEET_PATHS,
     },
@@ -145,7 +136,16 @@ const QUERIES = [
             'attachment.card.binding_values.card_url.string_value',
             'attachment.card.url',
         ],
-    }
+    },
+    {
+        uri: /\/Conversation$/,
+        root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.legacy',
+        scan: TWEET_PATHS,
+        targets: [
+            { path: 'card.binding_values' },
+            'card.url',
+        ],
+    },
 ]
 
 /*
@@ -292,10 +292,9 @@ function transformLinks (data, uri) {
                         const wantKey = target.key || 'card_url'
                         const object = objects.find(it => it.key === wantKey)
 
-                        if (object) {
+                        if ($context = object) {
                             $target = target.target || 'value.string_value'
-                            $context = object
-                            url = get(object, $target)
+                            url = get($context, $target)
                         }
                     }
                 }
