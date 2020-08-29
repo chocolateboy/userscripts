@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name          Linkify Twitter Trends
+// @name          Twitter Linkify Trends
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.1.0
+// @version       0.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -27,7 +27,7 @@ function onTrends ($trends) {
         const href = `${location.origin}/search?q=${query}`
         const $link = $('<a></a>')
             .attr({ href, role: 'link', 'data-focusable': true })
-            .css({ color: 'inherit', display: 'contents' })
+            .css({ color: 'inherit', textDecoration: 'inherit' })
 
         $trend.wrap($link)
     }
