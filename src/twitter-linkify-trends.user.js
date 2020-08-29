@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name          Twitter Linkify Trends
+// @name          Linkify Twitter Trends
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.2.0
+// @version       0.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
