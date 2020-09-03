@@ -3,7 +3,7 @@
 // @description   Show the number of replies on tweet pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.0
+// @version       1.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -115,7 +115,7 @@ function isLeaf () {
 /************************************ classes *********************************/
 
 /*
- * a helper class which encapsulates a) reading reply counts from the stats
+ * a helper class which handles a) reading reply counts from the stats
  * element and b) syncing reply counts to the Replies widget's count and label
  * elements
  */
