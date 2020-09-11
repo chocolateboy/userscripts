@@ -3,15 +3,16 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.4.2
+// @version       0.5.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1
-// @require       https://cdn.jsdelivr.net/npm/just-safe-set@2.1.0
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
+// @require       https://cdn.jsdelivr.net/npm/just-safe-set@2.1.0/index.min.js
+// @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
@@ -21,6 +22,14 @@
  * this domain are ignored.
  */
 const TWITTER_API = 'api.twitter.com'
+
+/*
+ * the domain intercepted links are routed through
+ *
+ * not all links are intercepted. exceptions include links to twitter (e.g.
+ * https://twitter.com) and card URIs (e.g. card://123456)
+ */
+const TRACKING_DOMAIN = 't.co'
 
 /*
  * default locations to search for URL metadata (arrays of objects) within tweet
@@ -55,10 +64,10 @@ const NONE = []
  *
  * options:
  *
- *   - uri: optional URI filter: string (equality) or regex (match)
+ *   - uri: optional URI filter: one or more strings (equality) or regexps (match)
  *
- *   - root (required): a path (string or array) into the document under which
- *     to begin searching
+ *   - root (required): a path (string or array of steps) into the document
+ *     under which to begin searching
  *
  *   - collect (default: Object.values): a function which takes a root node and
  *     turns it into an array of context nodes to scan for URL data
@@ -75,12 +84,16 @@ const NONE = []
  */
 const QUERIES = [
     {
-        uri: /\/users\/lookup\.json$/,
+        uri: '/1.1/users/lookup.json',
         root: [], // returns self
     },
     {
         uri: /\/Conversation$/,
         root: 'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.core.user.legacy',
+    },
+    {
+        uri: /\/Conversation$/,
+        root: 'data.conversation_timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.core.user.legacy',
     },
     {
         uri: /\/Conversation$/,
@@ -103,18 +116,19 @@ const QUERIES = [
         root: 'data.user.followers_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
     },
     {
-        // found in /graphql/<query-id>/UserByScreenName
         // used for hovercard data
+        uri: /^\/graphql\/[^\/]+\/UserByScreenName$/,
         root: 'data.user.legacy',
         collect: Array.of,
     },
-    {
-        // spotted in list.json and all.json (used for hovercard data).
-        // may exist in other documents
-        root: 'globalObjects.tweets.*.card.users.*',
-    },
-    {
-        root: 'globalObjects.users',
+    {   // DMs
+        uri: ['/1.1/dm/inbox_initial_state.json', '/1.1/dm/user_updates.json'],
+        root: 'inbox_initial_state.entries.*.message.message_data',
+        scan: TWEET_PATHS,
+        targets: [
+            'attachment.card.binding_values.card_url.string_value',
+            'attachment.card.url',
+        ],
     },
     {
         root: 'globalObjects.tweets',
@@ -122,21 +136,7 @@ const QUERIES = [
         targets: ['card.binding_values.card_url.string_value', 'card.url'],
     },
     {
-        // DMs (/dm/conversation/<id>.json)
-        root: 'conversation_timeline.entries.*.message.message_data',
-        scan: TWEET_PATHS,
-        targets: [
-            'attachment.card.binding_values.card_url.string_value',
-            'attachment.card.url',
-        ],
-    },
-    {   // DMs (/dm/user_updates.json and /dm/inbox_initial_state.json)
-        root: 'inbox_initial_state.entries.*.message.message_data',
-        scan: TWEET_PATHS,
-        targets: [
-            'attachment.card.binding_values.card_url.string_value',
-            'attachment.card.url',
-        ],
+        root: 'globalObjects.users',
     },
 ]
 
@@ -147,10 +147,25 @@ const QUERIES = [
 const CONTENT_TYPE = /^application\/json\b/
 
 /*
- * compatibility shim needed for Violentmonkey for Firefox and Greasemonkey 4:
- * https://github.com/violentmonkey/violentmonkey/issues/997#issuecomment-637700732
+ * the minimum size (in bytes) of documents we deem to be "not small"
+ *
+ * we log misses (i.e. no URLs ever found/replaced) in documents whose size is
+ * greater than or equal to this value
+ *
+ * if we keep failing to find URLs in large documents, we may be able to speed
+ * things up by blacklisting them, at least in theory
+ *
+ * (in practice, URL data is optional in most of the matched document types
+ * (contained in arrays that can be empty), so an absence of URLs doesn't
+ * necessarily mean URL data will never be included...)
  */
-const GMCompat = { unsafeWindow }
+const LOG_THRESHOLD = 1024
+
+/*
+ * used to keep track of which roots (don't) have matching URIs and which URIs
+ * (don't) have matching roots
+ */
+const STATS = { root: {}, uri: {} }
 
 /*
  * a function which takes an object and a path into that object (a string of
@@ -220,30 +235,59 @@ function get (obj, path, $default) {
 }
 
 /*
+ * JSON.stringify helper used to serialize stats data
+ */
+function replacer (key, value) {
+    return (value instanceof Set) ? Array.from(value) : value
+}
+
+/*
  * replace t.co URLs with the original URL in all locations in the document
  * which contain URLs
  */
-function transformLinks (data, uri) {
-    const stats = new Map()
+function transformLinks (json, uri) {
+    let data, count = 0
+
+    if (!STATS.uri[uri]) {
+        STATS.uri[uri] = new Set()
+    }
+
+    try {
+        data = JSON.parse(json)
+    } catch (e) {
+        console.error(`Can't parse JSON for ${uri}:`, e)
+        return
+    }
 
     for (const query of QUERIES) {
-        const wantUri = query.uri
-
-        if (wantUri) {
-            const match = (typeof wantUri === 'string')
-                ? uri === wantUri
-                : wantUri.test(uri)
+        if (query.uri) {
+            const uris = [].concat(query.uri)
+            const match = uris.some(want => {
+                return (typeof want === 'string')
+                    ? (uri === want)
+                    : want.test(uri)
+            })
 
             if (!match) {
                 continue
             }
         }
 
+        if (!STATS.root[query.root]) {
+            STATS.root[query.root] = new Set()
+        }
+
         const root = get(data, query.root)
 
         // may be an array (e.g. lookup.json)
-        if (!(root && (typeof root === 'object'))) {
+        if (!root || typeof root !== 'object') {
             continue
+        }
+
+        const updateStats = () => {
+            ++count
+            STATS.uri[uri].add(query.root)
+            STATS.root[query.root].add(uri)
         }
 
         const {
@@ -252,118 +296,119 @@ function transformLinks (data, uri) {
             targets = NONE,
         } = query
 
+        const cache = new Map()
         const contexts = collect(root)
 
         for (const context of contexts) {
-            const cache = new Map()
-
             // scan the context nodes for { url, expanded_url } pairs, replace
-            // each t.co URL with its expansion, and cache the mappings
+            // each t.co URL with its expansion, and add the mappings to the
+            // cache
             for (const path of scan) {
                 const items = get(context, path, NONE)
 
                 for (const item of items) {
                     cache.set(item.url, item.expanded_url)
                     item.url = item.expanded_url
-                    stats.set(query.root, (stats.get(query.root) || 0) + 1)
+                    updateStats()
                 }
             }
+        }
 
-            // now pinpoint isolated URLs in the context which don't have a
-            // corresponding expansion, and replace them using the mappings we
-            // collected during the scan
-            for (const target of targets) {
-                let url, $context = context, $target = target
+        // do a separate pass for targets because some nested card URLs are
+        // expanded in other (earlier) tweets under the same root
+        if (targets.length) {
+            for (const context of contexts) {
+                // pinpoint isolated URLs in the context which don't have a
+                // corresponding expansion, and replace them using the mappings
+                // we collected during the scan
+                for (const target of targets) {
+                    let url, $context = context, $target = target
 
-                const node = get(context, target)
+                    const node = get(context, target)
 
-                // if the target points to an array rather than a string, locate
-                // the URL object within the array automatically
-                if (Array.isArray(node)) {
-                    if ($context = node.find(it => it.key === 'card_url')) {
-                        $target = 'value.string_value'
-                        url = get($context, $target)
+                    // if the target points to an array rather than a string, locate
+                    // the URL object within the array automatically
+                    if (Array.isArray(node)) {
+                        if ($context = node.find(it => it.key === 'card_url')) {
+                            $target = 'value.string_value'
+                            url = get($context, $target)
+                        }
+                    } else {
+                        url = node
                     }
-                } else {
-                    url = node
-                }
 
-                if (typeof url === 'string') {
-                    const expandedUrl = cache.get(url)
+                    if (typeof url === 'string') {
+                        const $url = new URL(url)
 
-                    if (expandedUrl) {
-                        exports.set($context, $target, expandedUrl)
-                        stats.set(query.root, (stats.get(query.root) || 0) + 1)
+                        if ($url.hostname !== TRACKING_DOMAIN) {
+                            continue
+                        }
+
+                        const expandedUrl = cache.get(url)
+
+                        if (expandedUrl) {
+                            exports.set($context, $target, expandedUrl)
+                            updateStats()
+                        } else {
+                            console.warn(`can't find expanded URL for ${url} in ${uri}`)
+                        }
                     }
                 }
             }
         }
     }
 
-    if (stats.size) {
-        // format: "expanded 1 URL in "a.b" and 2 URLs in "c.d" in /2/example.json"
-        const summary = Array.from(stats).map(([path, count]) => {
-            const urls = count === 1 ? '1 URL' : `${count} URLs`
-            return `${urls} in ${JSON.stringify(path)}`
-        }).join(' and ')
-
-        console.debug(`expanded ${summary} in ${uri}`)
-    }
-
-    return data
-}
-
-/*
- * parse and transform a JSON response, handling (catching and logging) any
- * errors
- */
-function transformResponse (json, path) {
-    let parsed
-
-    try {
-        parsed = JSON.parse(json)
-    } catch (e) {
-        console.error("Can't parse response:", e)
-        return
-    }
-
-    let transformed
-
-    try {
-        transformed = transformLinks(parsed, path)
-    } catch (e) {
-        console.error('Error transforming JSON:', e)
-        return
-    }
-
-    return transformed
+    return { count, data }
 }
 
 /*
  * replacement for Twitter's default response handler. we transform the response
  * if it's a) JSON and b) contains URL data; otherwise, we leave it unchanged
  */
-function onReadyStateChange (xhr, url) {
+function onResponse (xhr, uri) {
     const contentType = xhr.getResponseHeader('Content-Type')
 
     if (!CONTENT_TYPE.test(contentType)) {
         return
     }
 
-    const parsed = new URL(url)
+    const url = new URL(uri)
 
     // exclude e.g. the config-<date>.json file from pbs.twimg.com, which is the
     // second biggest document (~500K) after home_latest.json (~700K)
-    if (parsed.hostname !== TWITTER_API) {
+    if (url.hostname !== TWITTER_API) {
         return
     }
 
-    const transformed = transformResponse(xhr.responseText, parsed.pathname)
+    const json = xhr.responseText
+    const size = json.length
 
-    if (transformed) {
-        const descriptor = { value: JSON.stringify(transformed) }
-        const clone = GMCompat.cloneInto(descriptor, GMCompat.unsafeWindow)
+    // fold URIs which differ only in the user ID, e.g.:
+    // /2/timeline/profile/1234.json -> /2/timeline/profile.json
+    const path = url.pathname.replace(/\/\d+\.json$/, '.json')
+
+    const oldStats = JSON.stringify(STATS, replacer)
+    const transformed = transformLinks(json, path)
+
+    let count
+
+    if (transformed && (count = transformed.count)) {
+        const descriptor = { value: JSON.stringify(transformed.data) }
+        const clone = GMCompat.export(descriptor)
+
         GMCompat.unsafeWindow.Object.defineProperty(xhr, 'responseText', clone)
+    }
+
+    if (count) {
+        const newStats = JSON.stringify(STATS, replacer)
+
+        if (newStats !== oldStats) {
+            const replacements = 'replacement' + (count === 1 ? '' : 's')
+            console.debug(`${count} ${replacements} in ${path} (${size} B)`)
+            console.log(JSON.parse(newStats))
+        }
+    } else if (STATS.uri[path].size === 0 && size >= LOG_THRESHOLD) {
+        console.debug(`no replacements in ${path} (${size} B)`)
     }
 }
 
@@ -378,10 +423,10 @@ function hookXHRSend (oldSend) {
 
         this.onreadystatechange = function () {
             if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
-                onReadyStateChange(this, this.responseURL)
+                onResponse(this, this.responseURL)
             }
 
-            oldOnReadyStateChange.apply(this, arguments)
+            return oldOnReadyStateChange.apply(this, arguments)
         }
 
         return oldSend.apply(this, arguments)
@@ -389,42 +434,9 @@ function hookXHRSend (oldSend) {
 }
 
 /*
- * set up a cross-engine API to shield us from differences between engines so we
- * don't have to clutter the code with conditionals.
- *
- * XXX the functions are only needed by Violentmonkey for Firefox and
- * Greasemonkey 4, though Violentmonkey for Chrome also defines them (as
- * identity functions) for compatibility
- */
-if ((typeof cloneInto === 'function') && (typeof exportFunction === 'function')) {
-    Object.assign(GMCompat, { cloneInto, exportFunction })
-
-    // Violentmonkey for Firefox
-    if (unsafeWindow.wrappedJSObject) {
-        GMCompat.unsafeWindow = unsafeWindow.wrappedJSObject
-    }
-} else {
-    GMCompat.cloneInto = value => value
-
-    // we don't use the third argument, but may as well define this correctly in
-    // case we break this out into a separate helper.
-    //
-    // this is the same implementation as Violentmonkey's compatibility shim for
-    // Chrome: https://git.io/JJziH
-    GMCompat.exportFunction = (fn, target, { defineAs } = {}) => {
-        if (defineAs) {
-            target[defineAs] = fn
-        }
-
-        return fn
-    }
-}
-
-/*
  * replace the default XHR#send with our custom version, which scans responses
  * for tweets and expands their URLs
  */
-GMCompat.unsafeWindow.XMLHttpRequest.prototype.send = GMCompat.exportFunction(
-    hookXHRSend(window.XMLHttpRequest.prototype.send),
-    GMCompat.unsafeWindow
+GMCompat.unsafeWindow.XMLHttpRequest.prototype.send = GMCompat.export(
+    hookXHRSend(XMLHttpRequest.prototype.send)
 )
