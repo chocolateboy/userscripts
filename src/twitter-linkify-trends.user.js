@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.0.0
+// @version       1.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -22,43 +22,70 @@
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
-// a map from event IDs to their URLs. populated via the intercepted trends
-// data (JSON)
+/*
+ * a map from event IDs to their URLs. populated via the intercepted trends
+ * data (JSON)
+ */
 const CACHE = new exports.Cache({ maxAge: 60 * 60 * 1000 }) // one hour
 
-// events to disable (stop propagating) on event and trend elements
+/*
+ * events to disable (stop propagating) on event and trend elements
+ */
 const DISABLED_EVENTS = 'click touch'
 
-// path to the array of event records within the JSON document; each record
-// includes an ID, title, URL and image URL (which includes the ID)
-const EVENTS = 'timeline.instructions.*.addEntries.entries.*.content.timelineModule.items.*.item.content.eventSummary'
+/*
+ * path to the array of event records within the JSON document; each record
+ * includes an ID, title, URL and image URL
+ */
+const EVENT_PATH = 'timeline.instructions.*.addEntries.entries.*.content.timelineModule.items.*.item.content.eventSummary'
 
-// an immutable array used to indicate "no values". static to avoid unnecessary
-// allocations
+/*
+ * path to the data for the main image/link on trend pages
+ * (https://twitter.com/explore/tabs/*)
+ */
+const EVENT_HERO_PATH = 'timeline.instructions.*.addEntries.entries.*.content.item.content.eventSummary'
+
+/*
+ * the shared identifier (key) for live events (if they don't have a custom
+ * image). if an event has this key, we identify it by its title rather than its
+ * image URL
+ */
+const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
+
+/*
+ * an immutable array used to indicate "no values". static to avoid unnecessary
+ * allocations
+ */
 const NONE = []
 
-// selector for elements in the "What's happening" panel in the sidebar and the
-// dedicated trends pages (https://twitter.com/explore/tabs/*)
-//
-// includes actual trends as well as "events" (news items)
-const EVENT_SELECTOR = [
-    'div[role="link"]:not([data-testid])',
-        ':has(> div > div:nth-child(2):nth-last-child(1) img[src])'
-].join('')
+/*
+ * selectors for trend elements and event elements (i.e. Twitter's curated news
+ * links). works for trends/events in the "What's happening" panel in the
+ * sidebar and the dedicated trends pages (https://twitter.com/explore/tabs/*)
+ */
 
-const TREND_SELECTOR = 'div[role="link"][data-testid="trend"]'
+// NOTE: we detect the image inside an event/event-hero element and then
+// navigate up to the event to avoid the overhead of using :has()
+const EVENT = 'div[role="link"]:not([data-testid])'
+const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]`
+const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]'
+const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]`
+const TREND = 'div[role="link"][data-testid="trend"]'
+const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(', ')
 
-const SELECTOR = [EVENT_SELECTOR, TREND_SELECTOR].join(', ')
-
-// remove all of Twitter's interceptors for events raised on event elements
-function disableEventEvents (e) {
+/*
+ * remove the onclick interceptors from event elements
+ */
+function disableAll (e) {
     // don't preventDefault: we still want links to work
     e.stopPropagation()
 }
 
-// remove all of Twitter's interceptors for events raised on trend elements
-// apart from clicks on the caret, which opens a drop-down menu
-function disableTrendEvents (e) {
+/*
+ * remove the onclick interceptors from trend elements, apart from clicks on the
+ * caret (which opens a drop-down menu)
+ */
+function disableSome (e) {
     const $target = $(e.target)
     const $caret = $target.closest('[data-testid="caret"]', this)
 
@@ -68,7 +95,9 @@ function disableTrendEvents (e) {
     }
 }
 
-// a version of lodash.get with support for wildcards
+/*
+ * a version of lodash.get with support for wildcards
+ */
 function get (obj, path, $default) {
     if (!obj) {
         return $default
@@ -110,9 +139,10 @@ function get (obj, path, $default) {
     return obj
 }
 
-// intercept XMLHTTPRequest#open calls which pull in data for the "What's
-// happening" (Trends) panel, and pass the response (JSON) to a custom handler
-// which extracts ID/URL pairs for the event elements
+/*
+ * intercept XMLHTTPRequest#open requests for trend data (guide.json) and pass
+ * the response to a custom handler which extracts data for the event elements
+ */
 function hookXHROpen (oldOpen) {
     return function open (_method, url) {
         const $url = new URL(url)
@@ -126,47 +156,61 @@ function hookXHROpen (oldOpen) {
     }
 }
 
-// takes a URL and creates the link which is wrapped around the trend and event
-// titles
+/*
+ * translate an event's ID to its canonical form
+ *
+ * takes an identifier for an event image (its URL) and returns the portion of
+ * that identifier which the data and the element have in common
+ */
+function keyFor (url) {
+    return new URL(url).pathname.replace(/\.\w+$/, '')
+}
+
+/*
+ * create a link (A) which targets the specified URL
+ *
+ * used to wrap the trend/event titles
+ */
 function linkFor (href) {
     return $('<a></a>')
         .attr({ href, role: 'link', 'data-focusable': true })
         .css({ color: 'inherit', textDecoration: 'inherit' })
 }
 
-// update an event element: the link is extracted from the JSON data used to
-// populate the "What's happening" panel.
-function onEvent ($event) {
+/*
+ * linkify an event element: the target URL is (was) extracted from the
+ * intercepted JSON
+ */
+function onEvent ($event, $image, options = {}) {
     const { $target, title } = targetFor($event)
-    const $title = JSON.stringify(title)
-    const $image = $event.find('> div > div:nth-child(2) img[src]')
 
-    // console.debug(`event: ${$title}`)
+    // console.debug('event (element):', JSON.stringify(title))
 
-    if ($image.length === 0) {
-        console.warn(`Can't find image in event: ${$title}`)
-        return
-    }
-
-    const key = new URL($image.attr('src')).pathname
-    const url = CACHE.get(key)
+    const key = keyFor($image.attr('src'))
+    const url = key === LIVE_EVENT_KEY ? CACHE.get(title) : CACHE.get(key)
 
     if (url) {
         const $link = linkFor(url)
+
         $target.wrap($link)
-        $event.find('div:has(> img)').wrap($link) // also wrap the image
+
+        if (options.wrapImage !== false) {
+            $image.wrap($link)
+        }
     } else {
-        console.warn(`Can't find URL for event: ${$title}`)
+        console.warn("Can't find URL for event:", JSON.stringify(title))
     }
 }
 
-// update a trend element: the link is derived from the title in the element
-// rather than from the JSON
+/*
+ * linkify a trend element: the target URL is derived from the title in the
+ * element rather than from the JSON
+ */
 function onTrend ($trend) {
     const { $target, title } = targetFor($trend)
     const unquoted = title.replace(/"/g, '')
 
-    // console.debug(`trend: ${JSON.stringify(unquoted)}`)
+    // console.debug('trend (element):', JSON.stringify(unquoted))
 
     const query = encodeURIComponent('"' + unquoted + '"')
     const url = `${location.origin}/search?q=${query}`
@@ -174,43 +218,63 @@ function onTrend ($trend) {
     $target.wrap(linkFor(url))
 }
 
-// process a collection of newly-created trend or event elements. determines the
-// element's type and passes it to the appropriate handler
+/*
+ * process a collection of newly-created trend or event elements
+ */
 function onTrends ($trends) {
     for (const el of $trends) {
         const $el = $(el)
 
-        // remove the fake pointer
-        $el.css('cursor', 'auto')
-
-        // remove event hijacking and dispatch to the handler
-        if ($el.data('testid') === 'trend') {
-            $el.on(DISABLED_EVENTS, disableTrendEvents)
+        // determine the element's type and pass it to the appropriate handler
+        if ($el.is(TREND)) {
+            $el.css('cursor', 'auto') // remove the fake pointer
+            $el.on(DISABLED_EVENTS, disableSome)
             onTrend($el)
         } else {
-            $el.on(DISABLED_EVENTS, disableEventEvents)
-            onEvent($el)
+            const [$event, wrapImage] = $el.parent().is('[data-testid="image"]')
+                ? [$el.closest(EVENT_HERO), false]
+                : [$el.closest(EVENT), true]
+
+            $event.css('cursor', 'auto') // remove the fake pointer
+            $event.on(DISABLED_EVENTS, disableAll)
+            onEvent($event, $el, { wrapImage })
         }
     }
 }
 
-// process the events data (JSON): extract ID/URL pairs for the event elements
-// and store them in a cache
+/*
+ * process the events data (JSON): extract ID/URL pairs for the event elements
+ * and store them in a cache
+ */
 function processEvents (json) {
     const data = JSON.parse(json)
-    const events = get(data, EVENTS, NONE)
+    const events = get(data, EVENT_PATH, NONE)
 
-    if (!events.length) {
+    // always returns an array even though there's at most 1
+    const eventHero = get(data, EVENT_HERO_PATH, NONE)
+
+    const $events = eventHero.concat(events)
+    const nEvents = $events.length
+
+    if (!nEvents) {
         return
     }
 
-    console.debug(`processing events: ${events.length}`)
+    const plural = nEvents === 1 ? 'event' : 'events'
 
-    for (const event of events) {
-        const { image: { url: imageURL }, url: { url } } = event
-        const key = new URL(imageURL).pathname.replace(/\.\w+$/, '')
+    console.debug(`caching data for ${nEvents} ${plural}`)
 
-        CACHE.set(key, url)
+    for (const event of $events) {
+        const { image: { url: imageURL }, title, url: { url } } = event
+        const key = keyFor(imageURL)
+
+        // console.debug('event (data):', JSON.stringify(title))
+
+        if (key === LIVE_EVENT_KEY) {
+            CACHE.set(title, url)
+        } else {
+            CACHE.set(key, url)
+        }
     }
 
     // keep track of the cache size (for now) to ensure it doesn't become a
@@ -218,8 +282,10 @@ function processEvents (json) {
     console.debug(`cache size: ${CACHE.size}`)
 }
 
-// given a trend or event element, return its target element — i.e. the SPAN
-// containing the element's title — along with its title text
+/*
+ * given a trend or event element, return its target element — i.e. the SPAN
+ * containing the element's title — along with its title text
+ */
 function targetFor ($el) {
     const $target = $el.find('div[dir="ltr"]').first().find('> span')
     const title = $target.text().trim()
