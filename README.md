@@ -20,6 +20,7 @@
 - [See Also](#see-also)
   - [Addons](#addons)
   - [Libraries](#libraries)
+  - [jQuery Plugins](#jquery-plugins)
   - [Sites](#sites-1)
 - [Author](#author)
 - [Copyright and License](#copyright-and-license)
@@ -133,9 +134,12 @@ The following are all direct links i.e. clicking them installs the script.
 
 - [gm-compat](https://github.com/chocolateboy/gm-compat) - portable monkey-patching for userscripts
 - [gm-storage](https://github.com/chocolateboy/gm-storage) - an ES6 Map wrapper for the synchronous userscript storage API
-- [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - a jQuery plugin to highlight new items since the last time a site was visited
-- [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - a jQuery plugin to mark up web pages with next/previous page annotations
 - [UnCommonJS](https://github.com/chocolateboy/uncommonjs) - a minimum viable shim for `module.exports`
+
+### jQuery Plugins
+
+- [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - highlight new items since the last time a site was visited
+- [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - mark up web pages with next/previous page annotations
 
 ### Sites
 
