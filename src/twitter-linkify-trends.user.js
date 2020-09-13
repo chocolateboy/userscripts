@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.0
+// @version       1.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -71,6 +71,7 @@ const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]`
 const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]'
 const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]`
 const TREND = 'div[role="link"][data-testid="trend"]'
+const EVENT_ANY = [EVENT, EVENT_HERO].join(', ')
 const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(', ')
 
 /*
@@ -231,9 +232,8 @@ function onTrends ($trends) {
             $el.on(DISABLED_EVENTS, disableSome)
             onTrend($el)
         } else {
-            const [$event, wrapImage] = $el.parent().is('[data-testid="image"]')
-                ? [$el.closest(EVENT_HERO), false]
-                : [$el.closest(EVENT), true]
+            const $event = $el.closest(EVENT_ANY)
+            const wrapImage = $event.is(EVENT)
 
             $event.css('cursor', 'auto') // remove the fake pointer
             $event.on(DISABLED_EVENTS, disableAll)
