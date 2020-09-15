@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.1
+// @version       1.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -14,6 +14,7 @@
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
+// @require       https://unpkg.com/get-wild@0.0.1/dist/index.umd.min.js
 // @require       https://unpkg.com/tmp-cache@1.0.0/lib/index.js
 // @grant         GM_log
 // @inject-into   auto
@@ -94,50 +95,6 @@ function disableSome (e) {
         // don't preventDefault: we still want links to work
         e.stopPropagation()
     }
-}
-
-/*
- * a version of lodash.get with support for wildcards
- */
-function get (obj, path, $default) {
-    if (!obj) {
-        return $default
-    }
-
-    let props, prop
-
-    if (Array.isArray(path)) {
-        props = path.slice(0) // clone
-    } else if (typeof path === 'string') {
-        props = path.split('.')
-    } else {
-        throw new Error('path must be an array or string')
-    }
-
-    while (props.length) {
-        if (!obj) {
-            return $default
-        }
-
-        prop = props.shift()
-
-        if (prop === '*') {
-            // Object.values is very forgiving and works with anything that
-            // can be turned into an object via Object(...), i.e. everything
-            // but undefined and null, which we've guarded against above.
-            return Object.values(obj).flatMap(value => {
-                return get(value, props.slice(0), NONE)
-            })
-        }
-
-        obj = obj[prop]
-
-        if (obj === undefined) {
-            return $default
-        }
-    }
-
-    return obj
 }
 
 /*
@@ -248,10 +205,10 @@ function onTrends ($trends) {
  */
 function processEvents (json) {
     const data = JSON.parse(json)
-    const events = get(data, EVENT_PATH, NONE)
+    const events = exports.get(data, EVENT_PATH, NONE)
 
     // always returns an array even though there's at most 1
-    const eventHero = get(data, EVENT_HERO_PATH, NONE)
+    const eventHero = exports.get(data, EVENT_HERO_PATH, NONE)
 
     const $events = eventHero.concat(events)
     const nEvents = $events.length
@@ -265,7 +222,15 @@ function processEvents (json) {
     console.debug(`caching data for ${nEvents} ${plural}`)
 
     for (const event of $events) {
-        const { image: { url: imageURL }, title, url: { url } } = event
+        const { title, url: { url } } = event
+        const imageURL = event.image?.url
+
+        if (!imageURL) {
+            // XXX not all event heroes (or adverts) have images
+            console.warn("Can't find image for event:", title)
+            continue
+        }
+
         const key = keyFor(imageURL)
 
         // console.debug('event (data):', JSON.stringify(title))
