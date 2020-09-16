@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.5.0
+// @version       0.5.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -11,6 +11,7 @@
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
+// @require       https://unpkg.com/get-wild@0.0.1/dist/index.umd.min.js
 // @require       https://cdn.jsdelivr.net/npm/just-safe-set@2.1.0/index.min.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
 // @run-at        document-start
@@ -168,73 +169,6 @@ const LOG_THRESHOLD = 1024
 const STATS = { root: {}, uri: {} }
 
 /*
- * a function which takes an object and a path into that object (a string of
- * dot-separated property names or an array of property names) and returns the
- * value at that position within the object, or the (optional) default value if
- * it can't be reached.
- *
- * based on just-safe-get by Angus Croll [1] (which in turn is an implementation
- * of Lodash's function of the same name), but with added support for
- * wildcard props, e.g.:
- *
- *    foo.*.bar.baz.*.quux
- *
- * is roughly equivalent to:
- *
- *    obj.foo
- *        |> Object.values(#)
- *        |> #.flatMap(value => get(value, "bar.baz", []))
- *        |> Object.values(#)
- *        |> #.flatMap(value => get(value, "quux", []))
- *
- * [1] https://www.npmjs.com/package/just-safe-get
- */
-
-// TODO release as an NPM module (just-safe-get is ES5 only, but this
-// requires ES6 for Array#flatMap and Object.values, though both could be
-// polyfilled
-function get (obj, path, $default) {
-    if (!obj) {
-        return $default
-    }
-
-    let props, prop
-
-    if (Array.isArray(path)) {
-        props = path.slice(0) // clone
-    } else if (typeof path === 'string') {
-        props = path.split('.')
-    } else {
-        throw new Error('path must be an array or string')
-    }
-
-    while (props.length) {
-        if (!obj) {
-            return $default
-        }
-
-        prop = props.shift()
-
-        if (prop === '*') {
-            // Object.values is very forgiving and works with anything that
-            // can be turned into an object via Object(...), i.e. everything
-            // but undefined and null, which we've guarded against above.
-            return Object.values(obj).flatMap(value => {
-                return get(value, props.slice(0), NONE)
-            })
-        }
-
-        obj = obj[prop]
-
-        if (obj === undefined) {
-            return $default
-        }
-    }
-
-    return obj
-}
-
-/*
  * JSON.stringify helper used to serialize stats data
  */
 function replacer (key, value) {
@@ -277,7 +211,7 @@ function transformLinks (json, uri) {
             STATS.root[query.root] = new Set()
         }
 
-        const root = get(data, query.root)
+        const root = exports.get(data, query.root)
 
         // may be an array (e.g. lookup.json)
         if (!root || typeof root !== 'object') {
@@ -304,7 +238,7 @@ function transformLinks (json, uri) {
             // each t.co URL with its expansion, and add the mappings to the
             // cache
             for (const path of scan) {
-                const items = get(context, path, NONE)
+                const items = exports.get(context, path, NONE)
 
                 for (const item of items) {
                     cache.set(item.url, item.expanded_url)
@@ -324,14 +258,14 @@ function transformLinks (json, uri) {
                 for (const target of targets) {
                     let url, $context = context, $target = target
 
-                    const node = get(context, target)
+                    const node = exports.get(context, target)
 
                     // if the target points to an array rather than a string, locate
                     // the URL object within the array automatically
                     if (Array.isArray(node)) {
                         if ($context = node.find(it => it.key === 'card_url')) {
                             $target = 'value.string_value'
-                            url = get($context, $target)
+                            url = exports.get($context, $target)
                         }
                     } else {
                         url = node
