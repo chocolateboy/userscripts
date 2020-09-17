@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.2
+// @version       1.1.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -14,7 +14,7 @@
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
-// @require       https://unpkg.com/get-wild@0.0.1/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@0.1.1/dist/index.umd.min.js
 // @require       https://unpkg.com/tmp-cache@1.0.0/lib/index.js
 // @grant         GM_log
 // @inject-into   auto
@@ -54,12 +54,6 @@ const EVENT_HERO_PATH = 'timeline.instructions.*.addEntries.entries.*.content.it
 const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
 
 /*
- * an immutable array used to indicate "no values". static to avoid unnecessary
- * allocations
- */
-const NONE = []
-
-/*
  * selectors for trend elements and event elements (i.e. Twitter's curated news
  * links). works for trends/events in the "What's happening" panel in the
  * sidebar and the dedicated trends pages (https://twitter.com/explore/tabs/*)
@@ -74,6 +68,12 @@ const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] 
 const TREND = 'div[role="link"][data-testid="trend"]'
 const EVENT_ANY = [EVENT, EVENT_HERO].join(', ')
 const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(', ')
+
+/*
+ * a custom version of get-wild's `get` function which automatically
+ * removes missing/undefined results
+ */
+const get = exports.getter({ default: [] })
 
 /*
  * remove the onclick interceptors from event elements
@@ -205,10 +205,10 @@ function onTrends ($trends) {
  */
 function processEvents (json) {
     const data = JSON.parse(json)
-    const events = exports.get(data, EVENT_PATH, NONE)
+    const events = get(data, EVENT_PATH)
 
     // always returns an array even though there's at most 1
-    const eventHero = exports.get(data, EVENT_HERO_PATH, NONE)
+    const eventHero = get(data, EVENT_HERO_PATH)
 
     const $events = eventHero.concat(events)
     const nEvents = $events.length
