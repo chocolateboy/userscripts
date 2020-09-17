@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.5.2
+// @version       0.6.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -86,7 +86,7 @@ const NONE = []
 const QUERIES = [
     {
         uri: '/1.1/users/lookup.json',
-        root: [], // returns self
+        root: '', // returns self
     },
     {
         uri: /\/Conversation$/,
@@ -135,6 +135,9 @@ const QUERIES = [
         root: 'globalObjects.tweets',
         scan: TWEET_PATHS,
         targets: ['card.binding_values.card_url.string_value', 'card.url'],
+    },
+    {
+        root: 'globalObjects.tweets.*.card.users.*',
     },
     {
         root: 'globalObjects.users',
@@ -234,6 +237,10 @@ function transformLinks (json, uri) {
         const contexts = collect(root)
 
         for (const context of contexts) {
+            if (!context) {
+                continue
+            }
+
             // scan the context nodes for { url, expanded_url } pairs, replace
             // each t.co URL with its expansion, and add the mappings to the
             // cache
