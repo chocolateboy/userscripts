@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.3
+// @version       1.1.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -14,7 +14,7 @@
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
-// @require       https://unpkg.com/get-wild@0.1.1/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@1.2.0/dist/index.umd.min.js
 // @require       https://unpkg.com/tmp-cache@1.0.0/lib/index.js
 // @grant         GM_log
 // @inject-into   auto
@@ -70,10 +70,13 @@ const EVENT_ANY = [EVENT, EVENT_HERO].join(', ')
 const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(', ')
 
 /*
- * a custom version of get-wild's `get` function which automatically
- * removes missing/undefined results
+ * a custom version of get-wild's `get` function which automatically removes
+ * missing/undefined results
+ *
+ * we also use a simpler/faster path parser since we don't use the extended
+ * syntax
  */
-const get = exports.getter({ default: [] })
+const get = exports.getter({ default: [], split: '.' })
 
 /*
  * remove the onclick interceptors from event elements
