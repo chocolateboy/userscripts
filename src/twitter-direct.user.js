@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.6.0
+// @version       0.6.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -11,8 +11,8 @@
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
-// @require       https://unpkg.com/get-wild@0.1.1/dist/index.umd.min.js
-// @require       https://cdn.jsdelivr.net/npm/just-safe-set@2.1.0/index.min.js
+// @require       https://unpkg.com/get-wild@1.2.0/dist/index.umd.min.js
+// @require       https://unpkg.com/just-safe-set@2.1.0/index.js
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
 // @run-at        document-start
 // @inject-into   auto
@@ -86,7 +86,7 @@ const NONE = []
 const QUERIES = [
     {
         uri: '/1.1/users/lookup.json',
-        root: '', // returns self
+        root: [], // returns self
     },
     {
         uri: /\/Conversation$/,
@@ -172,6 +172,12 @@ const LOG_THRESHOLD = 1024
 const STATS = { root: {}, uri: {} }
 
 /*
+ * a custom version of get-wild's `get` function which uses a simpler/faster
+ * path parser since we don't use the extended syntax
+ */
+const get = exports.getter({ split: '.' })
+
+/*
  * JSON.stringify helper used to serialize stats data
  */
 function replacer (key, value) {
@@ -214,7 +220,7 @@ function transformLinks (json, uri) {
             STATS.root[query.root] = new Set()
         }
 
-        const root = exports.get(data, query.root)
+        const root = get(data, query.root)
 
         // may be an array (e.g. lookup.json)
         if (!root || typeof root !== 'object') {
@@ -245,7 +251,7 @@ function transformLinks (json, uri) {
             // each t.co URL with its expansion, and add the mappings to the
             // cache
             for (const path of scan) {
-                const items = exports.get(context, path, NONE)
+                const items = get(context, path, NONE)
 
                 for (const item of items) {
                     cache.set(item.url, item.expanded_url)
@@ -265,14 +271,14 @@ function transformLinks (json, uri) {
                 for (const target of targets) {
                     let url, $context = context, $target = target
 
-                    const node = exports.get(context, target)
+                    const node = get(context, target)
 
                     // if the target points to an array rather than a string, locate
                     // the URL object within the array automatically
                     if (Array.isArray(node)) {
                         if ($context = node.find(it => it.key === 'card_url')) {
                             $target = 'value.string_value'
-                            url = exports.get($context, $target)
+                            url = get($context, $target)
                         }
                     } else {
                         url = node
