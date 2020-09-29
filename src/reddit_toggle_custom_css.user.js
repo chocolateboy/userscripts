@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name          Reddit - Toggle Custom CSS
+// @name          Reddit Toggle Custom CSS
 // @description   Persistently disable/re-enable custom subreddit styles via a userscript command
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.0
+// @version       1.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/r/*
@@ -48,23 +48,25 @@ function disableCss () {
     // [2] https://github.com/Tampermonkey/tampermonkey/issues/211#issuecomment-317116595
     // [3] Greasemonkey isn't supported as it doesn't support GM_registerMenuCommand
 
-    document.documentElement.style.display = 'none'
+    const { style } = document.documentElement
+
+    style.display = 'none'
 
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelector(CUSTOM_CSS).disabled = true
-        document.documentElement.style.display = null
+        style.removeProperty('display')
     })
 }
 
 function toggle () {
-    const toggled = !GM_getValue(SUBREDDIT, DISABLE_CSS)
+    const disableCss = !GM_getValue(SUBREDDIT, DISABLE_CSS)
 
-    document.querySelector(CUSTOM_CSS).disabled = toggled
+    document.querySelector(CUSTOM_CSS).disabled = disableCss
 
-    if (toggled === DISABLE_CSS) {
+    if (disableCss === DISABLE_CSS) {
         GM_deleteValue(SUBREDDIT)
     } else {
-        GM_setValue(SUBREDDIT, toggled)
+        GM_setValue(SUBREDDIT, disableCss)
     }
 }
 
