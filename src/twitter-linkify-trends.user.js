@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.4
+// @version       1.1.5
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -15,7 +15,7 @@
 // @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
 // @require       https://unpkg.com/get-wild@1.2.0/dist/index.umd.min.js
-// @require       https://unpkg.com/tmp-cache@1.0.0/lib/index.js
+// @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
 // @grant         GM_log
 // @inject-into   auto
 // ==/UserScript==
@@ -27,7 +27,9 @@
  * a map from event IDs to their URLs. populated via the intercepted trends
  * data (JSON)
  */
-const CACHE = new exports.Cache({ maxAge: 60 * 60 * 1000 }) // one hour
+
+// an LRU cache (flru) with up to 256 (128 * 2) entries
+const CACHE = new exports.default(128)
 
 /*
  * events to disable (stop propagating) on event and trend elements
@@ -145,7 +147,7 @@ function linkFor (href) {
 function onEvent ($event, $image, options = {}) {
     const { $target, title } = targetFor($event)
 
-    // console.debug('event (element):', JSON.stringify(title))
+    console.debug('event (element):', JSON.stringify(title))
 
     const key = keyFor($image.attr('src'))
     const url = key === LIVE_EVENT_KEY ? CACHE.get(title) : CACHE.get(key)
@@ -236,7 +238,7 @@ function processEvents (json) {
 
         const key = keyFor(imageURL)
 
-        // console.debug('event (data):', JSON.stringify(title))
+        console.debug('event (data):', JSON.stringify(title))
 
         if (key === LIVE_EVENT_KEY) {
             CACHE.set(title, url)
@@ -244,10 +246,6 @@ function processEvents (json) {
             CACHE.set(key, url)
         }
     }
-
-    // keep track of the cache size (for now) to ensure it doesn't become a
-    // memory hog
-    console.debug(`cache size: ${CACHE.size}`)
 }
 
 /*
