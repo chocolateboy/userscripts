@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.6.1
+// @version       0.7.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -79,9 +79,14 @@ const NONE = []
  *   - targets (default: NONE): an array of paths to standalone URLs (URLs that
  *     don't have an accompanying expansion), e.g. for URLs in cards embedded in
  *     tweets. these URLs are replaced by expanded URLs gathered during the
- *     scan. target paths can point directly to a URL node (string) or to an
+ *     scan.
+ *
+ *     target paths can point directly to a URL node (string) or to an
  *     array of objects. in the latter case, we find the URL object in the array
- *     (.key == "card_url") and replace its URL node (obj.value.string_value)
+ *     (obj.key === "card_url") and replace its URL node (obj.value.string_value)
+ *
+ *     if the target path is an object containing a { url: path, expanded_url: path }
+ *     pair, it is expanded directly in the same way as scanned paths.
  */
 const QUERIES = [
     {
@@ -134,7 +139,14 @@ const QUERIES = [
     {
         root: 'globalObjects.tweets',
         scan: TWEET_PATHS,
-        targets: ['card.binding_values.card_url.string_value', 'card.url'],
+        targets: [
+            {
+                url: 'card.binding_values.website_shortened_url.string_value',
+                expanded_url: 'card.binding_values.website_url.string_value',
+            },
+            'card.binding_values.card_url.string_value',
+            'card.url',
+        ],
     },
     {
         root: 'globalObjects.tweets.*.card.users.*',
@@ -176,6 +188,14 @@ const STATS = { root: {}, uri: {} }
  * path parser since we don't use the extended syntax
  */
 const get = exports.getter({ split: '.' })
+
+/**
+ * a helper function which returns true if the supplied URL is tracked by
+ * Twitter, false otherwise
+ */
+function isTracked (url) {
+    return (new URL(url)).hostname === TRACKING_DOMAIN
+}
 
 /*
  * JSON.stringify helper used to serialize stats data
@@ -254,51 +274,69 @@ function transformLinks (json, uri) {
                 const items = get(context, path, NONE)
 
                 for (const item of items) {
-                    cache.set(item.url, item.expanded_url)
-                    item.url = item.expanded_url
-                    updateStats()
+                    if (item.url && item.expanded_url) {
+                        if (isTracked(item.url)) {
+                            cache.set(item.url, item.expanded_url)
+                            item.url = item.expanded_url
+                            updateStats()
+                        }
+                    } else {
+                        console.warn("can't find url/expanded_url pair for:", { uri, root: query.root, path })
+                    }
                 }
             }
         }
 
+        if (!targets.length) {
+            continue
+        }
+
         // do a separate pass for targets because some nested card URLs are
         // expanded in other (earlier) tweets under the same root
-        if (targets.length) {
-            for (const context of contexts) {
-                // pinpoint isolated URLs in the context which don't have a
-                // corresponding expansion, and replace them using the mappings
-                // we collected during the scan
-                for (const target of targets) {
-                    let url, $context = context, $target = target
+        for (const context of contexts) {
+            // pinpoint isolated URLs in the context which don't have a
+            // corresponding expansion, and replace them using the mappings
+            // we collected during the scan
+            for (const targetPath of targets) {
+                // this is similar to the url/expanded_url pairs handled in the
+                // scan, but with custom property names (paths)
+                if (targetPath && typeof targetPath === 'object') {
+                    const { url: urlPath, expanded_url: expandedUrlPath } = targetPath
+                    const url = get(context, urlPath)
+                    const expandedUrl = get(context, expandedUrlPath)
 
-                    const node = get(context, target)
-
-                    // if the target points to an array rather than a string, locate
-                    // the URL object within the array automatically
-                    if (Array.isArray(node)) {
-                        if ($context = node.find(it => it.key === 'card_url')) {
-                            $target = 'value.string_value'
-                            url = get($context, $target)
-                        }
-                    } else {
-                        url = node
+                    if (url && expandedUrl && isTracked(url)) {
+                        cache.set(url, expandedUrl)
+                        exports.set(context, urlPath, expandedUrl)
+                        updateStats()
                     }
 
-                    if (typeof url === 'string') {
-                        const $url = new URL(url)
+                    continue
+                }
 
-                        if ($url.hostname !== TRACKING_DOMAIN) {
-                            continue
-                        }
+                let url, $context = context, $targetPath = targetPath
 
-                        const expandedUrl = cache.get(url)
+                const node = get(context, targetPath)
 
-                        if (expandedUrl) {
-                            exports.set($context, $target, expandedUrl)
-                            updateStats()
-                        } else {
-                            console.warn(`can't find expanded URL for ${url} in ${uri}`)
-                        }
+                // if the target points to an array rather than a string, locate
+                // the URL object within the array automatically
+                if (Array.isArray(node)) {
+                    if ($context = node.find(it => it.key === 'card_url')) {
+                        $targetPath = 'value.string_value'
+                        url = get(context, $targetPath)
+                    }
+                } else {
+                    url = node
+                }
+
+                if (typeof url === 'string' && isTracked(url)) {
+                    const expandedUrl = cache.get(url)
+
+                    if (expandedUrl) {
+                        exports.set($context, $targetPath, expandedUrl)
+                        updateStats()
+                    } else {
+                        console.warn(`can't find expanded URL for ${url} in ${uri}`)
                     }
                 }
             }
