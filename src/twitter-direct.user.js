@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.7.1
+// @version       0.7.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -328,7 +328,7 @@ function transformLinks (json, uri) {
                 if (Array.isArray(node)) {
                     if ($context = node.find(it => it.key === 'card_url')) {
                         $targetPath = 'value.string_value'
-                        url = get(context, $targetPath)
+                        url = get($context, $targetPath)
                     }
                 } else {
                     url = node
