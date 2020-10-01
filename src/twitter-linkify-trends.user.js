@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.5
+// @version       1.1.6
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -112,7 +112,7 @@ function hookXHROpen (oldOpen) {
 
         if ($url.pathname === '/2/guide.json') {
             // register a new listener
-            this.addEventListener('load', () => processEvents(this.responseText))
+            this.addEventListener('load', () => processEventData(this.responseText))
         }
 
         return oldOpen.apply(this, arguments)
@@ -208,7 +208,7 @@ function onTrends ($trends) {
  * process the events data (JSON): extract ID/URL pairs for the event elements
  * and store them in a cache
  */
-function processEvents (json) {
+function processEventData (json) {
     const data = JSON.parse(json)
     const events = get(data, EVENT_PATH)
 
