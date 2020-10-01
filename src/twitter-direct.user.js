@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.7.2
+// @version       0.8.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -90,7 +90,8 @@ const NONE = []
  */
 const QUERIES = [
     {
-        uri: '/1.1/users/lookup.json',
+        // e.g. '/1.1/users/lookup.json',
+        uri: /\/lookup\.json$/,
         root: [], // returns self
     },
     {
@@ -123,18 +124,24 @@ const QUERIES = [
     },
     {
         // used for hovercard data
-        uri: /^\/graphql\/[^\/]+\/UserByScreenName$/,
+        uri: /\/UserByScreenName$/,
         root: 'data.user.legacy',
         collect: Array.of,
     },
     {   // DMs
-        uri: ['/1.1/dm/inbox_initial_state.json', '/1.1/dm/user_updates.json'],
+        // e.g. '/1.1/dm/inbox_initial_state.json' and '/1.1/dm/user_updates.json'
+        uri: [/\/inbox_initial_state\.json$/, /\/user_updates\.json$/],
         root: 'inbox_initial_state.entries.*.message.message_data',
         scan: TWEET_PATHS,
         targets: [
             'attachment.card.binding_values.card_url.string_value',
             'attachment.card.url',
         ],
+    },
+    {
+        // e.g. '/1.1/friends/following/list.json',
+        uri: /\/list\.json$/,
+        root: 'users.*',
     },
     {
         root: 'globalObjects.tweets',
@@ -281,7 +288,12 @@ function transformLinks (json, uri) {
                             updateStats()
                         }
                     } else {
-                        console.warn("can't find url/expanded_url pair for:", { uri, root: query.root, path })
+                        console.warn("can't find url/expanded_url pair for:", {
+                            uri,
+                            root: query.root,
+                            path,
+                            item,
+                        })
                     }
                 }
             }
