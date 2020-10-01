@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       0.7.0
+// @version       0.7.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -85,8 +85,8 @@ const NONE = []
  *     array of objects. in the latter case, we find the URL object in the array
  *     (obj.key === "card_url") and replace its URL node (obj.value.string_value)
  *
- *     if the target path is an object containing a { url: path, expanded_url: path }
- *     pair, it is expanded directly in the same way as scanned paths.
+ *     if a target path is an object containing a { url: path, expanded_url: path }
+ *     pair, the URL is expanded directly in the same way as scanned paths.
  */
 const QUERIES = [
     {
@@ -294,18 +294,19 @@ function transformLinks (json, uri) {
         // do a separate pass for targets because some nested card URLs are
         // expanded in other (earlier) tweets under the same root
         for (const context of contexts) {
-            // pinpoint isolated URLs in the context which don't have a
-            // corresponding expansion, and replace them using the mappings
-            // we collected during the scan
             for (const targetPath of targets) {
                 // this is similar to the url/expanded_url pairs handled in the
-                // scan, but with custom property names (paths)
+                // scan, but with custom property-names (paths)
                 if (targetPath && typeof targetPath === 'object') {
                     const { url: urlPath, expanded_url: expandedUrlPath } = targetPath
-                    const url = get(context, urlPath)
-                    const expandedUrl = get(context, expandedUrlPath)
 
-                    if (url && expandedUrl && isTracked(url)) {
+                    let url, expandedUrl
+
+                    if (
+                           (url = get(context, urlPath))
+                        && isTracked(url)
+                        && (expandedUrl = get(context, expandedUrlPath))
+                    ) {
                         cache.set(url, expandedUrl)
                         exports.set(context, urlPath, expandedUrl)
                         updateStats()
@@ -313,6 +314,10 @@ function transformLinks (json, uri) {
 
                     continue
                 }
+
+                // pinpoint isolated URLs in the context which don't have a
+                // corresponding expansion, and replace them using the mappings
+                // we collected during the scan
 
                 let url, $context = context, $targetPath = targetPath
 
