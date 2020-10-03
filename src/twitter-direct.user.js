@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.0.0
+// @version       1.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -276,12 +276,12 @@ function* router (state, data) {
  * (WILDCARD) URL substitutions in nodes (subtrees) within a JSON-formatted
  * document returned by the Twitter API.
  *
- * a scanner is instantiated for each query and its methods are passed a context
- * (node within the document tree) and a spec of some kind mostly corresponding
- * to the query objects i.e. the `scan` option is handled by the `scan` method
- * and the `targets` option is processed by the `assign` method
+ * a transformer is instantiated for each query and its methods are passed a
+ * context (node within the document tree) and the value of an option from the
+ * query, e.g. the `scan` option is handled by the `scan` method and the
+ * `targets` option is processed by the `assign` method
  */
-class Scanner {
+class Transformer {
     constructor ({ onReplace, root, uri }) {
         this._cache = new Map()
         this._onReplace = onReplace
@@ -290,10 +290,28 @@ class Scanner {
     }
 
     /*
+     * expand URLs in context nodes in the locations specified by the query's
+     * `scan` and `targets` options
+     */
+    // @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
+    transform (contexts, scan, targets) {
+        // scan the context nodes for { url, expanded_url } pairs, replace
+        // each t.co URL with its expansion, and add the mappings to the
+        // cache
+        eachDefined(contexts, context => this._scan(context, scan))
+
+        // do a separate pass for targets because some nested card URLs are
+        // expanded in other (earlier) tweets under the same root
+        if (targets.length) {
+            eachDefined(contexts, context => this._assign(context, targets))
+        }
+    }
+
+    /*
      * scan the context node for { url, expanded_url } pairs, replace each t.co
      * URL with its expansion, and add the mappings to the cache
      */
-    scan (context, paths) {
+    _scan (context, paths) {
         const { _cache: cache, _onReplace: onReplace } = this
 
         for (const path of paths) {
@@ -325,12 +343,12 @@ class Scanner {
      * cache, or URLs whose expansion exists in the context in a location not
      * covered by the scan
      */
-    assign (context, targets) {
+    _assign (context, targets) {
         for (const target of targets) {
             if (isPlainObject(target)) {
-                this.assignFromPath(context, target)
+                this._assignFromPath(context, target)
             } else {
-                this.assignFromCache(context, target)
+                this._assignFromCache(context, target)
             }
         }
     }
@@ -343,7 +361,7 @@ class Scanner {
      * than using a fixed set of locations/property names, the paths to the
      * short/expanded URLs are supplied as a parameter
      */
-    assignFromPath (context, target) {
+    _assignFromPath (context, target) {
         const { url: urlPath, expanded_url: expandedUrlPath } = target
 
         let url, expandedUrl
@@ -364,7 +382,7 @@ class Scanner {
      * corresponding expansion, and replace it using the mappings we collected
      * during the scan
      */
-    assignFromCache (context, path) {
+    _assignFromCache (context, path) {
         let url, $context = context, $path = path
 
         const node = get(context, path)
@@ -451,18 +469,15 @@ function transform (data, uri) {
             }
 
             const contexts = collect(root)
-            const scanner = new Scanner({ onReplace: updateStats, root: rootPath, uri })
 
-            // scan the context nodes for { url, expanded_url } pairs, replace
-            // each t.co URL with its expansion, and add the mappings to the
-            // cache
-            eachDefined(contexts, context => scanner.scan(context, scan))
+            const transformer = new Transformer({
+                onReplace: updateStats,
+                root: rootPath,
+                uri
+            })
 
-            // do a separate pass for targets because some nested card URLs are
-            // expanded in other (earlier) tweets under the same root
-            if (targets.length) {
-                eachDefined(contexts, context => scanner.assign(context, targets))
-            }
+            // @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
+            transformer.transform(contexts, scan, targets)
         }
     }
 
@@ -516,11 +531,8 @@ function onResponse (xhr, uri) {
     }
 
     const descriptor = { value: JSON.stringify(data) }
-
-    // @ts-ignore
     const clone = GMCompat.export(descriptor)
 
-    // @ts-ignore
     GMCompat.unsafeWindow.Object.defineProperty(xhr, 'responseText', clone)
 
     const newStats = JSON.stringify(STATS, replacer)
@@ -538,20 +550,20 @@ function onResponse (xhr, uri) {
  * (this.onreadystatechange)
  */
 function hookXHRSend (oldSend) {
-    return function send () {
-        // @ts-ignore
+    return /** @this {XMLHttpRequest} */ function send () {
         const oldOnReadyStateChange = this.onreadystatechange
 
-        // @ts-ignore
         this.onreadystatechange = function () {
             if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
                 onResponse(this, this.responseURL)
             }
 
-            return oldOnReadyStateChange.apply(this, arguments)
+            if (oldOnReadyStateChange) {
+                // @ts-ignore
+                return oldOnReadyStateChange.apply(this, arguments)
+            }
         }
 
-        // @ts-ignore
         return oldSend.apply(this, arguments)
     }
 }
@@ -560,7 +572,6 @@ function hookXHRSend (oldSend) {
  * replace the default XHR#send with our custom version, which scans responses
  * for tweets and expands their URLs
  */
-// @ts-ignore
 GMCompat.unsafeWindow.XMLHttpRequest.prototype.send = GMCompat.export(
     hookXHRSend(XMLHttpRequest.prototype.send)
 )
