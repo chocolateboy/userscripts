@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.0.1
+// @version       1.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -27,8 +27,8 @@ const CONTENT_TYPE = /^application\/json\b/
 /*
  * the minimum size (in bytes) of documents we deem to be "not small"
  *
- * we log misses (i.e. no URLs ever found/replaced) in documents whose size is
- * greater than or equal to this value
+ * we log misses (i.e. no URLs ever found/replaced) to the console in documents
+ * whose size is greater than or equal to this value
  *
  * if we keep failing to find URLs in large documents, we may be able to speed
  * things up by blacklisting them, at least in theory
@@ -150,6 +150,14 @@ const MATCH = [
         'data.user.followers_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
     ],
     [
+        /\/ListMembers$/,
+        'data.list.members_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy'
+    ],
+    [
+        /\/ListSubscribers$/,
+        'data.list.subscribers_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
+    ],
+    [
         // used for hovercard data
         /\/UserByScreenName$/, {
             root: 'data.user.legacy',
@@ -216,9 +224,9 @@ const isPlainObject = (function () {
  * a helper function which iterates over the supplied iterable, filtering out
  * missing (undefined) values.
  *
- * this is done in one pass (rather than map + filter) as there may
- * potentially be dozens or even hundreds of values e.g. contexts (tweet/user
- * objects) under a root node
+ * this is done in one pass (rather than map + filter) as there may potentially
+ * be dozens or even hundreds of values, e.g. contexts (tweet/user objects)
+ * under a root node
  */
 function eachDefined (iterable, fn) {
     for (const value of iterable) {
