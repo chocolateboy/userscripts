@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.0
+// @version       1.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -27,8 +27,8 @@ const CONTENT_TYPE = /^application\/json\b/
 /*
  * the minimum size (in bytes) of documents we deem to be "not small"
  *
- * we log misses (i.e. no URLs ever found/replaced) to the console in documents
- * whose size is greater than or equal to this value
+ * we log (to the console) misses (i.e. no URLs ever found/replaced) in
+ * documents whose size is greater than or equal to this value
  *
  * if we keep failing to find URLs in large documents, we may be able to speed
  * things up by blacklisting them, at least in theory
