@@ -3,7 +3,7 @@
 <!-- toc -->
 
 - [Installation](#installation)
-  - [Engines](#engines)
+  - [Compatibility](#compatibility)
 - [Sites](#sites)
   - [Amazon](#amazon)
   - [GitHub](#github)
@@ -38,7 +38,7 @@ aren't ready for release and which may not even compile. In addition, the
 file/directory names here are subject to change, whereas the URLs on GreasyFork
 will always remain stable.
 
-### Engines
+### Compatibility
 
 All of these scripts work in and are tested on
 [Violentmonkey](https://violentmonkey.github.io/), which is open source, cross
