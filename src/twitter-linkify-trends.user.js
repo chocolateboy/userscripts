@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.6
+// @version       1.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -35,6 +35,11 @@ const CACHE = new exports.default(128)
  * events to disable (stop propagating) on event and trend elements
  */
 const DISABLED_EVENTS = 'click touch'
+
+/*
+ * path to the JSON document containing event data
+ */
+const EVENT_DATA = '/i/api/2/guide.json'
 
 /*
  * path to the array of event records within the JSON document; each record
@@ -110,7 +115,7 @@ function hookXHROpen (oldOpen) {
     return function open (_method, url) {
         const $url = new URL(url)
 
-        if ($url.pathname === '/2/guide.json') {
+        if ($url.pathname === EVENT_DATA) {
             // register a new listener
             this.addEventListener('load', () => processEventData(this.responseText))
         }
@@ -161,7 +166,7 @@ function onEvent ($event, $image, options = {}) {
             $image.wrap($link)
         }
     } else {
-        console.warn("Can't find URL for event:", JSON.stringify(title))
+        console.warn("Can't find URL for event (element):", JSON.stringify(title))
     }
 }
 
@@ -232,7 +237,7 @@ function processEventData (json) {
 
         if (!imageURL) {
             // XXX not all event heroes (or adverts) have images
-            console.warn("Can't find image for event:", title)
+            console.warn("Can't find image for event (data):", title)
             continue
         }
 
