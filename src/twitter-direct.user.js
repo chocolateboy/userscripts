@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.1
+// @version       1.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -60,10 +60,10 @@ const STATS = { root: {}, uri: {} }
 const TRACKING_DOMAIN = 't.co'
 
 /*
- * the domain we expect data (JSON) to come from. responses that aren't from
- * this domain are ignored.
+ * a pattern which matches the domain(s) we expect data (JSON) to come from.
+ * responses which don't come from a matching domain are ignored.
  */
-const TWITTER_API = 'api.twitter.com'
+const TWITTER_API = /^(?:api\.)?twitter\.com$/
 
 /*
  * default locations to search for URL metadata (arrays of objects) within tweet
@@ -507,7 +507,7 @@ function onResponse (xhr, uri) {
 
     // exclude e.g. the config-<date>.json file from pbs.twimg.com, which is the
     // second biggest document (~500K) after home_latest.json (~700K)
-    if (url.hostname !== TWITTER_API) {
+    if (!TWITTER_API.test(url.hostname)) {
         return
     }
 
