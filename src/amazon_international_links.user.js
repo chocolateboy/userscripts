@@ -3,7 +3,7 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.3.0
+// @version       3.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://smile.amazon.tld/*
@@ -45,7 +45,7 @@ const SITES = {
 }
 
 // Amazon TLDs which support the "smile.amazon" subdomain
-const SMILE = { 'com': true, 'co.uk': true, 'de': true }
+const SMILE = new Set(['com', 'co.uk', 'de'])
 
 // a tiny DOM builder to avoid cluttering the code with HTML templates
 // https://github.com/aduth/hijinks
@@ -111,7 +111,7 @@ class Linker {
 
         // XXX we can't always preserve the "smile.amazon" subdomain as it's not
         // available for most Amazon TLDs
-        const subdomain = SMILE[tld] ? this.subdomain : 'www.amazon'
+        const subdomain = SMILE.has(tld) ? this.subdomain : 'www.amazon'
 
         let tag
 
@@ -127,7 +127,7 @@ class Linker {
         this.links.push($(link))
     }
 
-    // populate the array of links and display them by appending them to the
+    // populate the array of links and display them by prepending them to the
     // body of the cross-site navigation bar
     addLinks () {
         // create the subset of the TLD -> country-code map (SITES)
@@ -142,15 +142,16 @@ class Linker {
             // const tlds = sortBy(Object.keys(sites), tld => sites[tld])
             const tlds = Object.keys(sites).sort((a, b) => sites[a].localeCompare(sites[b]))
 
-            // populate the `links` array with jQuery wrappers for link
-            // (i.e. <a>...</a>) elements
+            // populate the `links` array with jQuery wrappers for link elements
+            // (i.e. <a>...</a>)
             for (const tld of tlds) {
                 const country = sites[tld]
                 this.addLink(tld, country)
             }
 
-            // append the cross-site links to the body of the crossSiteLinks container
-            this.crossSiteLinks.append.apply(this.crossSiteLinks, this.links)
+            // prepend the cross-site links to the body of the crossSiteLinks
+            // container
+            this.crossSiteLinks.prepend.apply(this.crossSiteLinks, this.links)
         }
     }
 
@@ -189,7 +190,7 @@ class Linker {
             $link.remove() // remove from the DOM...
         }
 
-        links.length = 0; // ...and empty the array
+        links.length = 0 // ...and empty the array
     }
 }
 
