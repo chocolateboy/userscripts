@@ -3,7 +3,7 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.4.0
+// @version       3.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://smile.amazon.tld/*
@@ -16,6 +16,8 @@
 // @grant         GM_setValue
 // ==/UserScript==
 
+// XXX GM_getValue and GM_setValue are used by GM_config
+
 /*
  *
  * further reading:
@@ -25,8 +27,11 @@
 
 /*********************** Constants ********************************/
 
-// a map from the Amazon TLD to the corresponding two-letter country code
-// XXX technically, UK should be GB: https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+/*
+ * a map from the Amazon TLD to the corresponding two-letter country code
+ *
+ * XXX technically, UK should be GB: https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+ */
 const SITES = {
     'com.au': 'AU', // Australia
     'com.br': 'BR', // Brazil
@@ -44,19 +49,27 @@ const SITES = {
     'com':    'US', // US
 }
 
-// Amazon TLDs which support the "smile.amazon" subdomain
+/*
+ * Amazon TLDs which support the "smile.amazon" subdomain
+ */
 const SMILE = new Set(['com', 'co.uk', 'de'])
 
-// a tiny DOM builder to avoid cluttering the code with HTML templates
-// https://github.com/aduth/hijinks
+/*
+ * a tiny DOM builder to avoid cluttering the code with HTML templates
+ * https://github.com/aduth/hijinks
+ */
 const el = hijinks
 
 /*********************** Functions and Classes ********************************/
 
-// A class which encapsulates the logic for creating and updating cross-site links
+/*
+ * A class which encapsulates the logic for creating and updating cross-site links
+ */
 class Linker {
-    // get the unique identifier (ASIN - Amazon Standard Identification Number)
-    // for this product, or return a falsey value if it's not found
+    /*
+     * get the unique identifier (ASIN - Amazon Standard Identification Number)
+     * for this product, or return a falsey value if it's not found
+     */
     static getASIN () {
         let asin, $asin = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]')
 
@@ -101,7 +114,9 @@ class Linker {
         this.tld = parts.slice(2).join('.')
     }
 
-    // add a link element to the internal `links` array
+    /*
+     * add a link element to the internal `links` array
+     */
     addLink (tld, country) {
         const attrs = {
             class: 'nav-a',
@@ -127,8 +142,10 @@ class Linker {
         this.links.push($(link))
     }
 
-    // populate the array of links and display them by prepending them to the
-    // body of the cross-site navigation bar
+    /*
+     * populate the array of links and display them by prepending them to the
+     * body of the cross-site navigation bar
+     */
     addLinks () {
         // create the subset of the TLD -> country-code map (SITES)
         // corresponding to the enabled sites
@@ -155,7 +172,9 @@ class Linker {
         }
     }
 
-    // build the underlying data model used by the GM_config utility
+    /*
+     * build the underlying data model used by the GM_config utility
+     */
     initializeConfig () {
         const checkboxes = {}
 
@@ -182,7 +201,9 @@ class Linker {
         GM_config.init('Amazon International Links Settings', checkboxes, callbacks)
     }
 
-    // remove all added links from the DOM and clear the array referencing them
+    /*
+     * remove all added links from the DOM and clear the array referencing them
+     */
     removeLinks () {
         const { links } = this
 
