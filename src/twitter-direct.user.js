@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.0
+// @version       1.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -148,6 +148,10 @@ const MATCH = [
     [
         /\/Followers$/,
         'data.user.followers_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
+    ],
+    [
+        /\/FollowersYouKnow$/,
+        'data.user.friends_following_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
     ],
     [
         /\/ListMembers$/,
@@ -558,21 +562,28 @@ function onResponse (xhr, uri) {
  * (this.onreadystatechange)
  */
 function hookXHRSend (oldSend) {
-    return /** @this {XMLHttpRequest} */ function send () {
+    return /** @this {XMLHttpRequest} */ function send (body = null) {
+        // video requests (HLS) use a readystate listener with a custom object
+        // bound as its `this` value. the responses aren't tweet/user data so we
+        // don't need to touch them
+
         const oldOnReadyStateChange = this.onreadystatechange
+        const isBound = oldOnReadyStateChange?.toString().includes('[native code]')
 
-        this.onreadystatechange = function () {
-            if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
-                onResponse(this, this.responseURL)
-            }
+        if (!isBound) {
+            this.onreadystatechange = function () {
+                if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
+                    onResponse(this, this.responseURL)
+                }
 
-            if (oldOnReadyStateChange) {
-                // @ts-ignore
-                return oldOnReadyStateChange.apply(this, arguments)
+                if (oldOnReadyStateChange) {
+                    // @ts-ignore
+                    oldOnReadyStateChange.call(this)
+                }
             }
         }
 
-        return oldSend.apply(this, arguments)
+        oldSend.call(this, body)
     }
 }
 
@@ -580,6 +591,6 @@ function hookXHRSend (oldSend) {
  * replace the default XHR#send with our custom version, which scans responses
  * for tweets and expands their URLs
  */
-GMCompat.unsafeWindow.XMLHttpRequest.prototype.send = GMCompat.export(
-    hookXHRSend(XMLHttpRequest.prototype.send)
-)
+const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
+
+xhrProto.send = GMCompat.export(hookXHRSend(xhrProto.send))
