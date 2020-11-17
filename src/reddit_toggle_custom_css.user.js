@@ -3,7 +3,7 @@
 // @description   Persistently disable/re-enable custom subreddit styles via a userscript command
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.1
+// @version       1.4.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/r/*
@@ -15,7 +15,7 @@
 // @grant         GM_setValue
 // @grant         GM_registerMenuCommand
 // @run-at        document-start
-// @inject-into   content
+// @inject-into   auto
 // ==/UserScript==
 
 // inspired by: http://userscripts-mirror.org/scripts/show/109818

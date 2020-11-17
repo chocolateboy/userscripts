@@ -3,7 +3,7 @@
 // @description   Link last.fm artist/album images directly to the image page
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.3
+// @version       1.2.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.last.fm/*
@@ -13,7 +13,7 @@
 // @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @grant         GM_log
-// @inject-into   content
+// @inject-into   auto
 // ==/UserScript==
 
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:

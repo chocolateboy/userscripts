@@ -3,7 +3,7 @@
 // @description   Highlight new stories on Digg
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.1
+// @version       1.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://digg.com/
@@ -14,7 +14,7 @@
 // @grant         GM_listValues
 // @grant         GM_registerMenuCommand
 // @grant         GM_setValue
-// @inject-into   content
+// @inject-into   auto
 // ==/UserScript==
 
 const ITEMS = ['featured', 'vertical']
