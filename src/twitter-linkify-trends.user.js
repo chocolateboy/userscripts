@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.0
+// @version       1.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -17,10 +17,12 @@
 // @require       https://unpkg.com/get-wild@1.2.0/dist/index.umd.min.js
 // @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
 // @grant         GM_log
+// @grant         GM_registerMenuCommand
+// @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
 
-// XXX note: the unused grant is a workaround for a Greasemonkey bug:
+// XXX note: the unused grant (GM_log) is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
 
 /*
@@ -30,6 +32,15 @@
 
 // an LRU cache (flru) with up to 256 (128 * 2) entries
 const CACHE = new exports.default(128)
+
+// debugging options. currently used to define colors for trend and event
+// elements. the values are undefined by default (no change) but can be
+// overridden (until the page is reloaded) via a menu command
+let DEBUG = {}
+
+// the background colors to use for trend and event elements when debugging is
+// enabled
+const DEBUG_SELECTORS = { event: 'powderblue', trend: 'palegreen' }
 
 /*
  * events to disable (stop propagating) on event and trend elements
@@ -68,7 +79,7 @@ const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
 
 // NOTE: we detect the image inside an event/event-hero element and then
 // navigate up to the event to avoid the overhead of using :has()
-const EVENT = 'div[role="link"]:not([data-testid])'
+const EVENT = 'div[role="link"]:not([data-testid]).r-1j3t67a'
 const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]`
 const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]'
 const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]`
@@ -112,7 +123,7 @@ function disableSome (e) {
  * the response to a custom handler which extracts data for the event elements
  */
 function hookXHROpen (oldOpen) {
-    return function open (_method, url) {
+    return function open (_method, url, ...rest) { // preserve the arity
         const $url = new URL(url)
 
         if ($url.pathname === EVENT_DATA) {
@@ -120,7 +131,7 @@ function hookXHROpen (oldOpen) {
             this.addEventListener('load', () => processEventData(this.responseText))
         }
 
-        return oldOpen.apply(this, arguments)
+        return oldOpen.call(this, _method, url, ...rest)
     }
 }
 
@@ -143,6 +154,35 @@ function linkFor (href) {
     return $('<a></a>')
         .attr({ href, role: 'link', 'data-focusable': true })
         .css({ color: 'inherit', textDecoration: 'inherit' })
+}
+
+/*
+ * process a newly-created trend or event element
+ */
+function onElement (el) {
+    const $el = $(el)
+
+    // determine the element's type and pass it to the appropriate handler
+    if ($el.is(TREND)) {
+        $el.css({
+            cursor: 'auto', // remove the fake pointer
+            backgroundColor: DEBUG.trend,
+        })
+
+        $el.on(DISABLED_EVENTS, disableSome)
+        onTrend($el)
+    } else {
+        const $event = $el.closest(EVENT_ANY)
+        const wrapImage = $event.is(EVENT)
+
+        $event.css({
+            cursor: 'auto', // remove the fake pointer
+            backgroundColor: DEBUG.event,
+        })
+
+        $event.on(DISABLED_EVENTS, disableAll)
+        onEvent($event, $el, { wrapImage })
+    }
 }
 
 /*
@@ -184,29 +224,6 @@ function onTrend ($trend) {
     const url = `${location.origin}/search?q=${query}`
 
     $target.wrap(linkFor(url))
-}
-
-/*
- * process a collection of newly-created trend or event elements
- */
-function onTrends ($trends) {
-    for (const el of $trends) {
-        const $el = $(el)
-
-        // determine the element's type and pass it to the appropriate handler
-        if ($el.is(TREND)) {
-            $el.css('cursor', 'auto') // remove the fake pointer
-            $el.on(DISABLED_EVENTS, disableSome)
-            onTrend($el)
-        } else {
-            const $event = $el.closest(EVENT_ANY)
-            const wrapImage = $event.is(EVENT)
-
-            $event.css('cursor', 'auto') // remove the fake pointer
-            $event.on(DISABLED_EVENTS, disableAll)
-            onEvent($event, $el, { wrapImage })
-        }
-    }
 }
 
 /*
@@ -267,7 +284,26 @@ function targetFor ($el) {
 // hook HMLHTTPRequest#open so we can extract event data from the JSON
 const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
 
-xhrProto.open = GMCompat.export(hookXHROpen(XMLHttpRequest.prototype.open))
+xhrProto.open = GMCompat.export(hookXHROpen(xhrProto.open))
+
+// GM_registerMenuCommand is not available in Greasemonkey
+// https://github.com/greasemonkey/greasemonkey/issues/3078
+if (typeof GM_registerMenuCommand === 'function') {
+    GM_registerMenuCommand(`Debug ${GM_info.script.name} Selectors`, () => {
+        DEBUG = DEBUG_SELECTORS
+    })
+}
 
 // monitor the creation of trend/event elements
-$.onCreate(SELECTOR, onTrends, true /* multi */)
+//
+// this script needs to be loaded early enough to intercept the JSON
+// (document-start), but run after the page has loaded. this ensures the latter
+$(() => {
+    const onElements = $elements => {
+        for (const el of $elements) {
+            onElement(el)
+        }
+    }
+
+    $.onCreate(SELECTOR, onElements, true /* multi */)
+})
