@@ -3,7 +3,7 @@
 // @description   Persistently disable/re-enable custom subreddit styles via a userscript command
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.5.0
+// @version       1.5.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/r/*
@@ -42,7 +42,8 @@ const DISABLE_CSS = GM_getValue(SUBREDDIT, DEFAULT_DISABLE_CSS)
 const { style } = document.documentElement
 
 function toggle (customCss) {
-    const disableCss = !GM_getValue(SUBREDDIT, DEFAULT_DISABLE_CSS)
+    const oldDisableCss = GM_getValue(SUBREDDIT, DEFAULT_DISABLE_CSS)
+    const disableCss = !oldDisableCss
 
     customCss.disabled = disableCss
 
