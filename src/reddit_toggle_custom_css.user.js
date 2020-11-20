@@ -3,7 +3,7 @@
 // @description   Persistently disable/re-enable custom subreddit styles via a userscript command
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.5.1
+// @version       1.5.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/r/*
@@ -20,26 +20,14 @@
 
 // inspired by: http://userscripts-mirror.org/scripts/show/109818
 
+// XXX the @inject-into directive is needed for the script to work on
+// Violentmonkey if JavaScript is disabled (i.e. not because of CSP):
+// https://github.com/violentmonkey/violentmonkey/issues/302#issuecomment-485271317
+
 const CUSTOM_CSS = 'link[ref^="applied_subreddit_"]'
 const DEFAULT_DISABLE_CSS = false
 const SUBREDDIT = location.pathname.match(/\/r\/(\w+)/)[1]
 const DISABLE_CSS = GM_getValue(SUBREDDIT, DEFAULT_DISABLE_CSS)
-
-// the definition of document-start varies across userscript engines and may
-// vary for the same userscript engine across different browsers. currently, the
-// following userscript-engines/browsers all expose document.documentElement (in
-// fact, they all expose document.head as well, though that's not guaranteed [1]
-// [2]):
-//
-//   - Greasemonkey 4 [3]
-//   - Tampermonkey for Firefox
-//   - Violentmonkey for Chrome
-//   - Violentmonkey for Firefox
-//
-// [1] https://github.com/violentmonkey/violentmonkey/releases/tag/v2.12.8rc16
-// [2] https://github.com/Tampermonkey/tampermonkey/issues/211#issuecomment-317116595
-// [3] Greasemonkey isn't supported as it doesn't support GM_registerMenuCommand
-const { style } = document.documentElement
 
 function toggle (customCss) {
     const oldDisableCss = GM_getValue(SUBREDDIT, DEFAULT_DISABLE_CSS)
@@ -53,6 +41,22 @@ function toggle (customCss) {
         GM_setValue(SUBREDDIT, disableCss)
     }
 }
+
+// the definition of document-start varies across userscript engines and may
+// vary for the same userscript engine across different browsers. currently, the
+// following userscript-engines/browsers all expose document.documentElement (in
+// fact, they all expose document.head as well, though that's not guaranteed [1]
+// [2]):
+//
+//   - Greasemonkey 4 [3]
+//   - Tampermonkey for Firefox
+//   - Violentmonkey for Chrome
+//   - Violentmonkey for Firefox
+//
+// [1] https://github.com/violentmonkey/violentmonkey/issues/420
+// [2] https://github.com/Tampermonkey/tampermonkey/issues/211#issuecomment-317116595
+// [3] Greasemonkey isn't supported as it doesn't support GM_registerMenuCommand
+const { style } = document.documentElement
 
 if (DISABLE_CSS) {
     // 1) hide the page 2) disable the stylesheet 3) unhide the page
