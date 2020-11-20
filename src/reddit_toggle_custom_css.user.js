@@ -3,7 +3,7 @@
 // @description   Persistently disable/re-enable custom subreddit styles via a userscript command
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.2
+// @version       1.4.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       http://reddit.com/r/*
@@ -34,7 +34,7 @@ function disableCss () {
     // still results in a FOSC on some subreddits e.g. /r/firefox
 
     // the definition of document-start varies between userscript engines and
-    // may vary for the same userscript engine across different browser engines.
+    // may vary for the same userscript engine across different browsers.
     // currently, the following userscript-engines/browsers all expose
     // document.documentElement (in fact, they all expose document.head as well,
     // currently, though that is not guaranteed [1] [2]):
@@ -53,7 +53,17 @@ function disableCss () {
     style.display = 'none'
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.querySelector(CUSTOM_CSS).disabled = true
+        const customCss = document.querySelector(CUSTOM_CSS)
+
+        // not defined on all subreddit pages, e.g.:
+        //
+        //   ✔ /r/<subreddit>/about/rules/
+        //   x /r/<subreddit>/about/moderators/
+
+        if (customCss) {
+            customCss.disabled = true
+        }
+
         style.removeProperty('display')
     })
 }
