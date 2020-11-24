@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.0
+// @version       1.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -13,7 +13,7 @@
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
 // @require       https://unpkg.com/get-wild@1.2.0/dist/index.umd.min.js
 // @require       https://unpkg.com/just-safe-set@2.1.0/index.js
-// @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
+// @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@d762d3bf283d9662e18c1c78af2fad3182e7fdfe/index.min.js
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
@@ -563,23 +563,15 @@ function onResponse (xhr, uri) {
  */
 function hookXHRSend (oldSend) {
     return /** @this {XMLHttpRequest} */ function send (body = null) {
-        // video requests (HLS) use a readystate listener with a custom object
-        // bound as its `this` value. the responses aren't tweet/user data so we
-        // don't need to touch them
-
         const oldOnReadyStateChange = this.onreadystatechange
-        const isBound = oldOnReadyStateChange?.toString().includes('[native code]')
 
-        if (!isBound) {
-            this.onreadystatechange = function () {
-                if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
-                    onResponse(this, this.responseURL)
-                }
+        this.onreadystatechange = function (event) {
+            if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
+                onResponse(this, this.responseURL)
+            }
 
-                if (oldOnReadyStateChange) {
-                    // @ts-ignore
-                    oldOnReadyStateChange.call(this)
-                }
+            if (oldOnReadyStateChange) {
+                oldOnReadyStateChange.call(this, event)
             }
         }
 
