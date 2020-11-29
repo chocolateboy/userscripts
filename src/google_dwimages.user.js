@@ -3,19 +3,21 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.2.0
+// @version       2.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
-// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
+// @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @grant         GM_log
 // @inject-into   auto
 // ==/UserScript==
 
 // XXX note: the unused grant is a workaround for a Greasemonkey bug:
 // https://github.com/greasemonkey/greasemonkey/issues/1614
+
+const SELECTOR = 'div[data-ri][data-ved][jsaction]'
 
 // events to intercept (stop propagating) in result elements
 const EVENTS = 'click focus mousedown'
@@ -24,22 +26,13 @@ let METADATA
 
 /******************************** helper functions ****************************/
 
-// extract the image metadata for the original batch of results from the
-// content of the SCRIPT tag
-function extractMetadata (source) {
-    // XXX not all browsers support the ES2018 /s (matchAll) flag
-    // const json = source.match(/(\[.+\])/s)[1]
-    const json = source.match(/(\[[\s\S]+\])/)[1]
-    return JSON.parse(json)
-}
-
 // return a wrapper for XmlHttpRequest#open which intercepts image-metadata
 // requests and appends the results to our metadata store (array)
-function hookXHROpen (oldOpen) {
-    return function open (...args) {
-        oldOpen.apply(this, args) // there's no return value
+function hookXhrOpen (oldOpen, $container) {
+    return function open (method, url) {
+        GMCompat.apply(this, oldOpen, arguments) // there's no return value
 
-        if (!isImageDataRequest(args)) {
+        if (!isImageDataRequest(method, url)) {
             return
         }
 
@@ -60,7 +53,7 @@ function hookXHROpen (oldOpen) {
             try {
                 METADATA = METADATA.concat(imageMetadata(parsed))
                 // process the new images
-                $('div[data-ri][data-ved][jsaction]').each(onResult)
+                $container.children(SELECTOR).each(onResult)
             } catch (e) {
                 console.error("Can't merge new metadata:", e)
             }
@@ -74,15 +67,15 @@ function imageMetadata (tree) {
 }
 
 // determine whether an XHR request is an image-metadata request
-function isImageDataRequest (args) {
-    return (args.length >= 2)
-        && (args[0].toUpperCase() === 'POST')
-        && /\/batchexecute\?rpcids=/.test(args[1])
+function isImageDataRequest (method, url) {
+    return method.toUpperCase() === 'POST' && /\/batchexecute\?rpcids=/.test(url)
 }
 
-// return the URL for the nth image (0-based)
+// return the URL for the nth image (0-based) and remove its data from the tree
 function nthImageUrl (index) {
-    return METADATA[index][1][3][0]
+    const result = METADATA[index][1][3][0]
+    delete METADATA[index]
+    return result
 }
 
 // event handler for image links, page links and results which prevents their
@@ -93,19 +86,51 @@ function stopPropagation (e) {
 
 /************************************* main ************************************/
 
-// extract the data for the first ≈ 100 images out of the SCRIPT element
-// embedded in the page and register a listener for the requests for
-// additional data
+// extract the data for the first ≈ 100 images embedded in the page and register
+// a listener for the requests for additional data
 function init () {
-    const scripts = Array.from(document.scripts)
-    const callbacks = scripts.filter(script => /^AF_initDataCallback\b/.test(script.text))
-    const callback = callbacks.pop().text
+    const $container = $('.islrc')
 
-    METADATA = imageMetadata(extractMetadata(callback))
+    if (!$container.length) {
+        throw new Error("Can't find results container")
+    }
 
-    GMCompat.unsafeWindow.XMLHttpRequest.prototype.open = GMCompat.export(
-        hookXHROpen(XMLHttpRequest.prototype.open)
-    )
+    const initialMetadata = imageMetadata(GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
+
+    // clone the data so we can mutate it (remove obsolete entries)
+    //
+    // XXX this (or at least a shallow clone) is also needed to avoid permission
+    // errors in Violentmonkey for Firefox (but not Violentmonkey for Chrome)
+    METADATA = JSON.parse(JSON.stringify(initialMetadata))
+
+    // there's static data for the first ~100 images, but only the first 50 are
+    // shown initially. the next 50 are loaded dynamically and then the
+    // remaining images are loaded in batches of 100 (these can be processed
+    // synchronously because the images have been added to the DOM by the time
+    // the data arrives)
+    const callback = (mutations, observer) => {
+        const $elements = $container.children(SELECTOR)
+
+        for (const el of $elements) {
+            const index = $(el).data('ri')
+
+            if (index < METADATA.length) {
+                onResult.call(el)
+            } else {
+                observer.disconnect()
+                break
+            }
+        }
+    }
+
+    // process the initial images
+    const $initial = $container.children(SELECTOR)
+    const observer = new MutationObserver(callback)
+    const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
+
+    $initial.each(onResult)
+    observer.observe($container.get(0), { childList: true })
+    xhrProto.open = GMCompat.export(hookXhrOpen(xhrProto.open, $container))
 }
 
 // process an image result (DIV), assigning the image URL to its first link and
@@ -123,13 +148,15 @@ function onResult () {
     try {
         imageUrl = nthImageUrl(index)
     } catch (e) {
-        console.warn(`Can't find image URL for image #${index + 1}`)
+        console.warn("Can't find image URL for result:", index)
         return // continue
     }
 
     // prevent new trackers being registered on this DIV and its descendant
     // elements
-    $result.find('*').addBack().removeAttr('jsaction')
+    //
+    // XXX cash doesn't support +addBack+
+    $result.find('*').add($result).removeAttr('jsaction')
 
     // assign the correct/missing URI to the image link
     const $links = $result.find('a')
@@ -149,8 +176,6 @@ function onResult () {
 
 try {
     init()
-    // process the initial images
-    $('div[data-ri][data-ved]').each(onResult)
 } catch (e) {
-    console.error("Can't parse metadata:", e)
+    console.error('Initialisation error:', e)
 }
