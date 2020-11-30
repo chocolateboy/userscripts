@@ -3,19 +3,15 @@
 // @description   Add a link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.0.0
+// @version       1.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
 // @include       https://github.com/*
-// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
 // @grant         GM_log
 // @inject-into   auto
 // ==/UserScript==
-
-// XXX note: the unused grant is a workaround for a Greasemonkey bug:
-// https://github.com/greasemonkey/greasemonkey/issues/1614
 
 // value of the ID attribute for the "My Issues" link. used to identify an
 // existing link so it can be removed on pjax page loads
@@ -46,17 +42,14 @@ function meta (name, key = 'name') {
     return $(`meta[${key}=${quotedName}]`).attr('content')
 }
 
-// handler which adds the "My Issues" link. called either a) on page load (full)
-// or b) pjax load (partial)
-function main (type) {
+// add the "My Issues" link
+function run () {
     const self = meta(SELF)
     const $issues = $(ISSUES)
 
     // if we're here via a pjax load, there may be an existing "My Issues" link
     // from a previous page load: remove it
     $(`#${ID}`).remove()
-
-    // console.log(`XXX page (${type}):`, location.href)
 
     if (self && $issues.length === 1) {
         let path = '/issues', query = `involves:${self}`, prop
@@ -86,13 +79,5 @@ function main (type) {
     }
 }
 
-// navigation between pages on GitHub is a mixture of full-page requests and
-// partial requests (pjax [1]). we detect the latter by detecting the
-// modification of the page's TITLE element.
-//
-// in the pjax case, we need to take care not to keep adding "My Issues" links.
-//
-// [1] https://github.com/defunkt/jquery-pjax
-
-$('html > head > title').onText(() => main('pjax'), true /* multi */)
-main('page')
+$(document).on('pjax:end', run) // run on pjax page loads
+$(run) // run on full page loads

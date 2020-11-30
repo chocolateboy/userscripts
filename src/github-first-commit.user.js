@@ -3,21 +3,17 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.6.2
+// @version       2.7.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
 // @include       https://github.com/*
-// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
 // @grant         GM_log
 // @inject-into   auto
 // ==/UserScript==
 
-// XXX note: the unused grant is a workaround for a Greasemonkey bug:
-// https://github.com/greasemonkey/greasemonkey/issues/1614
-
-const COMMIT_BAR = 'div.js-details-container[data-issue-and-pr-hovercards-enabled] > *:last ul'
+const COMMIT_BAR = 'div.js-details-container[data-issue-and-pr-hovercards-enabled] > *:last-child ul'
 const FIRST_COMMIT_LABEL = '<span aria-label="First commit"><strong>1st</strong> commit</span>'
 
 // this function extracts the URL of the repo's first commit and navigates to it.
@@ -83,8 +79,15 @@ function openFirstCommit (user, repo) {
 // fix if the implementation changes.
 //
 // [1] https://greasyfork.org/en/scripts/39311-hacker-news-highlighter
-function addLink ($commitBar) {
-    // bail if it already exists
+function run () {
+    const $commitBar = $(COMMIT_BAR)
+
+    // bail if it's not a repo page
+    if (!$commitBar.length) {
+        return
+    }
+
+    // bail if the widget already exists
     let $firstCommit = $commitBar.find('#first-commit')
 
     if ($firstCommit.length) {
@@ -121,7 +124,7 @@ function addLink ($commitBar) {
 
     const $label = $(FIRST_COMMIT_LABEL)
 
-    $link.find('> span').empty().append($label)
+    $link.find(':scope > span').empty().append($label)
 
     const [user, repo] = $('meta[name="octolytics-dimension-repository_network_root_nwo"]')
         .attr('content')
@@ -145,4 +148,5 @@ function addLink ($commitBar) {
     $commitBar.append($firstCommit)
 }
 
-$.onCreate(COMMIT_BAR, addLink, true /* multi */)
+$(document).on('pjax:end', run) // run on pjax page loads
+$(run) // run on full page loads
