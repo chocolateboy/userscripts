@@ -1,0 +1,18 @@
+/* ==UserStyle==
+@name          Twitter Zoom Cursor
+@description   Distinguish between images and links on Twitter
+@author        chocolateboy
+@copyright     chocolateboy
+@version       0.0.1
+@namespace     https://github.com/chocolateboy/userscripts
+@license       GPL: http://www.gnu.org/copyleft/gpl.html
+==/UserStyle== */
+
+@-moz-document url-prefix("https://twitter.com/"), url-prefix("https://mobile.twitter.com/") {
+    a[role="link"][href^="/"][href$="/photo/1"],
+    a[role="link"][href^="/"][href$="/photo/2"],
+    a[role="link"][href^="/"][href$="/photo/3"],
+    a[role="link"][href^="/"][href$="/photo/4"] {
+        cursor: zoom-in !important;
+    }
+}

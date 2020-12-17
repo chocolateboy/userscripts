@@ -94,6 +94,7 @@ supported. Some scripts work, but most haven't been tested. <br />
 - [Twitter Direct](https://greasyfork.org/en/scripts/404632-twitter-direct) - remove t.co tracking links from Twitter
 - [Twitter Linkify Trends](https://greasyfork.org/en/scripts/405103-linkify-twitter-trends) - make Twitter trends links (again)
 - [Twitter Reply Count](https://greasyfork.org/en/scripts/405335-twitter-reply-count) - show the number of replies on tweet pages
+- [Twitter Zoom Cursor](https://greasyfork.org/en/scripts/413963-twitter-zoom-cursor) - distinguish between images and links on Twitter (userstyle)
 
 ## Highlighters
 
