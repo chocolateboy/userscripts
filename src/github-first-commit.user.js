@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.7.0
+// @version       2.7.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
@@ -16,13 +16,15 @@
 const COMMIT_BAR = 'div.js-details-container[data-issue-and-pr-hovercards-enabled] > *:last-child ul'
 const FIRST_COMMIT_LABEL = '<span aria-label="First commit"><strong>1st</strong> commit</span>'
 
-// this function extracts the URL of the repo's first commit and navigates to it.
-// it is based on code by several developers, a list of whom can be found here:
-// https://github.com/FarhadG/init#contributors
-//
-// XXX it doesn't work on private repos. a way to do that can be found here,
-// but it requires an authentication token:
-// https://gist.github.com/simonewebdesign/a70f6c89ffd71e6ba4f7dcf7cc74ccf8
+ /*
+  * this function extracts the URL of the repo's first commit and navigates to it.
+  * it is based on code by several developers, a list of whom can be found here:
+  * https://github.com/FarhadG/init#contributors
+  *
+  * XXX it doesn't work on private repos. a way to do that can be found here,
+  * but it requires an authentication token:
+  * https://gist.github.com/simonewebdesign/a70f6c89ffd71e6ba4f7dcf7cc74ccf8
+  */
 function openFirstCommit (user, repo) {
     return fetch(`https://api.github.com/repos/${user}/${repo}/commits`)
         // the `Link` header has additional URLs for paging.
@@ -42,6 +44,8 @@ function openFirstCommit (user, repo) {
                 // extract the URL of the last page (commits are ordered in
                 // reverse chronological order, like the git CLI, so the oldest
                 // commit is on the last page)
+
+                // @ts-ignore
                 const lastPage = link.match(/^.+?<([^>]+)>;/)[1]
 
                 // fetch the last page of results
@@ -58,27 +62,9 @@ function openFirstCommit (user, repo) {
         })
 }
 
-// add the "First commit" link as the last child of the commit bar
-//
-// XXX on most sites, hitting the back button takes you back to a snapshot of
-// the previous DOM tree, e.g. navigating away from a page on Hacker News
-// highlighted via Hacker News Highlighter [1], then back to the highlighted
-// page, retains the DOM changes (the highlighting). that isn't the case on
-// GitHub, which triggers network requests and fragment/page reloads when
-// navigating (back) to any (SPA) page, even when not logged in. this means, for
-// example, we don't need to check if the first-commit widget already exists (it
-// never does), and don't need to restore its old label when navigating away
-// from a page (since the widget will always be created from scratch rather than
-// reused)
-//
-// this has not always been the case, and may not be the case in the future (and
-// may not be the case in some scenarios I haven't tested, e.g. on mobile), so
-// rather than taking it for granted, we assume the site behaves like every
-// other site in this respect and code to that (defensive coding). this costs
-// nothing (apart from this explanation) and saves us having to scramble for a
-// fix if the implementation changes.
-//
-// [1] https://greasyfork.org/en/scripts/39311-hacker-news-highlighter
+/*
+ * add the "First commit" link as the last child of the commit bar
+ */
 function run () {
     const $commitBar = $(COMMIT_BAR)
 
@@ -87,12 +73,9 @@ function run () {
         return
     }
 
-    // bail if the widget already exists
-    let $firstCommit = $commitBar.find('#first-commit')
-
-    if ($firstCommit.length) {
-        return
-    }
+    // delete (i.e. replace) the (possibly inert/unresponsive) widget if it
+    // already exists
+    $commitBar.find('#first-commit').remove()
 
     /*
      * This is the first LI in the commit bar (UL), which we clone to create the
@@ -111,7 +94,7 @@ function run () {
      */
 
     // create it
-    $firstCommit = $commitBar
+    const $firstCommit = $commitBar
         .find('li')
         .eq(0)
         .clone()
@@ -126,18 +109,10 @@ function run () {
 
     $link.find(':scope > span').empty().append($label)
 
+    // @ts-ignore
     const [user, repo] = $('meta[name="octolytics-dimension-repository_network_root_nwo"]')
         .attr('content')
         .split('/')
-
-    // before navigating away from the page, restore the original label. this
-    // ensures it has the correct value if we navigate back to the repo page
-    // without making a new request (e.g. via the back button)
-    const oldLabelHtml = $label.html()
-
-    $(window).on('unload', () => {
-        $label.html(oldLabelHtml)
-    })
 
     $link.on('click', () => {
         $label.text('Loading...')
