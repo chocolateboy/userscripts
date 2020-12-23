@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.15.2
+// @version       2.15.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -215,7 +215,7 @@ function affixRT ($target, data) {
             $target.before($clear).after($clear).css({
                 'float':          'left',
                 'padding-top':    '11px',
-                'padding-bottom': '0px'
+                'padding-bottom': '0px',
             })
         }
 
@@ -311,7 +311,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         fail('no response')
     }
 
-    if (!$.isArray(results)) {
+    if (!Array.isArray(results)) {
         const type = {}.toString.call(results)
         fail(`invalid response: ${type}`)
     }
