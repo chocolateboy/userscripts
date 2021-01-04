@@ -3,14 +3,13 @@
 // @description   Add a link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.0
+// @version       1.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
 // @include       https://github.com/*
 // @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
 // @grant         GM_log
-// @inject-into   auto
 // ==/UserScript==
 
 // value of the ID attribute for the "My Issues" link. used to identify an
@@ -48,35 +47,40 @@ function run () {
     const $issues = $(ISSUES)
 
     // if we're here via a pjax load, there may be an existing "My Issues" link
-    // from a previous page load: remove it
+    // from a previous page load. we can't reuse it as the event handlers may no
+    // longer work, so we just replace it
     $(`#${ID}`).remove()
 
-    if (self && $issues.length === 1) {
-        let path = '/issues', query = `involves:${self}`, prop
+    if (!self || $issues.length !== 1) {
+        return
+    }
 
-        if (prop = meta(PAGE_REPO)) { // user/repo
-            path = `/${prop}/issues`
-        } else if (prop = $(PJAX_REPO).attr('href')) { // /user/repo
-            path = `${prop}/issues`
-        } else if (prop = meta(USER, 'property')) { // user
-            if (prop === self) { // own homepage
-                // user:<self> involves:<self> is:open archived:false
-                query = [`user:${prop}`, query, 'is:open', 'archived:false']
-            } else { // other user's homepage
-                // user:<user> involves:<self>
-                query = [`user:${prop}`, query]
-            }
+    let prop, query = `involves:${self}`, path = '/issues'
 
-            query = query.join('+')
+    if (prop = meta(PAGE_REPO)) { // user/repo
+        path = `/${prop}/issues`
+    } else if (prop = $(PJAX_REPO).attr('href')) { // /user/repo
+        path = `${prop}/issues`
+    } else if (prop = meta(USER, 'property')) { // user
+        let queries
+
+        if (prop === self) { // own homepage
+            // user:<self> involves:<self> is:open archived:false
+            queries = [`user:${prop}`, query, 'is:open', 'archived:false']
+        } else { // other user's homepage
+            // user:<user> involves:<self>
+            queries = [`user:${prop}`, query]
         }
 
-        const href = `${path}?q=${escape(query)}`
-        const $link = $issues.clone()
-            .attr({ href, 'data-hotkey': 'g I', id: ID })
-            .text(MY_ISSUES)
-
-        $issues.after($link)
+        query = queries.join('+')
     }
+
+    const href = `${path}?q=${escape(query)}`
+    const $link = $issues.clone()
+        .attr({ href, 'data-hotkey': 'g I', id: ID })
+        .text(MY_ISSUES)
+
+    $issues.after($link)
 }
 
 $(document).on('pjax:end', run) // run on pjax page loads
