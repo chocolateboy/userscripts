@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.7.1
+// @version       2.7.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
@@ -32,33 +32,35 @@ function openFirstCommit (user, repo) {
         .then(res => Promise.all([res.headers.get('link'), res.json()]))
 
         .then(([link, commits]) => {
-            if (link) {
-                // the link header contains two URLs and has the following
-                // format (wrapped for readability):
-                //
-                //     <https://api.github.com/repositories/1234/commits?page=2>;
-                //     rel="next",
-                //     <https://api.github.com/repositories/1234/commits?page=9>;
-                //     rel="last"
-
-                // extract the URL of the last page (commits are ordered in
-                // reverse chronological order, like the git CLI, so the oldest
-                // commit is on the last page)
-
-                // @ts-ignore
-                const lastPage = link.match(/^.+?<([^>]+)>;/)[1]
-
-                // fetch the last page of results
-                return fetch(lastPage).then(res => res.json())
+            if (!link) {
+                // if there's no link, we know we're on the only page
+                return commits
             }
 
-            // if there's no link, we know we're on the only page
-            return commits
+            // the link header contains two URLs and has the following
+            // format (wrapped for readability):
+            //
+            //  <https://api.github.com/repositories/1234/commits?page=2>; rel="next",
+            //  <https://api.github.com/repositories/1234/commits?page=9>; rel="last"
+
+            // extract the URL of the last page (commits are ordered in
+            // reverse chronological order, like the git CLI, so the oldest
+            // commit is on the last page)
+
+            // @ts-ignore
+            const lastPage = link.match(/^.+?<([^>]+)>;/)[1]
+
+            // fetch the last page of results
+            return fetch(lastPage).then(res => res.json())
         })
 
         // get the last commit and navigate to its target URL
         .then(commits => {
-            location.href = commits[commits.length - 1].html_url
+            if (Array.isArray(commits)) {
+                location.href = commits[commits.length - 1].html_url
+            } else {
+                console.error(commits)
+            }
         })
 }
 
