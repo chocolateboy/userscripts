@@ -153,7 +153,7 @@ The following are all direct links i.e. clicking them installs the script.
 
 ## Copyright and License
 
-Copyright © 2011-2020 by chocolateboy.
+Copyright © 2011-2021 by chocolateboy.
 
 These userscripts are free software; you can redistribute and/or modify them
 under the terms of the [GPL](https://www.gnu.org/copyleft/gpl.html).
