@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.0
+// @version       2.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -11,16 +11,13 @@
 // @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @grant         GM_log
-// @inject-into   auto
 // ==/UserScript==
 
-// XXX note: the unused grant is a workaround for a Greasemonkey bug:
-// https://github.com/greasemonkey/greasemonkey/issues/1614
-
+// @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
 const SELECTOR = 'div[data-ri][data-ved][jsaction]'
 
 // events to intercept (stop propagating) in result elements
-const EVENTS = 'click focus mousedown'
+const EVENTS = 'click focus focusin mousedown touchstart'
 
 let METADATA
 
@@ -29,7 +26,7 @@ let METADATA
 // return a wrapper for XmlHttpRequest#open which intercepts image-metadata
 // requests and appends the results to our metadata store (array)
 function hookXhrOpen (oldOpen, $container) {
-    return function open (method, url) {
+    return /** @this {XMLHttpRequest} */ function open (method, url) {
         GMCompat.apply(this, oldOpen, arguments) // there's no return value
 
         if (!isImageDataRequest(method, url)) {
@@ -42,6 +39,7 @@ function hookXhrOpen (oldOpen, $container) {
             let parsed
 
             try {
+                // @ts-ignore
                 const cooked = this.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)[0] // '"[...]\n"'
                 const raw = JSON.parse(cooked) // '[...]'
                 parsed = JSON.parse(raw) // [...]
@@ -79,7 +77,7 @@ function nthImageUrl (index) {
 }
 
 // event handler for image links, page links and results which prevents their
-// click/mousedown events being hijacked for tracking
+// click/mousedown events being intercepted
 function stopPropagation (e) {
     e.stopPropagation()
 }
@@ -105,10 +103,8 @@ function init () {
 
     // there's static data for the first ~100 images, but only the first 50 are
     // shown initially. the next 50 are loaded dynamically and then the
-    // remaining images are loaded in batches of 100 (these can be processed
-    // synchronously because the images have been added to the DOM by the time
-    // the data arrives)
-    const callback = (mutations, observer) => {
+    // remaining images are loaded in batches of 100. this handles images 50-99
+    const callback = (_mutations, observer) => {
         const $elements = $container.children(SELECTOR)
 
         for (const el of $elements) {
@@ -128,16 +124,18 @@ function init () {
     const observer = new MutationObserver(callback)
     const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
 
-    $initial.each(onResult)
-    observer.observe($container.get(0), { childList: true })
-    xhrProto.open = GMCompat.export(hookXhrOpen(xhrProto.open, $container))
+    $initial.each(onResult) // 0-49
+    observer.observe($container.get(0), { childList: true }) // 50-99
+    xhrProto.open = GMCompat.export(hookXhrOpen(xhrProto.open, $container)) // 100+
 }
 
 // process an image result (DIV), assigning the image URL to its first link and
-// disabling trackers
+// disabling interceptors
 //
 // used to process the original batch of results as well as the lazily-loaded
 // updates
+
+/** @this {HTMLDivElement} */
 function onResult () {
     // grab the metadata for this result
     const $result = $(this)
@@ -148,30 +146,18 @@ function onResult () {
     try {
         imageUrl = nthImageUrl(index)
     } catch (e) {
-        console.warn("Can't find image URL for result:", index)
+        console.error(`Can't find image URL for result (${index}):`, e)
         return // continue
     }
 
-    // prevent new trackers being registered on this DIV and its descendant
-    // elements
-    //
-    // XXX cash doesn't support +addBack+
-    $result.find('*').add($result).removeAttr('jsaction')
+    // prevent new interceptors being added to this element and its
+    // descendants and pre-empt the existing interceptors
+    $result.find('[jsaction]').add($result).each(function () {
+        $(this).removeAttr('jsaction').on(EVENTS, stopPropagation)
+    })
 
-    // assign the correct/missing URI to the image link
-    const $links = $result.find('a')
-    const $imageLink = $links.eq(0)
-    const $pageLink = $links.eq(1)
-
-    $imageLink.attr('href', imageUrl)
-
-    // pre-empt the existing trackers on elements which don't already have
-    // direct listeners (the result element and the image link)
-    $result.on(EVENTS, stopPropagation)
-    $imageLink.on(EVENTS, stopPropagation)
-
-    // forcibly remove trackers from the remaining element (the page link)
-    $pageLink.replaceWith($pageLink.clone())
+    // assign the correct URI to the image link
+    $result.find('a').eq(0).attr('href', imageUrl)
 }
 
 try {
