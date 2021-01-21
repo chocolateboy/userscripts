@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.2
+// @version       1.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -12,8 +12,8 @@
 // @include       https://mobile.twitter.com/*
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@1.3.0/dist/index.umd.min.js
-// @require       https://unpkg.com/just-safe-set@2.1.0/index.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @require       https://unpkg.com/just-safe-set@2.1.0/index.js
 // @run-at        document-start
 // @inject-into   auto
 // ==/UserScript==
@@ -142,6 +142,10 @@ const MATCH = [
         ]
     ],
     [
+        /\/Favoriters$/,
+        'data.favoriters_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
+    ],
+    [
         /\/Following$/,
         'data.user.following_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
     ],
@@ -160,6 +164,10 @@ const MATCH = [
     [
         /\/ListSubscribers$/,
         'data.list.subscribers_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
+    ],
+    [
+        /\/Retweeters/,
+        'data.retweeters_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy'
     ],
     [
         // used for hovercard data
