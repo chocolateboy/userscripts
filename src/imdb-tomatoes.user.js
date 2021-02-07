@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.15.3
+// @version       2.15.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -341,7 +341,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         const parser = new DOMParser()
         const dom = parser.parseFromString(res.responseText, 'text/html')
         const $rt = $(dom)
-        const $consensus = $rt.find('.mop-ratings-wrap__text--concensus')
+        const $consensus = $rt.find('.what-to-know__section-body > span')
 
         if ($consensus.length) {
             consensus = $consensus.html().trim()
