@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.1
+// @version       2.3.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://www.google.tld/*tbm=isch*
@@ -17,7 +17,7 @@
 const SELECTOR = 'div[data-ri][data-ved][jsaction]'
 
 // events to intercept (stop propagating) in result elements
-const EVENTS = 'click focus focusin mousedown touchstart'
+const EVENTS = 'auxclick click focus focusin mousedown touchstart'
 
 let METADATA
 
