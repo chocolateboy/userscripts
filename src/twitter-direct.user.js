@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.0
+// @version       1.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -11,7 +11,7 @@
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@1.3.0/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@1.4.0/dist/index.umd.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/just-safe-set@2.1.0/index.js
 // @run-at        document-start
@@ -46,8 +46,8 @@ const LOG_THRESHOLD = 1024
 const NONE = []
 
 /*
- * used to keep track of which roots (don't) have matching URIs and which URIs
- * (don't) have matching roots
+ * used to keep track of which queries (don't) have matching URIs and which URIs
+ * (don't) have matching queries
  */
 const STATS = { root: {}, uri: {} }
 
@@ -229,6 +229,7 @@ const get = exports.getter({ split: '.' })
  */
 const isPlainObject = (function () {
     const toString = {}.toString
+    // only used with JSON data, so we don't need this to be foolproof
     return value => toString.call(value) === '[object Object]'
 })()
 
@@ -298,8 +299,8 @@ function* router (state, data) {
  *
  * a transformer is instantiated for each query and its methods are passed a
  * context (node within the document tree) and the value of an option from the
- * query, e.g. the `scan` option is handled by the `scan` method and the
- * `targets` option is processed by the `assign` method
+ * query, e.g. the `scan` option is handled by the `_scan` method and the
+ * `targets` option is processed by the `_assign` method
  */
 class Transformer {
     constructor ({ onReplace, root, uri }) {
@@ -446,7 +447,7 @@ function transform (data, uri) {
     const it = router(state, data)
 
     for (const [key, value] of it) {
-        const uris = NONE.concat(key)
+        const uris = NONE.concat(key) // coerce to an array
         const queries = NONE.concat(value)
         const match = uris.some(want => {
             return (typeof want === 'string') ? (uri === want) : want.test(uri)
