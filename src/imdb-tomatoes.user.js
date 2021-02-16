@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -14,6 +14,7 @@
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@1.4.0/dist/index.umd.min.js
+// @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @resource      query https://pastebin.com/raw/EdgTfhij
 // @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
 // @grant         GM_addStyle
@@ -24,6 +25,7 @@
 // @grant         GM_registerMenuCommand
 // @grant         GM_setValue
 // @grant         GM_xmlhttpRequest
+// @run-at        document-start
 // @noframes
 // ==/UserScript==
 
@@ -57,13 +59,13 @@
 
 'use strict';
 
+const ANALYTICS_KEY   = 'ue_ibe'
 const NO_CONSENSUS    = 'No consensus yet.'
-const NOW             = Date.now()
+const NO_RESULTS      = 'no results found'
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
 const SCRIPT_NAME     = GM_info.script.name
 const SCRIPT_VERSION  = GM_info.script.version
-const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
 const THIS_YEAR       = new Date().getFullYear()
 
 const COLOR = {
@@ -100,195 +102,39 @@ const BALLOON_OPTIONS = {
     position: 'bottom',
 }
 
+// log a message to the console
+const log = console.log
+
+// run a function when the +pageshow+ event fires, or immediately if it has fired
+// already
+const onPageShow = when('pageshow')
+
 // a custom version of get-wild's `get` function which uses a simpler/faster
 // path parser since we don't use the extended syntax
 const pluck = exports.getter({ split: '.' })
 
-// log a debug message to the console
-const debug = console.debug
+// register a jQuery plugin which extracts and returns JSON-LD data for the
+// current page.
+//
+// used to extract metadata on legacy IMDb and Rotten Tomatoes
+//
+// @ts-ignore
+$.fn.jsonLd = function jsonLd (id) {
+    const $script = this.find('script[type="application/ld+json"]')
 
-// URL-encode the supplied query parameter and replace encoded spaces ("%20")
-// with plus signs ("+")
-function encodeParam (param) {
-    return encodeURIComponent(param).replace(/%20/g, '+')
-}
+    let data
 
-// encode a dictionary of params as a query parameter string. this is similar to
-// jQuery.params, but we additionally replace spaces ("%20") with plus signs
-// ("+")
-function encodeParams (params) {
-    const pairs = []
-
-    for (const [key, value] of Object.entries(params)) {
-        pairs.push(`${encodeParam(key)}=${encodeParam(value)}`)
-    }
-
-    return pairs.join('&')
-}
-
-// promisified cross-origin HTTP requests
-function httpGet (url, options = {}) {
-    if (options.params) {
-        url = url + '?' + encodeParams(options.params)
-    }
-
-    const request = Object.assign({ method: 'GET', url }, options.request || {})
-
-    return new Promise((resolve, reject) => {
-        request.onload = resolve
-
-        // XXX the onerror response object doesn't contain any useful info
-        request.onerror = _res => {
-            reject(new Error(`error fetching ${options.title || url}`))
+    if ($script.length) {
+        try {
+            data = JSON.parse($script.first().text().trim())
+        } catch (e) {
+            throw new Error(`Can't parse JSON-LD data for ${id}: ${e}`)
         }
-
-        GM_xmlhttpRequest(request)
-    })
-}
-
-// purge expired entries
-function purgeCached (date) {
-    for (const key of GM_listValues()) {
-        const json = GM_getValue(key)
-        const value = JSON.parse(json)
-
-        if (value.expires === -1) { // persistent storage (currently unused)
-            if (value.version !== SCHEMA_VERSION) {
-                debug(`purging invalid value (obsolete schema version): ${key}`)
-                GM_deleteValue(key)
-            }
-        } else if (value.version !== DATA_VERSION) {
-            debug(`purging invalid value (obsolete data version): ${key}`)
-            GM_deleteValue(key)
-        } else if (date === -1 || (typeof value.expires !== 'number') || (date > value.expires)) {
-            debug(`purging expired value: ${key}`)
-            GM_deleteValue(key)
-        }
-    }
-}
-
-// add an RT widget to the review bar
-function addWidget ($target, data) {
-    const { consensus, rating, url } = data
-
-    let status
-
-    if (rating === -1) {
-        status = 'N/A'
-    } else if (rating < 60) {
-        status = 'Rotten'
     } else {
-        status = 'Fresh'
+        throw new Error(`Can't find JSON-LD data for ${id}`)
     }
 
-    const style = STATUS_TO_STYLE[status]
-    const score = rating === -1 ? 'N/A' : rating
-
-    if ($target.hasClass('titleReviewBar')) {
-        // reduce the amount of space taken up by the Metacritic widget
-        // and make it consistent with our style (i.e. site name rather
-        // than domain name)
-        $target.find('a[href="http://www.metacritic.com"]').text('Metacritic')
-
-        // 4 review widgets is too many for the "compact" layout (i.e.
-        // a poster but no trailer). it's designed for a maximum of 3.
-        // to work around this, we hoist the review bar out of the
-        // movie-info block (.plot_summary_wrapper) and float it left
-        // beneath the poster, e.g.:
-        //
-        // before:
-        //
-        // [  [        ] [                    ] ]
-        // [  [        ] [                    ] ]
-        // [  [ Poster ] [        Info        ] ]
-        // [  [        ] [                    ] ]
-        // [  [        ] [ [MC] [IMDb] [etc.] ] ]
-        //
-        // after:
-        //
-        // [  [        ] [                    ] ]
-        // [  [        ] [                    ] ]
-        // [  [ Poster ] [        Info        ] ]
-        // [  [        ] [                    ] ]
-        // [  [        ] [                    ] ]
-        // [                                    ]
-        // [  [RT] [MC] [IMDb] [etc.]           ]
-
-        if ($(COMPACT_LAYOUT).length && $target.find('.titleReviewBarItem').length > 2) {
-            const $clear = $('<div class="clear">&nbsp;</div>')
-
-            // sometimes there are two Info (.plot_summary_wrapper) DIVs (e.g.
-            // [1]). the first is (currently) empty and the second contains the
-            // actual markup. this may be a transient error in the markup, or
-            // may be used somehow (e.g. for mobile). if targeted, the first one
-            // is displayed above the visible Plot/Info row, whereas the second
-            // one is to the right of the poster, as expected, so we target that
-            //
-            // [1] https://www.imdb.com/title/tt0129387/
-            $('.plot_summary_wrapper').last().after($target.remove())
-
-            $target.before($clear).after($clear).css({
-                'float':          'left',
-                'padding-top':    '11px',
-                'padding-bottom': '0px',
-            })
-        }
-
-        const html = `
-            <div class="titleReviewBarItem">
-                <a href="${url}"><div
-                    class="rt-consensus metacriticScore score_${style} titleReviewBarSubItem"><span>${score}</span></div></a>
-               <div class="titleReviewBarSubItem">
-                   <div>
-                       <a href="${url}">Tomatometer</a>
-                   </div>
-                   <div>
-                       <span class="subText">
-                           From <a href="https://www.rottentomatoes.com" target="_blank">Rotten Tomatoes</a>
-                       </span>
-                   </div>
-                </div>
-            </div>
-            <div class="divider"></div>
-        `
-        $target.prepend(html)
-    } else { // new UI
-        // clone the IMDb rating widget: https://git.io/JtXpQ
-        const $rtRating = $target.children().first().clone()
-
-        // 1) set the star (SVG) to the right color
-        $rtRating.find('svg').css('color', COLOR[style])
-
-        // 2) remove the review count and its preceding spacer element
-        const $reviewCount = $rtRating.find('[class^="AggregateRatingButton__TotalRatingAmount-"]')
-
-        $reviewCount.add($reviewCount.prev()).remove()
-
-        // 3) replace "IMDb Rating" with "RT Rating"
-        $rtRating.find('[class^="TitleBlockButtonBase__Header-"]').text('RT RATING')
-
-        // 4) remove the "/ 10" suffix
-        const $score = $rtRating.find('[data-testid="hero-title-block__aggregate-rating__score"]')
-            .children()
-
-        $score.last().remove()
-
-        // 5) replace the IMDb rating with the RT score
-        $score.first().text(score)
-
-        // 6) add the tooltip class to the link and update its label and URL
-        $rtRating.find('a[role="button"]')
-            .addClass('rt-consensus')
-            .attr('aria-label', 'View RT Rating')
-            .attr('href', url)
-
-        // 7) prepend the element to the review bar
-        $target.prepend($rtRating)
-    }
-
-    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
-
-    $target.find('.rt-consensus').balloon(balloonOptions)
+    return data
 }
 
 // take a record (object) from the OMDb fallback data (object) and convert it
@@ -327,13 +173,185 @@ function adaptOmdbData (data) {
     }
 }
 
+// add a Rotten Tomatoes widget to the review bar in the legacy UI
+function addLegacyWidget ($target, { balloonOptions, rating, style, url }) {
+    // reduce the amount of space taken up by the Metacritic widget
+    // and make it consistent with our style (i.e. site name rather
+    // than domain name)
+    $target.find('a[href="http://www.metacritic.com"]').text('Metacritic')
+
+    // 4 review widgets is too many for the "compact" layout (i.e.
+    // a poster but no trailer). it's designed for a maximum of 3.
+    // to work around this, we hoist the review bar out of the
+    // movie-info block (.plot_summary_wrapper) and float it left
+    // beneath the poster, e.g.:
+    //
+    // before:
+    //
+    // [  [        ] [                    ] ]
+    // [  [        ] [                    ] ]
+    // [  [ Poster ] [        Info        ] ]
+    // [  [        ] [                    ] ]
+    // [  [        ] [ [MC] [IMDb] [etc.] ] ]
+    //
+    // after:
+    //
+    // [  [        ] [                    ] ]
+    // [  [        ] [                    ] ]
+    // [  [ Poster ] [        Info        ] ]
+    // [  [        ] [                    ] ]
+    // [  [        ] [                    ] ]
+    // [                                    ]
+    // [  [RT] [MC] [IMDb] [etc.]           ]
+
+    if ($(COMPACT_LAYOUT).length && $target.find('.titleReviewBarItem').length > 2) {
+        const $clear = $('<div class="clear">&nbsp;</div>')
+
+        // sometimes there are two Info (.plot_summary_wrapper) DIVs (e.g.
+        // [1]). the first is (currently) empty and the second contains the
+        // actual markup. this may be a transient error in the markup, or
+        // may be used somehow (e.g. for mobile). if targeted, the first one
+        // is displayed above the visible Plot/Info row, whereas the second
+        // one is to the right of the poster, as expected, so we target that
+        //
+        // [1] https://www.imdb.com/title/tt0129387/
+        $('.plot_summary_wrapper').last().after($target.remove())
+
+        $target.before($clear).after($clear).css({
+            'float':          'left',
+            'padding-top':    '11px',
+            'padding-bottom': '0px',
+        })
+    }
+
+    const score = rating === -1 ? 'N/A' : rating
+
+    const html = `
+        <div id="rt-rating" class="titleReviewBarItem">
+            <a href="${url}"><div
+                class="rt-consensus metacriticScore score_${style} titleReviewBarSubItem"><span>${score}</span></div></a>
+           <div class="titleReviewBarSubItem">
+               <div>
+                   <a href="${url}">Tomatometer</a>
+               </div>
+               <div>
+                   <span class="subText">
+                       From <a href="https://www.rottentomatoes.com" target="_blank">Rotten Tomatoes</a>
+                   </span>
+               </div>
+            </div>
+        </div>
+        <div class="divider"></div>
+    `
+    $target.prepend(html)
+    $target.find('.rt-consensus').balloon(balloonOptions)
+    log('added widget')
+}
+
+// add a Rotten Tomatoes widget to the review bar in the new UI
+function addReactWidget ($target, { balloonOptions, rating, style, url }) {
+    log('adding widget')
+
+    // clone the IMDb rating widget: https://git.io/JtXpQ
+    const $imdbRating = $target.children().first()
+    const $rtRating = $imdbRating.clone().attr('id', 'rt-rating')
+
+    // 1) set the star (SVG) to the right color
+    GM_addStyle(`#rt-rating svg { color: ${COLOR[style]} }`)
+
+    // 2) remove the review count and its preceding spacer element
+    const $reviewCount = $rtRating
+        .find('[class^="AggregateRatingButton__TotalRatingAmount-"]')
+
+    $reviewCount.add($reviewCount.prev()).remove()
+
+    // 3) replace "IMDb Rating" with "RT Rating"
+    $rtRating.find('[class^="TitleBlockButtonBase__Header-"]')
+        .text('RT RATING')
+
+    // 4) remove the "/ 10" suffix
+    const $score = $rtRating
+        .find('[data-testid="hero-title-block__aggregate-rating__score"]')
+        .children()
+
+    $score.last().remove()
+
+    // 5) replace the IMDb rating with the RT score
+    const score = rating === -1 ? 'N/A' : `${rating}%`
+
+    $score.first().text(score)
+
+    // 6) add the tooltip class to the link and update its label and URL
+    $rtRating.find('a[role="button"]')
+        .addClass('rt-consensus')
+        .balloon(balloonOptions)
+        .attr('aria-label', 'View RT Rating')
+        .attr('href', url)
+
+    // 7) prepend the element to the review bar
+
+    // defer to work around React reconciliation
+    onPageShow(() => {
+        $target.prepend($rtRating)
+        log('added widget')
+    })
+}
+
+// add a Rotten Tomatoes widget to the review bar
+function addWidget ($target, data) {
+    const { consensus, rating } = data
+    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
+
+    let style
+
+    if (rating === -1) {
+        style = 'tbd'
+    } else if (rating < 60) {
+        style = 'unfavorable'
+    } else {
+        style = 'favorable'
+    }
+
+    const options = { ...data, balloonOptions, style }
+
+    if ($target.hasClass('titleReviewBar')) { // legacy UI
+        addLegacyWidget($target, options)
+    } else { // new UI
+        addReactWidget($target, options)
+    }
+}
+
+// disable the debug/analytics code on the new site
+function disableAnalytics () {
+    GMCompat.unsafeWindow[ANALYTICS_KEY] = 1
+}
+
+// URL-encode the supplied query parameter and replace encoded spaces ("%20")
+// with plus signs ("+")
+function encodeParam (param) {
+    return encodeURIComponent(param).replace(/%20/g, '+')
+}
+
+// encode a dictionary of params as a query parameter string. this is similar to
+// jQuery.params, but we additionally replace spaces ("%20") with plus signs
+// ("+")
+function encodeParams (params) {
+    const pairs = []
+
+    for (const [key, value] of Object.entries(params)) {
+        pairs.push(`${encodeParam(key)}=${encodeParam(value)}`)
+    }
+
+    return pairs.join('&')
+}
+
 // parse the API's response and extract the RT rating and consensus.
 //
 // if there's no consensus, default to "No consensus yet."
 // if there's no rating, default to -1
 async function getRTData ({ response, imdbId, title, fallback }) {
-    function fail (msg) {
-        throw new Error(`error querying data for ${imdbId}: ${msg}`)
+    function fail (message) {
+        throw new Error(message)
     }
 
     let results
@@ -357,10 +375,10 @@ async function getRTData ({ response, imdbId, title, fallback }) {
 
     if (!movie) {
         if (fallback) {
-            debug(`no results for ${imdbId} - using fallback data`)
+            log(`no results for ${imdbId} - using fallback data`)
             movie = adaptOmdbData(fallback)
         } else {
-            fail('no results found')
+            fail(NO_RESULTS)
         }
     }
 
@@ -371,9 +389,9 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         // the new way: the RT URL is provided: scrape the consensus from
         // that page
 
-        debug(`loading RT URL for ${imdbId}: ${url}`)
+        log(`loading RT URL: ${url}`)
         const res = await httpGet(url)
-        debug(`response for ${url}: ${res.status} ${res.statusText}`)
+        log(`response: ${res.status} ${res.statusText}`)
 
         const parser = new DOMParser()
         const dom = parser.parseFromString(res.responseText, 'text/html')
@@ -390,14 +408,14 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         const newRating = meta.aggregateRating.ratingValue
 
         if (newRating !== rating) {
-            debug(`updating rating for ${url}: ${rating} -> ${newRating}`)
+            log(`updating rating: ${rating} -> ${newRating}`)
             rating = newRating
             updated = true
         }
     } else {
         // the old way: a rating but no RT URL (or consensus).
         // may still be used for some old and new releases
-        debug(`no Rotten Tomatoes URL for ${imdbId}`)
+        log(`no Rotten Tomatoes URL for ${imdbId}`)
         url = `https://www.rottentomatoes.com/search/?search=${encodeURIComponent(title)}`
     }
 
@@ -408,31 +426,6 @@ async function getRTData ({ response, imdbId, title, fallback }) {
     consensus = consensus ? consensus.replace(/--/g, '&#8212;') : NO_CONSENSUS
 
     return { data: { consensus, rating, url }, updated }
-}
-
-// extract a property from a META element, or return null if the property is
-// not defined
-function prop (name) {
-    const $meta = $(`meta[property="${name}"]`)
-    return $meta.length ? $meta.attr('content') : null
-}
-
-// extract metadata from the JSON+LD data embedded in the page and from metadata
-// elements
-function jsonLdMetadata (imdbId) {
-    // @ts-ignore
-    const meta = $(document).jsonLd(imdbId)
-
-    // override the original title (e.g. "Le fabuleux destin d'Amélie Poulain")
-    // with the English language (US) title (e.g. "Amélie") if available
-    // (the API only supports English-language titles)
-    const title = $('#star-rating-widget').data('title') || meta.name
-
-    return {
-        pageType: prop('pageType'),
-        title,
-        type: meta['@type']
-    }
 }
 
 // extract metadata from the GraphQL data embedded in the page
@@ -464,17 +457,84 @@ function graphQlMetadata (imdbId) {
     return { pageType, title, type }
 }
 
-async function main () {
+// promisified cross-origin HTTP requests
+function httpGet (url, options = {}) {
+    if (options.params) {
+        url = url + '?' + encodeParams(options.params)
+    }
+
+    const request = Object.assign({ method: 'GET', url }, options.request || {})
+
+    return new Promise((resolve, reject) => {
+        request.onload = resolve
+
+        // XXX the +onerror+ response object doesn't contain any useful info
+        request.onerror = _res => {
+            reject(new Error(`error fetching ${options.title || url}`))
+        }
+
+        GM_xmlhttpRequest(request)
+    })
+}
+
+// extract metadata from the JSON+LD data embedded in the page and from metadata
+// elements
+function jsonLdMetadata (imdbId) {
+    // @ts-ignore
+    const meta = $(document).jsonLd(imdbId)
+
+    // override the original title (e.g. "Le fabuleux destin d'Amélie Poulain")
+    // with the English language (US) title (e.g. "Amélie") if available
+    // (the API only supports English-language titles)
+    const title = $('#star-rating-widget').data('title') || meta.name
+
+    return {
+        pageType: prop('pageType'),
+        title,
+        type: meta['@type']
+    }
+}
+
+// extract a property from a META element, or return null if the property is
+// not defined
+function prop (name) {
+    const $meta = $(`meta[property="${name}"]`)
+    return $meta.length ? $meta.attr('content') : null
+}
+
+// purge expired entries
+function purgeCached (date) {
+    for (const key of GM_listValues()) {
+        const json = GM_getValue(key)
+        const value = JSON.parse(json)
+
+        if (value.expires === -1) { // persistent storage (currently unused)
+            if (value.version !== SCHEMA_VERSION) {
+                log(`purging invalid value (obsolete schema version): ${key}`)
+                GM_deleteValue(key)
+            }
+        } else if (value.version !== DATA_VERSION) {
+            log(`purging invalid value (obsolete data version): ${key}`)
+            GM_deleteValue(key)
+        } else if (date === -1 || (typeof value.expires !== 'number') || (date > value.expires)) {
+            log(`purging expired value: ${key}`)
+            GM_deleteValue(key)
+        }
+    }
+}
+
+async function run () {
     // @ts-ignore
     const imdbId = location.pathname.match(/\/title\/(tt\d+)/)[1]
 
+    log('id:', imdbId)
+
     const $classicReviewBar = $('.titleReviewBar')
-    const $darkReviewBar = $('[class^="TitleBlock__ButtonContainer-"]')
-    const $target = ($classicReviewBar.length && $classicReviewBar)
-        || ($darkReviewBar.length && $darkReviewBar)
+    const $reactReviewBar = $('[class^="TitleBlock__ButtonContainer-"]')
+    const $target = [$classicReviewBar, $reactReviewBar].find(it => it.length)
 
     if (!$target) {
-        console.warn(`Can't find target for ${location.href}`)
+        console.info(`Can't find target for ${imdbId}`)
         return
     }
 
@@ -482,60 +542,55 @@ async function main () {
 
     if ($target === $classicReviewBar) {
         meta = jsonLdMetadata(imdbId)
-
         /* make the background color more legible (darker) if the rating is N/A */
         GM_addStyle(`.score_tbd { background-color: ${COLOR.tbd} }`)
-    } else if ($target === $darkReviewBar) {
+    } else if ($target === $reactReviewBar) {
         meta = graphQlMetadata(imdbId)
     } else {
         console.warn(`can't find metadata for ${imdbId}`)
         return
     }
 
-    debug('metadata:', meta)
+    log('metadata:', meta)
 
     const { pageType, title, type } = meta
 
     if (type !== 'Movie') {
-        debug(`invalid type for ${imdbId}: ${type}`)
+        console.info(`invalid type for ${imdbId}: ${type}`)
         return
     }
 
     if (pageType !== 'title') {
-        console.warn(`invalid page type for ${imdbId}: ${pageType}`)
+        console.info(`invalid page type for ${imdbId}: ${pageType}`)
         return
     }
 
-    purgeCached(NOW)
+    const now = Date.now()
 
+    purgeCached(now)
+
+    // get the cached result for this page
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
 
     if (cached) {
         const expires = new Date(cached.expires).toLocaleString()
 
         if (cached.error) {
-            debug(`cached error (expires: ${expires}): ${imdbId}`)
-
-            // couldn't retrieve any RT data so there's nothing
-            // more we can do
-            console.warn(cached.error)
+            log(`cached error (expires: ${expires}):`, cached.error)
         } else {
-            debug(`cached result (expires: ${expires}): ${imdbId}`)
+            log(`cached result (expires: ${expires}):`, cached.data)
             addWidget($target, cached.data)
         }
 
         return
     } else {
-        debug(`not cached: ${imdbId}`)
+        log('not cached')
     }
 
-    // add an { expires, version, data|error } entry to the cache
-    function store (dataOrError, ttl) {
-        const cached = Object.assign({
-            expires: NOW + ttl,
-            version: DATA_VERSION
-        }, dataOrError)
-
+    // add a { version, expires, data|error } entry to the cache
+    const store = (dataOrError, ttl) => {
+        const expires = now + ttl
+        const cached = { version: DATA_VERSION, expires, ...dataOrError }
         const json = JSON.stringify(cached)
 
         GM_setValue(imdbId, json)
@@ -546,12 +601,13 @@ async function main () {
     Object.assign(query.params, { searchTerm: title, yearMax: THIS_YEAR })
 
     try {
-        debug(`querying API for ${imdbId} (${JSON.stringify(title)})`)
+        log(`querying API for ${JSON.stringify(title)}`)
+
         const requestOptions = Object.assign({}, query, { title: `data for ${imdbId}` })
         const response = await httpGet(query.api, requestOptions)
         const fallback = JSON.parse(GM_getResourceText('fallback'))
 
-        debug(`response for ${imdbId}: ${response.status} ${response.statusText}`)
+        log(`response: ${response.status} ${response.statusText}`)
 
         const { data, updated } = await getRTData({
             response: response.responseText,
@@ -561,44 +617,64 @@ async function main () {
         })
 
         if (updated) {
-            debug(`caching ${imdbId} result for one day`)
+            log(`caching result for: one day`)
             store({ data }, ONE_DAY)
         } else {
-            debug(`caching ${imdbId} result for one week`)
+            log(`caching result for: one week`)
             store({ data }, ONE_WEEK)
         }
 
         addWidget($target, data)
     } catch (error) {
         const message = error.message || String(error) // stringify
-        debug(`caching ${imdbId} error for one day`)
+
+        log(`caching error for one day: ${message}`)
         store({ error: message }, ONE_DAY)
-        console.error(message)
+
+        if (message !== NO_RESULTS) {
+            console.error(error)
+        }
     }
 }
 
-// register a jQuery plugin which extracts and returns JSON-LD data for
-// the specified document
-// @ts-ignore
-$.fn.jsonLd = function jsonLd (id) {
-    const $script = this.find('script[type="application/ld+json"]')
+// returns a function which runs a function when the specified event has fired,
+// or immediately if it has already fired
+function when (event, { target = window } = {}) {
+    let ready
 
-    let data
+    const callbacks = new Set()
 
-    if ($script.length) {
-        try {
-            data = JSON.parse($script.first().text().trim())
-        } catch (e) {
-            throw new Error(`Can't parse JSON-LD data for ${id}: ${e}`)
+    const listener = /** @this {any} */ function (...args) {
+        ready = { this: this, args }
+
+        if (callbacks.size) {
+            for (const callback of callbacks.values()) {
+                callback.apply(ready.this, ready.args)
+            }
+
+            callbacks.clear()
         }
-    } else {
-        throw new Error(`Can't find JSON-LD data for ${id}`)
     }
 
-    return data
+    const onEvent = callback => {
+        if (ready) {
+            queueMicrotask(() => callback.apply(ready.this, ready.args))
+        } else {
+            callbacks.add(callback)
+        }
+
+        return !!ready
+    }
+
+    target.addEventListener(event, listener, { once: true })
+
+    return onEvent
 }
 
 // register this first so data can be cleared even if there's an error
 GM_registerMenuCommand(SCRIPT_NAME + ': clear cache', () => { purgeCached(-1) })
 
-$(window).on('pageshow', main)
+// disable the debugging/analytics code on the new site
+disableAnalytics()
+
+$(window).on('DOMContentLoaded', run)
