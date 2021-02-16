@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.15.4
+// @version       3.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -12,6 +12,8 @@
 // @include       https://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.5.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
+// @require       https://unpkg.com/get-wild@1.4.0/dist/index.umd.min.js
 // @resource      query https://pastebin.com/raw/EdgTfhij
 // @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
 // @grant         GM_addStyle
@@ -48,6 +50,11 @@
 // [1] unaliased and incorrectly aliased titles are common:
 // http://web.archive.org/web/20151105080717/http://developer.rottentomatoes.com/forum/read/110751/2
 
+// XXX metadata mismatch: Zéro de conduite [2] is a "Movie" in the old UI, but a
+// "Short" in the new one
+//
+// [2] https://www.imdb.com/title/tt0024803/
+
 'use strict';
 
 const NO_CONSENSUS    = 'No consensus yet.'
@@ -59,6 +66,12 @@ const SCRIPT_VERSION  = GM_info.script.version
 const STATUS_TO_STYLE = { 'N/A': 'tbd', Fresh: 'favorable', Rotten: 'unfavorable' }
 const THIS_YEAR       = new Date().getFullYear()
 
+const COLOR = {
+    tbd: '#d9d9d9',
+    favorable: '#66cc33',
+    unfavorable: '#ff0000',
+}
+
 const COMPACT_LAYOUT = [
     '.plot_summary_wrapper .minPlotHeightWithPoster', // XXX probably obsolete
     '.plot_summary_wrapper .minPlotHeightWithPosterAndWatchlistButton', // XXX probably obsolete
@@ -66,7 +79,7 @@ const COMPACT_LAYOUT = [
 ].join(', ')
 
 // the version of each cached record is a combination of the schema version and
-// the <major>.<minor> parts of the script's (SemVer) version e.g. 3 (schema
+// the <major>.<minor> parts of the script's (SemVer) version, e.g. 3 (schema
 // version) + 1.7.0 (script version) gives a version of "3/1.7"
 //
 // this means cached records are invalidated either a) when the schema changes
@@ -79,7 +92,7 @@ const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
     css: {
         maxWidth: '31rem',
-        fontFamily: 'sans-serif',
+        fontFamily: 'Roboto, Helvetica, Arial, sans-serif',
         fontSize: '0.9rem',
         padding: '0.75rem',
     },
@@ -87,10 +100,12 @@ const BALLOON_OPTIONS = {
     position: 'bottom',
 }
 
+// a custom version of get-wild's `get` function which uses a simpler/faster
+// path parser since we don't use the extended syntax
+const pluck = exports.getter({ split: '.' })
+
 // log a debug message to the console
-function debug (message) {
-    console.debug(message)
-}
+const debug = console.debug
 
 // URL-encode the supplied query parameter and replace encoded spaces ("%20")
 // with plus signs ("+")
@@ -112,7 +127,7 @@ function encodeParams (params) {
 }
 
 // promisified cross-origin HTTP requests
-function get (url, options = {}) {
+function httpGet (url, options = {}) {
     if (options.params) {
         url = url + '?' + encodeParams(options.params)
     }
@@ -123,7 +138,7 @@ function get (url, options = {}) {
         request.onload = resolve
 
         // XXX the onerror response object doesn't contain any useful info
-        request.onerror = res => {
+        request.onerror = _res => {
             reject(new Error(`error fetching ${options.title || url}`))
         }
 
@@ -152,9 +167,8 @@ function purgeCached (date) {
     }
 }
 
-// prepend a widget to the review bar or append a link to the star box
-// XXX the review bar now appears to be the default for all users
-function affixRT ($target, data) {
+// add an RT widget to the review bar
+function addWidget ($target, data) {
     const { consensus, rating, url } = data
 
     let status
@@ -168,6 +182,7 @@ function affixRT ($target, data) {
     }
 
     const style = STATUS_TO_STYLE[status]
+    const score = rating === -1 ? 'N/A' : rating
 
     if ($target.hasClass('titleReviewBar')) {
         // reduce the amount of space taken up by the Metacritic widget
@@ -179,7 +194,7 @@ function affixRT ($target, data) {
         // a poster but no trailer). it's designed for a maximum of 3.
         // to work around this, we hoist the review bar out of the
         // movie-info block (.plot_summary_wrapper) and float it left
-        // beneath the poster e.g.:
+        // beneath the poster, e.g.:
         //
         // before:
         //
@@ -219,8 +234,6 @@ function affixRT ($target, data) {
             })
         }
 
-        const score = rating === -1 ? 'N/A' : rating
-
         const html = `
             <div class="titleReviewBarItem">
                 <a href="${url}"><div
@@ -239,14 +252,38 @@ function affixRT ($target, data) {
             <div class="divider"></div>
         `
         $target.prepend(html)
-    } else {
-        const score = rating === -1 ? 'N/A' : `${rating}%`
+    } else { // new UI
+        // clone the IMDb rating widget: https://git.io/JtXpQ
+        const $rtRating = $target.children().first().clone()
 
-        const html = `
-            <span class="ghost">|</span>
-            Rotten Tomatoes:&nbsp;<a class="rt-consensus" href="${url}">${score}</a>
-        `
-        $target.append(html)
+        // 1) set the star (SVG) to the right color
+        $rtRating.find('svg').css('color', COLOR[style])
+
+        // 2) remove the review count and its preceding spacer element
+        const $reviewCount = $rtRating.find('[class^="AggregateRatingButton__TotalRatingAmount-"]')
+
+        $reviewCount.add($reviewCount.prev()).remove()
+
+        // 3) replace "IMDb Rating" with "RT Rating"
+        $rtRating.find('[class^="TitleBlockButtonBase__Header-"]').text('RT RATING')
+
+        // 4) remove the "/ 10" suffix
+        const $score = $rtRating.find('[data-testid="hero-title-block__aggregate-rating__score"]')
+            .children()
+
+        $score.last().remove()
+
+        // 5) replace the IMDb rating with the RT score
+        $score.first().text(score)
+
+        // 6) add the tooltip class to the link and update its label and URL
+        $rtRating.find('a[role="button"]')
+            .addClass('rt-consensus')
+            .attr('aria-label', 'View RT Rating')
+            .attr('href', url)
+
+        // 7) prepend the element to the review bar
+        $target.prepend($rtRating)
     }
 
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
@@ -335,7 +372,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         // that page
 
         debug(`loading RT URL for ${imdbId}: ${url}`)
-        const res = await get(url)
+        const res = await httpGet(url)
         debug(`response for ${url}: ${res.status} ${res.statusText}`)
 
         const parser = new DOMParser()
@@ -348,6 +385,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         }
 
         // update the rating
+        // @ts-ignore
         const meta = $rt.jsonLd(url)
         const newRating = meta.aggregateRating.ratingValue
 
@@ -379,43 +417,92 @@ function prop (name) {
     return $meta.length ? $meta.attr('content') : null
 }
 
-async function main () {
-    const pageType = prop('pageType')
-
-    if (pageType !== 'title') {
-        console.warn(`invalid page type for ${location.href}: ${pageType}`)
-        return
-    }
-
-    const imdbId = prop('pageId')
-
-    if (!imdbId) {
-        console.warn(`Can't find IMDb ID for ${location.href}`)
-        return
-    }
-
+// extract metadata from the JSON+LD data embedded in the page and from metadata
+// elements
+function jsonLdMetadata (imdbId) {
+    // @ts-ignore
     const meta = $(document).jsonLd(imdbId)
-    const type = meta['@type']
 
-    // the original title e.g. "Le fabuleux destin d'Amélie Poulain"
-    const originalTitle = meta.name
+    // override the original title (e.g. "Le fabuleux destin d'Amélie Poulain")
+    // with the English language (US) title (e.g. "Amélie") if available
+    // (the API only supports English-language titles)
+    const title = $('#star-rating-widget').data('title') || meta.name
 
-    // override with the English language (US) title if available e.g. "Amélie"
-    const enTitle = $('#star-rating-widget').data('title')
-    const title = enTitle || originalTitle
+    return {
+        pageType: prop('pageType'),
+        title,
+        type: meta['@type']
+    }
+}
+
+// extract metadata from the GraphQL data embedded in the page
+function graphQlMetadata (imdbId) {
+    const meta = JSON.parse($('#__NEXT_DATA__').text())
+    const pageType = pluck(meta, 'props.requestContext.pageType')
+
+    // there are multiple matching subtrees (with different but partially
+    // overlapping keys). select the first one with the required properties
+    let title, type
+
+    const found = pluck(meta, 'props.urqlState.*.data', [])
+        .find(it => {
+            return pluck(it, 'title.id') === imdbId
+                && (title = pluck(it, 'title.titleText.text'))
+                && (type = pluck(it, 'title.titleType.text'))
+        })
+
+    if (!found) {
+        if (!title) {
+            throw new TypeError("Can't find title in metadata")
+        }
+
+        if (!type) {
+            throw new TypeError("Can't find type in metadata")
+        }
+    }
+
+    return { pageType, title, type }
+}
+
+async function main () {
+    // @ts-ignore
+    const imdbId = location.pathname.match(/\/title\/(tt\d+)/)[1]
+
+    const $classicReviewBar = $('.titleReviewBar')
+    const $darkReviewBar = $('[class^="TitleBlock__ButtonContainer-"]')
+    const $target = ($classicReviewBar.length && $classicReviewBar)
+        || ($darkReviewBar.length && $darkReviewBar)
+
+    if (!$target) {
+        console.warn(`Can't find target for ${location.href}`)
+        return
+    }
+
+    let meta
+
+    if ($target === $classicReviewBar) {
+        meta = jsonLdMetadata(imdbId)
+
+        /* make the background color more legible (darker) if the rating is N/A */
+        GM_addStyle(`.score_tbd { background-color: ${COLOR.tbd} }`)
+    } else if ($target === $darkReviewBar) {
+        meta = graphQlMetadata(imdbId)
+    } else {
+        console.warn(`can't find metadata for ${imdbId}`)
+        return
+    }
+
+    debug('metadata:', meta)
+
+    const { pageType, title, type } = meta
 
     if (type !== 'Movie') {
         debug(`invalid type for ${imdbId}: ${type}`)
         return
     }
 
-    const $titleReviewBar = $('.titleReviewBar')
-    const $starBox = $('.star-box-details')
-    const $target = ($titleReviewBar.length && $titleReviewBar)
-        || ($starBox.length && $starBox)
-
-    if (!$target) {
-        console.warn(`Can't find target for ${imdbId}`)
+    if (pageType !== 'title') {
+        console.warn(`invalid page type for ${imdbId}: ${pageType}`)
         return
     }
 
@@ -434,7 +521,7 @@ async function main () {
             console.warn(cached.error)
         } else {
             debug(`cached result (expires: ${expires}): ${imdbId}`)
-            affixRT($target, cached.data)
+            addWidget($target, cached.data)
         }
 
         return
@@ -461,8 +548,9 @@ async function main () {
     try {
         debug(`querying API for ${imdbId} (${JSON.stringify(title)})`)
         const requestOptions = Object.assign({}, query, { title: `data for ${imdbId}` })
-        const response = await get(query.api, requestOptions)
+        const response = await httpGet(query.api, requestOptions)
         const fallback = JSON.parse(GM_getResourceText('fallback'))
+
         debug(`response for ${imdbId}: ${response.status} ${response.statusText}`)
 
         const { data, updated } = await getRTData({
@@ -480,7 +568,7 @@ async function main () {
             store({ data }, ONE_WEEK)
         }
 
-        affixRT($target, data)
+        addWidget($target, data)
     } catch (error) {
         const message = error.message || String(error) // stringify
         debug(`caching ${imdbId} error for one day`)
@@ -491,6 +579,7 @@ async function main () {
 
 // register a jQuery plugin which extracts and returns JSON-LD data for
 // the specified document
+// @ts-ignore
 $.fn.jsonLd = function jsonLd (id) {
     const $script = this.find('script[type="application/ld+json"]')
 
@@ -512,7 +601,4 @@ $.fn.jsonLd = function jsonLd (id) {
 // register this first so data can be cleared even if there's an error
 GM_registerMenuCommand(SCRIPT_NAME + ': clear cache', () => { purgeCached(-1) })
 
-// make the background color more legible (darker) if the rating is N/A
-GM_addStyle('.score_tbd { background-color: #d9d9d9 }')
-
-main()
+$(window).on('pageshow', main)
