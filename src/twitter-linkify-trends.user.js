@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.0
+// @version       1.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -12,9 +12,9 @@
 // @include       https://mobile.twitter.com/*
 // @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
-// @require       https://cdn.jsdelivr.net/gh/chocolateboy/gm-compat@a26896b85770aa853b2cdaf2ff79029d8807d0c0/index.min.js
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@2.0.1/index.min.js
-// @require       https://unpkg.com/get-wild@1.2.0/dist/index.umd.min.js
+// @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
+// @require       https://unpkg.com/get-wild@1.4.0/dist/index.umd.min.js
 // @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
 // @grant         GM_log
 // @grant         GM_registerMenuCommand
