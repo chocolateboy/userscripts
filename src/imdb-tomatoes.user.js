@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -59,14 +59,13 @@
 
 'use strict';
 
-const ANALYTICS_KEY   = 'ue_ibe'
-const NO_CONSENSUS    = 'No consensus yet.'
-const NO_RESULTS      = 'no results found'
-const ONE_DAY         = 1000 * 60 * 60 * 24
-const ONE_WEEK        = ONE_DAY * 7
-const SCRIPT_NAME     = GM_info.script.name
-const SCRIPT_VERSION  = GM_info.script.version
-const THIS_YEAR       = new Date().getFullYear()
+const NO_CONSENSUS   = 'No consensus yet.'
+const NO_RESULTS     = 'no results found'
+const ONE_DAY        = 1000 * 60 * 60 * 24
+const ONE_WEEK       = ONE_DAY * 7
+const SCRIPT_NAME    = GM_info.script.name
+const SCRIPT_VERSION = GM_info.script.version
+const THIS_YEAR      = new Date().getFullYear()
 
 const COLOR = {
     tbd: '#d9d9d9',
@@ -321,9 +320,29 @@ function addWidget ($target, data) {
     }
 }
 
+// promisified cross-origin HTTP requests
+function asyncGet (url, options = {}) {
+    if (options.params) {
+        url = url + '?' + encodeParams(options.params)
+    }
+
+    const request = Object.assign({ method: 'GET', url }, options.request || {})
+
+    return new Promise((resolve, reject) => {
+        request.onload = resolve
+
+        // XXX the +onerror+ response object doesn't contain any useful info
+        request.onerror = _res => {
+            reject(new Error(`error fetching ${options.title || url}`))
+        }
+
+        GM_xmlhttpRequest(request)
+    })
+}
+
 // disable the debug/analytics code on the new site
 function disableAnalytics () {
-    GMCompat.unsafeWindow[ANALYTICS_KEY] = 1
+    GMCompat.unsafeWindow.ue_ib = 1
 }
 
 // URL-encode the supplied query parameter and replace encoded spaces ("%20")
@@ -390,7 +409,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         // that page
 
         log(`loading RT URL: ${url}`)
-        const res = await httpGet(url)
+        const res = await asyncGet(url)
         log(`response: ${res.status} ${res.statusText}`)
 
         const parser = new DOMParser()
@@ -455,26 +474,6 @@ function graphQlMetadata (imdbId) {
     }
 
     return { pageType, title, type }
-}
-
-// promisified cross-origin HTTP requests
-function httpGet (url, options = {}) {
-    if (options.params) {
-        url = url + '?' + encodeParams(options.params)
-    }
-
-    const request = Object.assign({ method: 'GET', url }, options.request || {})
-
-    return new Promise((resolve, reject) => {
-        request.onload = resolve
-
-        // XXX the +onerror+ response object doesn't contain any useful info
-        request.onerror = _res => {
-            reject(new Error(`error fetching ${options.title || url}`))
-        }
-
-        GM_xmlhttpRequest(request)
-    })
 }
 
 // extract metadata from the JSON+LD data embedded in the page and from metadata
@@ -604,7 +603,7 @@ async function run () {
         log(`querying API for ${JSON.stringify(title)}`)
 
         const requestOptions = Object.assign({}, query, { title: `data for ${imdbId}` })
-        const response = await httpGet(query.api, requestOptions)
+        const response = await asyncGet(query.api, requestOptions)
         const fallback = JSON.parse(GM_getResourceText('fallback'))
 
         log(`response: ${response.status} ${response.statusText}`)
@@ -649,7 +648,7 @@ function when (event, { target = window } = {}) {
 
         if (callbacks.size) {
             for (const callback of callbacks.values()) {
-                callback.apply(ready.this, ready.args)
+                queueMicrotask(() => callback.apply(ready.this, ready.args))
             }
 
             callbacks.clear()
