@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -15,6 +15,7 @@
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@1.4.0/dist/index.umd.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @require       https://unpkg.com/@chocolatey/when@1.0.0/dist/index.umd.min.js
 // @resource      query https://pastebin.com/raw/EdgTfhij
 // @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
 // @grant         GM_addStyle
@@ -106,7 +107,7 @@ const log = console.log
 
 // run a function when the +pageshow+ event fires, or immediately if it has fired
 // already
-const onPageShow = when('pageshow')
+const onPageShow = exports.when(done => $(window).one('pageshow', done))
 
 // a custom version of get-wild's `get` function which uses a simpler/faster
 // path parser since we don't use the extended syntax
@@ -634,40 +635,6 @@ async function run () {
             console.error(error)
         }
     }
-}
-
-// returns a function which runs a function when the specified event has fired,
-// or immediately if it has already fired
-function when (event, { target = window } = {}) {
-    let ready
-
-    const callbacks = new Set()
-
-    const listener = /** @this {any} */ function (...args) {
-        ready = { this: this, args }
-
-        if (callbacks.size) {
-            for (const callback of callbacks.values()) {
-                queueMicrotask(() => callback.apply(ready.this, ready.args))
-            }
-
-            callbacks.clear()
-        }
-    }
-
-    const onEvent = callback => {
-        if (ready) {
-            queueMicrotask(() => callback.apply(ready.this, ready.args))
-        } else {
-            callbacks.add(callback)
-        }
-
-        return !!ready
-    }
-
-    target.addEventListener(event, listener, { once: true })
-
-    return onEvent
 }
 
 // register this first so data can be cleared even if there's an error
