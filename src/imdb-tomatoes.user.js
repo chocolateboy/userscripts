@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.3
+// @version       3.0.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       http://*.imdb.tld/title/tt*
@@ -598,7 +598,7 @@ async function run () {
 
     const query = JSON.parse(GM_getResourceText('query'))
 
-    Object.assign(query.params, { searchTerm: title, yearMax: THIS_YEAR })
+    Object.assign(query.params, { title, yearMax: THIS_YEAR })
 
     try {
         log(`querying API for ${JSON.stringify(title)}`)
