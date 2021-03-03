@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.2
+// @version       1.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -11,7 +11,6 @@
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
 // @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@1.4.1/dist/index.umd.min.js
@@ -22,7 +21,6 @@
 
 /// <reference types="jquery" />
 /// <reference path="../types/gm-compat.d.ts" />
-/// <reference path="../types/jquery-onmutate.d.ts" />
 
 // isolate from the scope of the @requires to work around a missing feature in
 // TypeScript and a misfeature in a userscript engine.
@@ -96,11 +94,11 @@ const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
 
 // NOTE: we detect the image inside an event/event-hero element and then
 // navigate up to the event to avoid the overhead of using :has()
-const EVENT = 'div[role="link"]:not([data-testid])'
-const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]`
-const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]'
-const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]`
-const TREND = 'div[role="link"][data-testid="trend"]'
+const EVENT = 'div[role="link"]:not([data-testid]):not([data-linked])'
+const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([src=""])`
+const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])'
+const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`
+const TREND = 'div[role="link"][data-testid="trend"]:not([data-linked])'
 const EVENT_ANY = [EVENT, EVENT_HERO].join(', ')
 const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(', ')
 
@@ -195,7 +193,11 @@ function onElement (el) {
         })
 
         $el.on(DISABLED_EVENTS, disableSome)
-        onTrend($el)
+
+        // tag so we don't select it again
+        $el.attr('data-linked', 'true')
+
+        onTrendElement($el)
     } else {
         const $event = $el.closest(EVENT_ANY)
         const wrapImage = $event.is(EVENT)
@@ -206,7 +208,11 @@ function onElement (el) {
         })
 
         $event.on(DISABLED_EVENTS, disableAll)
-        onEvent($event, $el, { wrapImage })
+
+        // tag so we don't select it again
+        $event.attr('data-linked', 'true')
+
+        onEventElement($event, $el, { wrapImage })
     }
 }
 
@@ -214,7 +220,7 @@ function onElement (el) {
  * linkify an event element: the target URL is (was) extracted from the
  * intercepted JSON
  */
-function onEvent ($event, $image, options = {}) {
+function onEventElement ($event, $image, options = {}) {
     const { $target, title } = targetFor($event)
 
     console.debug('event (element):', JSON.stringify(title))
@@ -225,9 +231,9 @@ function onEvent ($event, $image, options = {}) {
     if (url) {
         const $link = linkFor(url)
 
-        $target.wrap($link)
+        $target.parent().wrap($link)
 
-        if (options.wrapImage !== false) {
+        if (options.wrapImage) {
             $image.wrap($link)
         }
     } else {
@@ -239,7 +245,7 @@ function onEvent ($event, $image, options = {}) {
  * linkify a trend element: the target URL is derived from the title in the
  * element rather than from the JSON
  */
-function onTrend ($trend) {
+function onTrendElement ($trend) {
     const { $target, title } = targetFor($trend)
     const unquoted = title.replace(/"/g, '')
 
@@ -309,23 +315,41 @@ function targetFor ($el) {
     return { $target, title }
 }
 
+/******************************************************************************/
+
+/*
+ * monitor the creation of trend/event elements
+ */
+function run () {
+    const reactRoot = document.getElementById('react-root')
+
+    if (!reactRoot) {
+        console.warn("can't find react-root element")
+        return
+    }
+
+    const callback = () => {
+        // FIXME TS is not picking up `downlevelIteration: true` in the jsconfig
+        // @ts-ignore
+        for (const el of reactRoot.querySelectorAll(SELECTOR)) {
+            onElement(el)
+        }
+    }
+
+    new MutationObserver(callback)
+        .observe(reactRoot, { childList: true, subtree: true })
+}
+
 // hook HMLHTTPRequest#open so we can extract event data from the JSON
 const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
 
 xhrProto.open = GMCompat.export(hookXHROpen(xhrProto.open))
 
-// monitor the creation of trend/event elements
+// monitor the creation of trend/event elements after the page has loaded
 //
 // this script needs to be loaded early enough to intercept the JSON
-// (document-start), but run after the page has loaded. this ensures the latter
-$(() => {
-    const onElements = $elements => {
-        for (const el of $elements) {
-            onElement(el)
-        }
-    }
-
-    $('#react-root').onCreate(SELECTOR, onElements, true /* multi */)
-})
+// (document-start), but run after the page has loaded (DOMContentLoaded). this
+// ensures the latter
+$(run)
 
 /* end */ }
