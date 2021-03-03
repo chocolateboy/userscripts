@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.0
+// @version       1.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -321,23 +321,26 @@ function targetFor ($el) {
  * monitor the creation of trend/event elements
  */
 function run () {
-    const reactRoot = document.getElementById('react-root')
+    const init = { childList: true, subtree: true }
+    const target = document.getElementById('react-root')
 
-    if (!reactRoot) {
+    if (!target) {
         console.warn("can't find react-root element")
         return
     }
 
-    const callback = () => {
-        // FIXME TS is not picking up `downlevelIteration: true` in the jsconfig
-        // @ts-ignore
-        for (const el of reactRoot.querySelectorAll(SELECTOR)) {
+    const callback = (_mutations, observer) => {
+        observer.disconnect()
+
+        for (const el of $(SELECTOR)) {
             onElement(el)
         }
+
+        observer.observe(target, init)
     }
 
     new MutationObserver(callback)
-        .observe(reactRoot, { childList: true, subtree: true })
+        .observe(target, init)
 }
 
 // hook HMLHTTPRequest#open so we can extract event data from the JSON
