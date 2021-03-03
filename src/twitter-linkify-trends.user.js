@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.1
+// @version       1.3.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -14,33 +14,50 @@
 // @require       https://cdn.jsdelivr.net/gh/eclecto/jQuery-onMutate@79bbb2b8caccabfc9b9ade046fe63f15f593fef6/src/jquery.onmutate.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@1.4.0/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@1.4.1/dist/index.umd.min.js
 // @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
 // @grant         GM_log
-// @grant         GM_registerMenuCommand
 // @run-at        document-start
-// @inject-into   auto
 // ==/UserScript==
 
-// XXX note: the unused grant (GM_log) is a workaround for a Greasemonkey bug:
-// https://github.com/greasemonkey/greasemonkey/issues/1614
+/// <reference types="jquery" />
+/// <reference path="../types/gm-compat.d.ts" />
+/// <reference path="../types/jquery-onmutate.d.ts" />
 
-/*
- * a map from event IDs to their URLs. populated via the intercepted trends
- * data (JSON)
+// isolate from the scope of the @requires to work around a missing feature in
+// TypeScript and a misfeature in a userscript engine.
+//
+// XXX https://github.com/microsoft/TypeScript/issues/14279
+// XXX https://github.com/chocolateboy/uncommonjs#scope
+
+/* begin */ {
+
+/**
+ * @typedef {Object} TwitterEvent
+ *
+ * @prop {{ url?: string }} TwitterEvent.image
+ * @prop {string} TwitterEvent.title
+ * @prop {{ url: string }} TwitterEvent.url
  */
 
-// an LRU cache (flru) with up to 256 (128 * 2) entries
+/**
+ * a map from event IDs to their URLs. populated via the intercepted trends
+ * data (JSON)
+ *
+ * uses an LRU cache (flru) with up to 256 (128 * 2) entries
+ *
+ * @type {import("flru").flruCache}
+ */
 const CACHE = new exports.default(128)
 
-// debugging options. currently used to define colors for trend and event
-// elements. the values are undefined by default (no change) but can be
-// overridden (until the page is reloaded) via a menu command
-let DEBUG = {}
-
-// the background colors to use for trend and event elements when debugging is
-// enabled
-const DEBUG_SELECTORS = { event: 'powderblue', trend: 'palegreen' }
+/*
+ * debugging options
+ *
+ * uncomment this to debug the selectors by assigning distinct background colors
+ * to trend and event elements
+ */
+// const DEBUG = { event: 'powderblue', trend: 'palegreen' }
+const DEBUG = {}
 
 /*
  * events to disable (stop propagating) on event and trend elements
@@ -79,7 +96,7 @@ const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
 
 // NOTE: we detect the image inside an event/event-hero element and then
 // navigate up to the event to avoid the overhead of using :has()
-const EVENT = 'div[role="link"]:not([data-testid]).r-1j3t67a'
+const EVENT = 'div[role="link"]:not([data-testid])'
 const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]`
 const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]'
 const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]`
@@ -87,14 +104,16 @@ const TREND = 'div[role="link"][data-testid="trend"]'
 const EVENT_ANY = [EVENT, EVENT_HERO].join(', ')
 const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(', ')
 
-/*
+/**
  * a custom version of get-wild's `get` function which automatically removes
  * missing/undefined results
  *
  * we also use a simpler/faster path parser since we don't use the extended
  * syntax
+ *
+ * @type {typeof import("get-wild").get}
  */
-const get = exports.getter({ default: [], split: '.' })
+const pluck = exports.getter({ default: [], split: '.' })
 
 /*
  * remove the onclick interceptors from event elements
@@ -104,9 +123,12 @@ function disableAll (e) {
     e.stopPropagation()
 }
 
-/*
+/**
  * remove the onclick interceptors from trend elements, apart from clicks on the
  * caret (which opens a drop-down menu)
+ *
+ * @this {Element}
+ * @param {JQueryEventObject} e
  */
 function disableSome (e) {
     const $target = $(e.target)
@@ -118,12 +140,15 @@ function disableSome (e) {
     }
 }
 
-/*
+/**
  * intercept XMLHTTPRequest#open requests for trend data (guide.json) and pass
  * the response to a custom handler which extracts data for the event elements
+ *
+ * @param {XMLHttpRequest['open']} oldOpen
+ * @returns {XMLHttpRequest['open']}
  */
 function hookXHROpen (oldOpen) {
-    return function open (_method, url, ...rest) { // preserve the arity
+    return /** @this {XMLHttpRequest} */ function open (_method, url) { // preserve the arity
         const $url = new URL(url)
 
         if ($url.pathname === EVENT_DATA) {
@@ -131,7 +156,7 @@ function hookXHROpen (oldOpen) {
             this.addEventListener('load', () => processEventData(this.responseText))
         }
 
-        return oldOpen.call(this, _method, url, ...rest)
+        return GMCompat.apply(this, oldOpen, arguments)
     }
 }
 
@@ -166,7 +191,7 @@ function onElement (el) {
     if ($el.is(TREND)) {
         $el.css({
             cursor: 'auto', // remove the fake pointer
-            backgroundColor: DEBUG.trend,
+            backgroundColor: DEBUG?.trend,
         })
 
         $el.on(DISABLED_EVENTS, disableSome)
@@ -177,7 +202,7 @@ function onElement (el) {
 
         $event.css({
             cursor: 'auto', // remove the fake pointer
-            backgroundColor: DEBUG.event,
+            backgroundColor: DEBUG?.event,
         })
 
         $event.on(DISABLED_EVENTS, disableAll)
@@ -232,10 +257,13 @@ function onTrend ($trend) {
  */
 function processEventData (json) {
     const data = JSON.parse(json)
-    const events = get(data, EVENT_PATH)
+
+    /** @type {Array<TwitterEvent>} */
+    const events = pluck(data, EVENT_PATH)
 
     // always returns an array even though there's at most 1
-    const eventHero = get(data, EVENT_HERO_PATH)
+    /** @type {Array<TwitterEvent>} */
+    const eventHero = pluck(data, EVENT_HERO_PATH)
 
     const $events = eventHero.concat(events)
     const nEvents = $events.length
@@ -286,14 +314,6 @@ const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
 
 xhrProto.open = GMCompat.export(hookXHROpen(xhrProto.open))
 
-// GM_registerMenuCommand is not available in Greasemonkey
-// https://github.com/greasemonkey/greasemonkey/issues/3078
-if (typeof GM_registerMenuCommand === 'function') {
-    GM_registerMenuCommand(`Debug ${GM_info.script.name} Selectors`, () => {
-        DEBUG = DEBUG_SELECTORS
-    })
-}
-
 // monitor the creation of trend/event elements
 //
 // this script needs to be loaded early enough to intercept the JSON
@@ -305,5 +325,7 @@ $(() => {
         }
     }
 
-    $.onCreate(SELECTOR, onElements, true /* multi */)
+    $('#react-root').onCreate(SELECTOR, onElements, true /* multi */)
 })
+
+/* end */ }
