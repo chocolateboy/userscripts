@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.2
+// @version       1.4.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -262,7 +262,7 @@ function replacer (_key, value) {
 }
 
 /*
- * an iterator which returns { pattern => queries } pairs where patterns
+ * a generator which returns { pattern => queries } pairs where patterns
  * are strings/regexps which match a URI and queries are objects which
  * define substitutions to perform in the matched document.
  *
@@ -277,7 +277,7 @@ function replacer (_key, value) {
  * latter all transform locations under obj.globalObjects, so we check for
  * the existence of that property before yielding these catch-all queries
  */
-function* router (state, data) {
+function* router (data, state) {
     for (const [key, value] of MATCH) {
         yield [key, value]
 
@@ -443,7 +443,7 @@ function transform (data, uri) {
     }
 
     const state = { matched: false }
-    const it = router(state, data)
+    const it = router(data, state)
 
     for (const [key, value] of it) {
         const uris = NONE.concat(key) // coerce to an array
@@ -453,7 +453,7 @@ function transform (data, uri) {
         })
 
         if (match) {
-            // stop matching URIs and switch to the wildcard queries
+            // stop matching URIs after this and switch to the wildcard queries
             state.matched = true
         } else {
             // try the next URI pattern, or switch to the wildcard queries if
