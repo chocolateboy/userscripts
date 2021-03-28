@@ -3,14 +3,14 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.4.1
+// @version       3.5.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: https://www.gnu.org/copyleft/gpl.html
+// @license       GPL
 // @include       https://smile.amazon.tld/*
 // @include       https://www.amazon.tld/*
-// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@6a82709680bbeb3bd2041a4345638b628d537c96/gm_config.js
-// @require       https://cdn.jsdelivr.net/gh/aduth/hijinks@23b74cdb43d3a76f4981c815eb3961c2625c7ae7/hijinks.min.js
+// @require       https://code.jquery.com/jquery-3.6.0.slim.min.js
+// @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@43fd0fe4de1166f343883511e53546e87840aeaf/gm_config.js
+// @require       https://cdn.jsdelivr.net/gh/aduth/hijinks@b4fbbd462c98248c585659fcc35a50b00fec147c/hijinks.min.js
 // @grant         GM_registerMenuCommand
 // @grant         GM_getValue
 // @grant         GM_setValue
@@ -35,6 +35,7 @@
 const SITES = {
     'com.au': 'AU', // Australia
     'com.br': 'BR', // Brazil
+    'ae':     'AE', // UAE
     'ca':     'CA', // Canada
     'cn':     'CN', // China
     'fr':     'FR', // France
@@ -45,6 +46,7 @@ const SITES = {
     'com.mx': 'MX', // Mexico
     'nl':     'NL', // Netherlands
     'es':     'ES', // Spain
+    'com.tr': 'TR', // Turkey
     'co.uk':  'UK', // UK
     'com':    'US', // US
 }
