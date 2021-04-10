@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.3
+// @version       1.5.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://twitter.com/
@@ -90,8 +90,8 @@ const USER_PATHS = [
  * under the root path to substitute URLs in.
  *
  * implemented as an array of pairs with URI-pattern keys (string(s) or
- * regexp(s)) and one or more queries as the value. if a query is a path (string
- * or array) it is converted into an object with the path as its `root`
+ * regexp(s)) and one or more queries as the value. if a query is a string
+ * (path), it is converted into an object with the path as its `root`
  * property.
  *
  * options:
@@ -118,12 +118,6 @@ const USER_PATHS = [
  *     pair, the URL is expanded directly in the same way as scanned paths.
  */
 const MATCH = [
-    [
-        // e.g. '/1.1/users/lookup.json',
-        /\/lookup\.json$/, {
-            root: NONE, // returns self
-        }
-    ],
     [
         /\/Conversation$/, [
             'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.core.user.legacy',
@@ -192,6 +186,19 @@ const MATCH = [
         /\/list\.json$/,
         'users.*'
     ],
+    [
+        // e.g. '/1.1/users/lookup.json',
+        /\/lookup\.json$/, {
+            root: NONE, // the document itself (an array of users) is the root
+        }
+    ],
+    [
+        // "Who to follow"
+        // e.g. '/1.1/users/recommendations.json'
+        /\/recommendations\.json$/, {
+            root: '*.user',
+        }
+    ],
 ]
 
 /*
@@ -203,7 +210,8 @@ const WILDCARD = [
         {
             root: 'globalObjects.tweets',
             scan: TWEET_PATHS,
-            targets: [{
+            targets: [
+                {
                     url: 'card.binding_values.website_shortened_url.string_value',
                     expanded_url: 'card.binding_values.website_url.string_value',
                 },
