@@ -3,20 +3,19 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.4
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: https://www.gnu.org/copyleft/gpl.html
+// @license       GPL
 // @include       http://*.imdb.tld/title/tt*
 // @include       http://*.imdb.tld/*/title/tt*
 // @include       https://*.imdb.tld/title/tt*
 // @include       https://*.imdb.tld/*/title/tt*
-// @require       https://code.jquery.com/jquery-3.5.1.min.js
+// @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@1.4.0/dist/index.umd.min.js
-// @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
-// @require       https://unpkg.com/@chocolatey/when@1.0.0/dist/index.umd.min.js
-// @resource      query https://pastebin.com/raw/EdgTfhij
+// @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
+// @require       https://unpkg.com/@chocolatey/when@1.2.0/dist/index.umd.min.js
+// @resource      query https://pastebin.com/raw/rynukt2g
 // @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
@@ -341,11 +340,6 @@ function asyncGet (url, options = {}) {
     })
 }
 
-// disable the debug/analytics code on the new site
-function disableAnalytics () {
-    GMCompat.unsafeWindow.ue_ib = 1
-}
-
 // URL-encode the supplied query parameter and replace encoded spaces ("%20")
 // with plus signs ("+")
 function encodeParam (param) {
@@ -639,8 +633,5 @@ async function run () {
 
 // register this first so data can be cleared even if there's an error
 GM_registerMenuCommand(SCRIPT_NAME + ': clear cache', () => { purgeCached(-1) })
-
-// disable the debugging/analytics code on the new site
-disableAnalytics()
 
 $(window).on('DOMContentLoaded', run)
