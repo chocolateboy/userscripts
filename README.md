@@ -118,7 +118,6 @@ The following are all direct links i.e. clicking them installs the script.
 - [Amazon](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_amazon.user.js "Install")
 - [Ars Technica](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_ars_technica.user.js "Install")
 - [eBay](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_ebay.user.js "Install")
-- [Hacker News](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_hacker_news.user.js "Install")
 - [Metafilter](https://github.com/chocolateboy/userscripts/raw/master/src/pagerize_metafilter.user.js "Install")
 
 ## Misc
