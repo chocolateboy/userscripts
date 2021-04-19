@@ -3,9 +3,9 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.5.0
+// @version       1.6.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: https://www.gnu.org/copyleft/gpl.html
+// @license       GPL
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
@@ -168,6 +168,22 @@ const MATCH = [
             root: 'data.user.legacy',
             collect: Array.of,
         }
+    ],
+    [
+        // e.g. /i/api/graphql/abcd1234/UserMedia
+        /\/UserMedia$/, [
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy.user_refs.*.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.card.legacy.user_refs.*.legacy',
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.legacy',
+                scan: TWEET_PATHS,
+            },
+        ]
     ],
     [
         // DMs
