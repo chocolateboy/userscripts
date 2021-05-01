@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.6.0
+// @version       1.7.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -11,9 +11,9 @@
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@1.4.1/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
-// @require       https://unpkg.com/just-safe-set@2.1.0/index.js
+// @require       https://unpkg.com/just-safe-set@2.2.1/index.js
 // @run-at        document-start
 // ==/UserScript==
 
@@ -107,8 +107,8 @@ const USER_PATHS = [
  *
  *   - targets (default: NONE): an array of paths to standalone URLs (URLs that
  *     don't have an accompanying expansion), e.g. for URLs in cards embedded in
- *     tweets. these URLs are replaced by expanded URLs gathered during the
- *     scan.
+ *     tweets. these URLs are replaced by expanded URLs gathered during
+ *     preceding scans.
  *
  *     target paths can point directly to a URL node (string) or to an
  *     array of objects. in the latter case, we find the URL object in the array
@@ -182,6 +182,27 @@ const MATCH = [
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.legacy',
                 scan: TWEET_PATHS,
+            },
+        ]
+    ],
+    [
+        // e.g. /i/api/graphql/abcd1234/UserTweets
+        /\/UserTweets$/, [
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
+
+                // just expand the URLs in the specified locations within the
+                // card; there's no user or tweet data under this root
+                scan: NONE,
+
+                // rest_id is the t.co URL, but the name suggests it's an
+                // identifier rather than an endpoint, so preserve it for now
+                // targets: ['legacy.binding_values', 'legacy.url', 'rest_id'],
+                targets: ['legacy.binding_values', 'legacy.url'],
             },
         ]
     ],
@@ -326,8 +347,8 @@ function* router (data, state) {
  * `targets` option is processed by the `_assign` method
  */
 class Transformer {
-    constructor ({ onReplace, root, uri }) {
-        this._cache = new Map()
+    constructor ({ cache, onReplace, root, uri }) {
+        this._cache = cache
         this._onReplace = onReplace
         this._root = root
         this._uri = uri
@@ -399,14 +420,14 @@ class Transformer {
 
     /*
      * replace a short URL in the context with an expanded URL defined in the
-     * context.
+     * context, e.g. context.foo.url = context.bar.baz.expanded_url
      *
      * this is similar to the replacements performed during the scan, but rather
      * than using a fixed set of locations/property names, the paths to the
-     * short/expanded URLs are supplied as a parameter
+     * short and expanded URLs are supplied as a parameter
      */
-    _assignFromPath (context, target) {
-        const { url: urlPath, expanded_url: expandedUrlPath } = target
+    _assignFromPath (context, paths) {
+        const { url: urlPath, expanded_url: expandedUrlPath } = paths
 
         let url, expandedUrl
 
@@ -423,8 +444,8 @@ class Transformer {
 
     /*
      * pinpoint an isolated URL in the context which doesn't have a
-     * corresponding expansion, and replace it using the mappings we collected
-     * during the scan
+     * corresponding expansion, and replace it using the mappings collected
+     * during preceding scans
      */
     _assignFromCache (context, path) {
         let url, $context = context, $path = path
@@ -466,6 +487,7 @@ function transform (data, uri) {
         STATS.uri[uri] = new Set()
     }
 
+    const cache = new Map() // t.co -> expanded URL cache for all queries in this document
     const state = { matched: false }
     const it = router(data, state)
 
@@ -515,9 +537,10 @@ function transform (data, uri) {
             const contexts = collect(root)
 
             const transformer = new Transformer({
+                cache,
                 onReplace: updateStats,
                 root: rootPath,
-                uri
+                uri,
             })
 
             // @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
