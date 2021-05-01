@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.7.0
+// @version       1.7.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -110,14 +110,39 @@ const USER_PATHS = [
  *     tweets. these URLs are replaced by expanded URLs gathered during
  *     preceding scans.
  *
- *     target paths can point directly to a URL node (string) or to an
- *     array of objects. in the latter case, we find the URL object in the array
- *     (obj.key === "card_url") and replace its URL node (obj.value.string_value)
+ *     target paths can point directly to a URL node (string), or to an array
+ *     or plain object, in which case the card URL is located inside the
+ *     array/object and replaced
  *
  *     if a target path is an object containing a { url: path, expanded_url: path }
  *     pair, the URL is expanded directly in the same way as scanned paths.
  */
 const MATCH = [
+    [
+        /\/Bookmarks$/, [
+            'data.bookmark_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy.user_refs.*.legacy',
+            'data.bookmark_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
+            {
+                root: 'data.bookmark_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+                targets:[
+                    {
+                        url: 'quoted_status_permalink.url',
+                        expanded_url: 'quoted_status_permalink.expanded',
+                    }
+                ]
+            },
+            {
+                root: 'data.bookmark_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
+
+                // just expand the URLs in the specified locations within the
+                // card; there's no user or tweet data under this root
+                scan: NONE,
+
+                targets: ['legacy.binding_values', 'legacy.url'],
+            },
+        ],
+    ],
     [
         /\/Conversation$/, [
             'data.conversation_timeline.instructions.*.moduleItems.*.item.itemContent.tweet.core.user.legacy',
@@ -151,6 +176,62 @@ const MATCH = [
         'data.user.friends_following_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy',
     ],
     [
+        // "List" page, e.g. /i/api/graphql/abcd1234/ListLatestTweetsTimeline
+        /\/ListLatestTweetsTimeline$/, [
+            'data.list.tweets_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
+            {
+                root: 'data.list.tweets_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.list.tweets_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.list.tweets_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet',
+                scan: NONE,
+                targets: [
+                    'card.legacy.binding_values',
+                    'card.legacy.url',
+                    'legacy.retweeted_status.card.legacy.binding_values',
+                    'legacy.retweeted_status.card.legacy.url',
+                ],
+            },
+        ]
+    ],
+    [
+        // "Likes" page, e.g. /i/api/graphql/abcd1234/Likes
+        /\/Likes$/, [
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.card.legacy.user_refs.*.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.core.user.legacy',
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+                targets: [
+                    {
+                        url: 'quoted_status_permalink.url',
+                        expanded_url: 'quoted_status_permalink.expanded',
+                    },
+                ],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet',
+                scan: NONE,
+                targets: [
+                    'card.legacy.binding_values',
+                    'card.legacy.url',
+                    'quoted_status.card.legacy.binding_values',
+                    'quoted_status.card.legacy.url',
+                ],
+            },
+        ],
+    ],
+    [
         /\/ListMembers$/,
         'data.list.members_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy'
     ],
@@ -168,6 +249,12 @@ const MATCH = [
             root: 'data.user.legacy',
             collect: Array.of,
         }
+    ],
+    [
+        /\/UserByScreenNameWithoutResults$/, {
+            root: 'data.user.legacy',
+            collect: Array.of,
+        },
     ],
     [
         // e.g. /i/api/graphql/abcd1234/UserMedia
@@ -188,21 +275,85 @@ const MATCH = [
     [
         // e.g. /i/api/graphql/abcd1234/UserTweets
         /\/UserTweets$/, [
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entry.content.itemContent.tweet.core.user.legacy',
+            {
+                root: 'data.user.legacy',
+                collect: Array.of,
+            },
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
                 scan: TWEET_PATHS,
             },
             {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entry.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
-
-                // just expand the URLs in the specified locations within the
-                // card; there's no user or tweet data under this root
                 scan: NONE,
-
-                // rest_id is the t.co URL, but the name suggests it's an
-                // identifier rather than an endpoint, so preserve it for now
-                // targets: ['legacy.binding_values', 'legacy.url', 'rest_id'],
                 targets: ['legacy.binding_values', 'legacy.url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card',
+                scan: NONE,
+                targets: ['legacy.binding_values', 'legacy.url'],
+            },
+        ]
+    ],
+    [
+        // e.g. /i/api/graphql/abcd1234/UserTweetsAndReplies
+        /\/UserTweetsAndReplies$/, [
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.core.user.legacy',
+            'data.user.result.timeline.timeline.instructions.*.entry.content.itemContent.tweet.core.user.legacy',
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entry.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.card',
+                scan: NONE,
+                targets: [
+                    'legacy.binding_values',
+                    'legacy.url',
+                ],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
+                scan: NONE,
+                targets: [
+                    'legacy.binding_values',
+                    'legacy.url',
+                ],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card',
+                scan: NONE,
+                targets: [
+                    'legacy.binding_values',
+                    'legacy.url',
+                ],
             },
         ]
     ],
@@ -213,15 +364,16 @@ const MATCH = [
             root: 'inbox_initial_state.entries.*.message.message_data',
             scan: TWEET_PATHS,
             targets: [
-                'attachment.card.binding_values.card_url.string_value',
+                'attachment.card.binding_values',
                 'attachment.card.url',
             ],
         }
     ],
     [
         // e.g. '/1.1/friends/following/list.json',
-        /\/list\.json$/,
-        'users.*'
+        /\/list\.json$/, {
+            root: 'users.*'
+        },
     ],
     [
         // e.g. '/1.1/users/lookup.json',
@@ -244,6 +396,8 @@ const MATCH = [
 const WILDCARD = [
     /./,
     [
+        'globalObjects.users',
+        'globalObjects.tweets.*.card.users',
         {
             root: 'globalObjects.tweets',
             scan: TWEET_PATHS,
@@ -252,12 +406,10 @@ const WILDCARD = [
                     url: 'card.binding_values.website_shortened_url.string_value',
                     expanded_url: 'card.binding_values.website_url.string_value',
                 },
-                'card.binding_values.card_url.string_value',
+                'card.binding_values',
                 'card.url',
             ],
         },
-        'globalObjects.tweets.*.card.users.*',
-        'globalObjects.users',
     ]
 ]
 
@@ -452,11 +604,24 @@ class Transformer {
 
         const node = get(context, path)
 
-        // if the target points to an array rather than a string, locate the URL
-        // object within the array automatically
+        // special-case card URLs
+        //
+        // if the target is an array or plain object, locate its target URL
+        // automatically. used to resolve "binding" nodes, which represent
+        // properties (key/value pairs) as an array or object
+
         if (Array.isArray(node)) {
-            if ($context = node.find(it => it.key === 'card_url')) {
+            const found = node.find(it => it?.key === 'card_url')
+
+            if (found) {
+                $context = found
                 $path = 'value.string_value'
+                url = get($context, $path)
+            }
+        } else if (isPlainObject(node)) {
+            if (node.card_url) {
+                $context = node
+                $path = 'card_url.string_value'
                 url = get($context, $path)
             }
         } else {
