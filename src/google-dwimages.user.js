@@ -3,9 +3,9 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.2
+// @version       2.3.3
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: https://www.gnu.org/copyleft/gpl.html
+// @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
 // @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
@@ -76,8 +76,8 @@ function nthImageUrl (index) {
     return result
 }
 
-// event handler for image links, page links and results which prevents their
-// click/mousedown events being intercepted
+// event handler for image links, page links and result elements which prevents
+// their click/mousedown events being intercepted
 function stopPropagation (e) {
     e.stopPropagation()
 }
@@ -103,7 +103,7 @@ function init () {
 
     // there's static data for the first ~100 images, but only the first 50 are
     // shown initially. the next 50 are loaded dynamically and then the
-    // remaining images are loaded in batches of 100. this handles images 50-99
+    // remaining images are fetched in batches of 100. this handles images 50-99
     const callback = (_mutations, observer) => {
         const $elements = $container.children(SELECTOR)
 
