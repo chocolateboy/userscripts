@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.7.1
+// @version       1.7.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -111,8 +111,8 @@ const USER_PATHS = [
  *     preceding scans.
  *
  *     target paths can point directly to a URL node (string), or to an array
- *     or plain object, in which case the card URL is located inside the
- *     array/object and replaced
+ *     or plain object, in which case the URL is located inside the array/object
+ *     and replaced
  *
  *     if a target path is an object containing a { url: path, expanded_url: path }
  *     pair, the URL is expanded directly in the same way as scanned paths.
@@ -334,26 +334,17 @@ const MATCH = [
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.card',
                 scan: NONE,
-                targets: [
-                    'legacy.binding_values',
-                    'legacy.url',
-                ],
+                targets: ['legacy.binding_values', 'legacy.url'],
             },
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
                 scan: NONE,
-                targets: [
-                    'legacy.binding_values',
-                    'legacy.url',
-                ],
+                targets: ['legacy.binding_values', 'legacy.url'],
             },
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card',
                 scan: NONE,
-                targets: [
-                    'legacy.binding_values',
-                    'legacy.url',
-                ],
+                targets: ['legacy.binding_values', 'legacy.url'],
             },
         ]
     ],
@@ -363,10 +354,7 @@ const MATCH = [
         /\/(?:inbox_initial_state|user_updates)\.json$/, {
             root: 'inbox_initial_state.entries.*.message.message_data',
             scan: TWEET_PATHS,
-            targets: [
-                'attachment.card.binding_values',
-                'attachment.card.url',
-            ],
+            targets: ['attachment.card.binding_values', 'attachment.card.url'],
         }
     ],
     [
@@ -391,7 +379,8 @@ const MATCH = [
 ]
 
 /*
- * a single { pattern => queries } pair for the router which matches all URIs
+ * a single { pattern => queries } pair for the router which is run against all
+ * documents
  */
 const WILDCARD = [
     /./,
@@ -459,20 +448,20 @@ function replacer (_key, value) {
 }
 
 /*
- * a generator which returns { pattern => queries } pairs where patterns
- * are strings/regexps which match a URI and queries are objects which
- * define substitutions to perform in the matched document.
+ * a generator which returns { pattern => queries } pairs where patterns are
+ * strings/regexps which match a URI and queries are objects which define
+ * substitutions to perform in the matched document.
  *
- * this forms the basis of a simple "router" which tries all URI patterns
- * until one matches (or none match) and then additionally performs a
- * wildcard match which works on all URIs.
+ * this forms the basis of a simple "router" which tries all URI patterns until
+ * one matches (or none match) and then additionally performs a wildcard match
+ * which works on all URIs.
  *
  * the URI patterns are disjoint, so there's no need to try them all if one
- * matches. in addition to these, some substitutions are non URI-specific,
- * i.e. they work on documents that aren't matched by URI (e.g.
- * profile.json) and documents that are (e.g. list.json). currently the
- * latter all transform locations under obj.globalObjects, so we check for
- * the existence of that property before yielding these catch-all queries
+ * matches. in addition to these, some substitutions are non URI-specific, i.e.
+ * they work on documents that aren't matched by URI (e.g. profile.json) and
+ * documents that are (e.g. list.json). currently these cross-document nodes can
+ * be found under obj.globalObjects, so we check for the existence of that
+ * property before yielding these catch-all queries
  */
 function* router (data, state) {
     for (const [key, value] of MATCH) {
@@ -517,8 +506,8 @@ class Transformer {
         // cache
         eachDefined(contexts, context => this._scan(context, scan))
 
-        // do a separate pass for targets because some nested card URLs are
-        // expanded in other (earlier) tweets under the same root
+        // do a separate pass for targets because the scan may have added more
+        // mappings to the cache
         if (targets.length) {
             eachDefined(contexts, context => this._assign(context, targets))
         }
@@ -575,8 +564,8 @@ class Transformer {
      * context, e.g. context.foo.url = context.bar.baz.expanded_url
      *
      * this is similar to the replacements performed during the scan, but rather
-     * than using a fixed set of locations/property names, the paths to the
-     * short and expanded URLs are supplied as a parameter
+     * than using a fixed set of locations/paths, the paths to the short and
+     * expanded URLs are supplied as a parameter
      */
     _assignFromPath (context, paths) {
         const { url: urlPath, expanded_url: expandedUrlPath } = paths
@@ -600,9 +589,9 @@ class Transformer {
      * during preceding scans
      */
     _assignFromCache (context, path) {
-        let url, $context = context, $path = path
-
         const node = get(context, path)
+
+        let url
 
         // special-case card URLs
         //
@@ -614,15 +603,15 @@ class Transformer {
             const found = node.find(it => it?.key === 'card_url')
 
             if (found) {
-                $context = found
-                $path = 'value.string_value'
-                url = get($context, $path)
+                context = found
+                path = 'value.string_value'
+                url = get(context, path)
             }
         } else if (isPlainObject(node)) {
             if (node.card_url) {
-                $context = node
-                $path = 'card_url.string_value'
-                url = get($context, $path)
+                context = node
+                path = 'card_url.string_value'
+                url = get(context, path)
             }
         } else {
             url = node
@@ -632,7 +621,7 @@ class Transformer {
             const expandedUrl = this._cache.get(url)
 
             if (expandedUrl) {
-                exports.set($context, $path, expandedUrl)
+                exports.set(context, path, expandedUrl)
                 this._onReplace()
             } else {
                 console.warn(`can't find expanded URL for ${url} in ${this._uri}`)
@@ -644,16 +633,28 @@ class Transformer {
 /*
  * replace t.co URLs with the original URL in all locations in the document
  * which contain URLs
+ *
+ * returns the number of substituted URLs
  */
 function transform (data, uri) {
-    let count = 0
+    let count = 0 // keep track of and return the number of expanded URLs
 
     if (!STATS.uri[uri]) {
         STATS.uri[uri] = new Set()
     }
 
-    const cache = new Map() // t.co -> expanded URL cache for all queries in this document
+    // t.co -> expanded URL mapping for all queries in this document. used to
+    // fill in isolated URLs (usually in cards) which don't have a corresponding
+    // `expanded_url`
+    const cache = new Map()
+
+    // used to notify the router when a pattern matches so it can stop trying
+    // URI matches and transition to the wildcard match
     const state = { matched: false }
+
+    // an iterator which yields { pattern => query } pairs for this document. if
+    // a document's URI matches the pattern, the corresponding queries (search +
+    // replace) are executed
     const it = router(data, state)
 
     for (const [key, value] of it) {
@@ -682,7 +683,7 @@ function transform (data, uri) {
 
             const root = get(data, rootPath)
 
-            // may be an array (e.g. lookup.json)
+            // might be an array (e.g. lookup.json)
             if (!root || typeof root !== 'object') {
                 continue
             }
@@ -717,8 +718,9 @@ function transform (data, uri) {
 }
 
 /*
- * replacement for Twitter's default response handler. we transform the response
- * if it's a) JSON and b) contains URL data; otherwise, we leave it unchanged
+ * replacement for Twitter's default handler for XHR requests. we transform the
+ * response if it's a) JSON and b) contains URL data; otherwise, we leave it
+ * unchanged
  */
 function onResponse (xhr, uri) {
     const contentType = xhr.getResponseHeader('Content-Type')
