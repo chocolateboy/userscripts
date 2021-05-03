@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.3
+// @version       2.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -19,12 +19,27 @@ const SELECTOR = 'div[data-ri][data-ved][jsaction]'
 // events to intercept (stop propagating) in result elements
 const EVENTS = 'auxclick click focus focusin mousedown touchstart'
 
-let METADATA
+// cache which maps an image's 0-based index to its URL
+const METADATA = new Map()
+
+// the first child of a node (array) contains the node's type (integer)
+const NODE_TYPE = 0
+
+// the type of image-metadata nodes; other types may be found in the tree, e.g.
+// the type of nodes containing metadata for "Related searches" widgets is 7
+const IMAGE_METADATA = 1
+
+// the field (index) in an image-metadata node which contains its 0-based index
+// within the list of results. this corresponds to the value of the data-ri
+// attribute
+const RESULT_INDEX = 4
 
 /******************************** helper functions ****************************/
 
-// return a wrapper for XmlHttpRequest#open which intercepts image-metadata
-// requests and appends the results to our metadata store (array)
+/*
+ * return a wrapper for XmlHttpRequest#open which intercepts image-metadata
+ * requests and appends the results to our metadata store (array)
+ */
 function hookXhrOpen (oldOpen, $container) {
     return /** @this {XMLHttpRequest} */ function open (method, url) {
         GMCompat.apply(this, oldOpen, arguments) // there's no return value
@@ -49,7 +64,7 @@ function hookXhrOpen (oldOpen, $container) {
             }
 
             try {
-                METADATA = METADATA.concat(imageMetadata(parsed))
+                mergeImageMetadata(parsed)
                 // process the new images
                 $container.children(SELECTOR).each(onResult)
             } catch (e) {
@@ -59,33 +74,51 @@ function hookXhrOpen (oldOpen, $container) {
     }
 }
 
-// return the image metadata subtree (array) of the full metadata tree
-function imageMetadata (tree) {
-    return tree[31][0][12][2]
+/*
+ * extract image metadata from the full-metadata tree and add it to the cache
+ */
+function mergeImageMetadata (root) {
+    for (const node of root[31][0][12][2]) {
+        // the first child is the node's type (1 for image metadata)
+        const type = node[NODE_TYPE]
+
+        // other nodes are ignored, e.g. metadata for "Related searches" widgets
+        if (type !== IMAGE_METADATA) {
+            continue
+        }
+
+        // the 0-based index of the image in the list of results (data-ri)
+        const index = node[RESULT_INDEX]
+
+        // there is more metadata in the node, but for now we only need the
+        // URL
+        const imageUrl = node[1][3][0]
+
+        METADATA.set(index, imageUrl)
+    }
 }
 
-// determine whether an XHR request is an image-metadata request
+/*
+ * determine whether an XHR request is an image-metadata request
+ */
 function isImageDataRequest (method, url) {
     return method.toUpperCase() === 'POST' && /\/batchexecute\?rpcids=/.test(url)
 }
 
-// return the URL for the nth image (0-based) and remove its data from the tree
-function nthImageUrl (index) {
-    const result = METADATA[index][1][3][0]
-    delete METADATA[index]
-    return result
-}
-
-// event handler for image links, page links and result elements which prevents
-// their click/mousedown events being intercepted
+/*
+ * event handler for image links, page links and result elements which prevents
+ * their click/mousedown events being intercepted
+ */
 function stopPropagation (e) {
     e.stopPropagation()
 }
 
 /************************************* main ************************************/
 
-// extract the data for the first ≈ 100 images embedded in the page and register
-// a listener for the requests for additional data
+/*
+ * extract the data for the first ≈ 100 images embedded in the page and register
+ * a listener for the requests for additional data
+ */
 function init () {
     const $container = $('.islrc')
 
@@ -93,24 +126,19 @@ function init () {
         throw new Error("Can't find results container")
     }
 
-    const initialMetadata = imageMetadata(GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
-
-    // clone the data so we can mutate it (remove obsolete entries)
-    //
-    // XXX this (or at least a shallow clone) is also needed to avoid permission
-    // errors in Violentmonkey for Firefox (but not Violentmonkey for Chrome)
-    METADATA = JSON.parse(JSON.stringify(initialMetadata))
+    // @ts-ignore
+    mergeImageMetadata(GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
 
     // there's static data for the first ~100 images, but only the first 50 are
-    // shown initially. the next 50 are loaded dynamically and then the
+    // shown initially. the next 50 are displayed dynamically and then the
     // remaining images are fetched in batches of 100. this handles images 50-99
     const callback = (_mutations, observer) => {
         const $elements = $container.children(SELECTOR)
 
         for (const el of $elements) {
-            const index = $(el).data('ri')
+            const index = $(el).data('ri') // data() converts it to an integer
 
-            if (index < METADATA.length) {
+            if (METADATA.has(index)) {
                 onResult.call(el)
             } else {
                 observer.disconnect()
@@ -129,24 +157,26 @@ function init () {
     xhrProto.open = GMCompat.export(hookXhrOpen(xhrProto.open, $container)) // 100+
 }
 
-// process an image result (DIV), assigning the image URL to its first link and
-// disabling interceptors
-//
-// used to process the original batch of results as well as the lazily-loaded
-// updates
-
-/** @this {HTMLDivElement} */
+/**
+ * process an image result (DIV), assigning the image URL to its first link and
+ * disabling interceptors
+ *
+ * used to process the original batch of results as well as the lazily-loaded
+ * updates
+ *
+ * @this {HTMLDivElement}
+ */
 function onResult () {
     // grab the metadata for this result
     const $result = $(this)
     const index = $result.data('ri') // 0-based index of the result
+    const imageUrl = METADATA.get(index)
 
-    let imageUrl
-
-    try {
-        imageUrl = nthImageUrl(index)
-    } catch (e) {
-        console.error(`Can't find image URL for result (${index}):`, e)
+    if (imageUrl) {
+        // no longer needed: release the memory
+        METADATA.delete(index)
+    } else {
+        console.error(`Can't find image URL for result (${index})`)
         return // continue
     }
 
