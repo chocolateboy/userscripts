@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.4.0
+// @version       2.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -13,14 +13,15 @@
 // @grant         GM_log
 // ==/UserScript==
 
+// selector for image result elements (DIVs) which haven't been processed
 // @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
 const SELECTOR = 'div[data-ri][data-ved][jsaction]'
 
 // events to intercept (stop propagating) in result elements
 const EVENTS = 'auxclick click focus focusin mousedown touchstart'
 
-// cache which maps an image's 0-based index to its URL
-const METADATA = new Map()
+// metadata cache which maps an image's 0-based index to its URL
+const CACHE = new Map()
 
 // the first child of a node (array) contains the node's type (integer)
 const NODE_TYPE = 0
@@ -38,7 +39,7 @@ const RESULT_INDEX = 4
 
 /*
  * return a wrapper for XmlHttpRequest#open which intercepts image-metadata
- * requests and appends the results to our metadata store (array)
+ * requests and appends the results to our metadata cache
  */
 function hookXhrOpen (oldOpen, $container) {
     return /** @this {XMLHttpRequest} */ function open (method, url) {
@@ -94,7 +95,7 @@ function mergeImageMetadata (root) {
         // URL
         const imageUrl = node[1][3][0]
 
-        METADATA.set(index, imageUrl)
+        CACHE.set(index, imageUrl)
     }
 }
 
@@ -138,7 +139,7 @@ function init () {
         for (const el of $elements) {
             const index = $(el).data('ri') // data() converts it to an integer
 
-            if (METADATA.has(index)) {
+            if (CACHE.has(index)) {
                 onResult.call(el)
             } else {
                 observer.disconnect()
@@ -170,11 +171,11 @@ function onResult () {
     // grab the metadata for this result
     const $result = $(this)
     const index = $result.data('ri') // 0-based index of the result
-    const imageUrl = METADATA.get(index)
+    const imageUrl = CACHE.get(index)
 
     if (imageUrl) {
         // no longer needed: release the memory
-        METADATA.delete(index)
+        CACHE.delete(index)
     } else {
         console.error(`Can't find image URL for result (${index})`)
         return // continue
