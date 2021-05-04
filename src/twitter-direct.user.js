@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.7.2
+// @version       1.7.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -652,9 +652,9 @@ function transform (data, uri) {
     // URI matches and transition to the wildcard match
     const state = { matched: false }
 
-    // an iterator which yields { pattern => query } pairs for this document. if
-    // a document's URI matches the pattern, the corresponding queries (search +
-    // replace) are executed
+    // an iterator which yields { pattern => queries } pairs for this document.
+    // if a document's URI matches the pattern, the corresponding queries
+    // (search + replace) are executed
     const it = router(data, state)
 
     for (const [key, value] of it) {
