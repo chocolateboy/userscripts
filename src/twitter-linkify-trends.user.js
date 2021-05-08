@@ -3,9 +3,9 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.4.1
+// @version       1.5.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
@@ -247,12 +247,12 @@ function onEventElement ($event, $image, options = {}) {
  */
 function onTrendElement ($trend) {
     const { $target, title } = targetFor($trend)
-    const unquoted = title.replace(/"/g, '')
+    const param = /\s+/.test(title) ? ('"' + title.replace(/"/g, '') + '"') : title
 
-    // console.debug('trend (element):', JSON.stringify(unquoted))
+    // console.debug('trend (element):', JSON.stringify(param))
 
-    const query = encodeURIComponent('"' + unquoted + '"')
-    const url = `${location.origin}/search?q=${query}`
+    const query = encodeURIComponent(param)
+    const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`
 
     $target.wrap(linkFor(url))
 }
