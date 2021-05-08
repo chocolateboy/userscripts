@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.4.1
+// @version       2.4.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -39,7 +39,7 @@ const RESULT_INDEX = 4
 
 /*
  * return a wrapper for XmlHttpRequest#open which intercepts image-metadata
- * requests and appends the results to our metadata cache
+ * requests and adds the results to our metadata cache
  */
 function hookXhrOpen (oldOpen, $container) {
     return /** @this {XMLHttpRequest} */ function open (method, url) {
@@ -76,7 +76,7 @@ function hookXhrOpen (oldOpen, $container) {
 }
 
 /*
- * extract image metadata from the full-metadata tree and add it to the cache
+ * extract image metadata from the full metadata tree and add it to the cache
  */
 function mergeImageMetadata (root) {
     for (const node of root[31][0][12][2]) {
@@ -134,13 +134,13 @@ function init () {
     // shown initially. the next 50 are displayed dynamically and then the
     // remaining images are fetched in batches of 100. this handles images 50-99
     const callback = (_mutations, observer) => {
-        const $elements = $container.children(SELECTOR)
+        const $results = $container.children(SELECTOR)
 
-        for (const el of $elements) {
-            const index = $(el).data('ri') // data() converts it to an integer
+        for (const result of $results) {
+            const index = $(result).data('ri') // data() converts it to an integer
 
             if (CACHE.has(index)) {
-                onResult.call(el)
+                onResult.call(result)
             } else {
                 observer.disconnect()
                 break
