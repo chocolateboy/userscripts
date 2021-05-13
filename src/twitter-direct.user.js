@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.7.3
+// @version       1.8.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -125,7 +125,7 @@ const MATCH = [
             {
                 root: 'data.bookmark_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
                 scan: TWEET_PATHS,
-                targets:[
+                targets: [
                     {
                         url: 'quoted_status_permalink.url',
                         expanded_url: 'quoted_status_permalink.expanded',
@@ -133,13 +133,13 @@ const MATCH = [
                 ]
             },
             {
-                root: 'data.bookmark_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
+                root: 'data.bookmark_timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy',
 
                 // just expand the URLs in the specified locations within the
                 // card; there's no user or tweet data under this root
                 scan: NONE,
 
-                targets: ['legacy.binding_values', 'legacy.url'],
+                targets: ['binding_values', 'url'],
             },
         ],
     ],
@@ -244,6 +244,28 @@ const MATCH = [
         'data.retweeters_timeline.timeline.instructions.*.entries.*.content.itemContent.user.legacy'
     ],
     [
+        /\/TweetDetail$/, [
+            'data.threaded_conversation_with_injections.instructions.*.entries.*.content.itemContent.tweet.card.legacy.user_refs.*.legacy',
+            {
+                root: 'data.threaded_conversation_with_injections.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.threaded_conversation_with_injections.instructions.*.entries.*.content.items.*.item.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+            },
+            {
+                root: 'data.threaded_conversation_with_injections.instructions.*.entries.*.content.items.*.item.itemContent.tweet.core.user.legacy',
+                targets: ['url'],
+            },
+            {
+                root: 'data.threaded_conversation_with_injections.instructions.*.entries.*.content.itemContent.tweet.card.legacy',
+                scan: NONE,
+                targets: ['binding_values', 'url', 'user_refs.*.legacy.url'],
+            }
+        ],
+    ],
+    [
         // used for hovercard data
         /\/UserByScreenName$/, {
             root: 'data.user.legacy',
@@ -259,16 +281,25 @@ const MATCH = [
     [
         // e.g. /i/api/graphql/abcd1234/UserMedia
         /\/UserMedia$/, [
-            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy.user_refs.*.legacy',
             'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
             'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.card.legacy.user_refs.*.legacy',
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.legacy',
                 scan: TWEET_PATHS,
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.quoted_status.legacy',
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
                 scan: TWEET_PATHS,
+                targets: [
+                    {
+                        url: 'quoted_status_permalink.url',
+                        expanded_url: 'quoted_status_permalink.expanded',
+                    },
+                ],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy.user_refs.*.legacy',
+                targets: ['url'],
             },
         ]
     ],
@@ -276,7 +307,6 @@ const MATCH = [
         // e.g. /i/api/graphql/abcd1234/UserTweets
         /\/UserTweets$/, [
             'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
-            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.core.user.legacy',
             'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.core.user.legacy',
             'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.user.legacy',
             'data.user.result.timeline.timeline.instructions.*.entry.content.itemContent.tweet.core.user.legacy',
@@ -285,11 +315,11 @@ const MATCH = [
                 collect: Array.of,
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.legacy',
                 scan: TWEET_PATHS,
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.legacy',
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.quoted_status.legacy',
                 scan: TWEET_PATHS,
             },
             {
@@ -297,14 +327,63 @@ const MATCH = [
                 scan: TWEET_PATHS,
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
-                scan: NONE,
-                targets: ['legacy.binding_values', 'legacy.url'],
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.quoted_status.card.legacy',
+                targets: ['binding_values', 'url'],
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card',
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.card.legacy.user_refs.*.legacy',
+                targets: ['url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.quoted_status.card.legacy.user_refs.*.legacy',
+                targets: ['url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card.legacy.user_refs.*.legacy',
+                targets: ['url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.core.user.legacy',
+                targets: ['url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy.user_refs.*.legacy',
+                targets: ['url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
+                scan: TWEET_PATHS,
+                targets: [
+                    {
+                        url: 'quoted_status_permalink.url',
+                        expanded_url: 'quoted_status_permalink.expanded',
+                    },
+                ],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.legacy',
+                scan: TWEET_PATHS,
+                targets: [
+                    {
+                        url: 'quoted_status_permalink.url',
+                        expanded_url: 'quoted_status_permalink.expanded',
+                    },
+                ],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy',
                 scan: NONE,
-                targets: ['legacy.binding_values', 'legacy.url'],
+                targets: ['binding_values', 'url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card.legacy',
+                scan: NONE,
+                targets: ['binding_values', 'url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.card.legacy',
+                scan: NONE,
+                targets: ['binding_values', 'url'],
             },
         ]
     ],
@@ -312,7 +391,6 @@ const MATCH = [
         // e.g. /i/api/graphql/abcd1234/UserTweetsAndReplies
         /\/UserTweetsAndReplies$/, [
             'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.core.user.legacy',
-            'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.core.user.legacy',
             'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.core.user.legacy',
             'data.user.result.timeline.timeline.instructions.*.entry.content.itemContent.tweet.core.user.legacy',
             {
@@ -322,29 +400,49 @@ const MATCH = [
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy',
                 scan: TWEET_PATHS,
+                targets: [
+                    {
+                        url: 'quoted_status_permalink.url',
+                        expanded_url: 'quoted_status_permalink.expanded',
+                    },
+                ]
             },
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.legacy',
                 scan: TWEET_PATHS,
+                targets: [
+                    {
+                        url: 'quoted_status_permalink.url',
+                        expanded_url: 'quoted_status_permalink.expanded',
+                    },
+                ],
             },
             {
                 root: 'data.user.result.timeline.timeline.instructions.*.entry.content.itemContent.tweet.legacy',
                 scan: TWEET_PATHS,
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.card',
-                scan: NONE,
-                targets: ['legacy.binding_values', 'legacy.url'],
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.core.user.legacy',
+                targets: ['url'],
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card',
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.items.*.item.itemContent.tweet.card.legacy',
                 scan: NONE,
-                targets: ['legacy.binding_values', 'legacy.url'],
+                targets: ['binding_values', 'url'],
             },
             {
-                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card',
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy',
                 scan: NONE,
-                targets: ['legacy.binding_values', 'legacy.url'],
+                targets: ['binding_values', 'url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.legacy.retweeted_status.card.legacy',
+                scan: NONE,
+                targets: ['binding_values', 'url'],
+            },
+            {
+                root: 'data.user.result.timeline.timeline.instructions.*.entries.*.content.itemContent.tweet.card.legacy.user_refs.*.legacy',
+                targets: ['url'],
             },
         ]
     ],
