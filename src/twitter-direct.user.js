@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -78,8 +78,8 @@ const TRACKING_DOMAIN = 't.co'
 const TWITTER_API = /^(?:(?:api|mobile)\.)?twitter\.com$/
 
 /*
- * a list of document paths which are known to not contain t.co URLs and which
- * therefore don't need to be processed
+ * a list of document URIs (paths) which are known to not contain t.co URLs and
+ * which therefore don't need to be processed
  */
 const URL_BLACKLIST = new Set([
     '/i/api/2/badge_count/badge_count.json',
@@ -129,17 +129,6 @@ const hookXHRSend = oldSend => {
         oldSend.call(this, body)
     }
 }
-
-/*
- * returns true if the supplied value is a plain object,
- * false otherwise
- *
- * only used with JSON data, so doesn't need to be foolproof
- */
-const isPlainObject = (function () {
-    const toString = {}.toString
-    return value => toString.call(value) === '[object Object]'
-})()
 
 /*
  * return true if the domain of the supplied URL (string) is t.co, false
