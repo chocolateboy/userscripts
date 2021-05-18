@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.0
+// @version       2.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -51,7 +51,6 @@ const LEGACY_KEYS = [
     'extended_entities',
     'quoted_status_permalink',
     'retweeted_status',
-    'url',
     'user_refs',
 ]
 
@@ -279,23 +278,12 @@ const replacerFor = state => /** @this {any} */ function replacer (key, value) {
         }
     }
 
-    // reduce the keys under this.legacy (typically around 30) to the handful we
-    // care about
-    if (key === 'legacy' && isPlainObject(value)) {
-        const filtered = {}
-
-        for (let i = 0; i < LEGACY_KEYS.length; ++i) {
-            const key = LEGACY_KEYS[i]
-
-            if (key in value) {
-                filtered[key] = value[key]
-            }
-        }
-
-        return filtered
-    }
-
     // expand t.co URL nodes in place
+    //
+    // note this comes before the "legacy" check because legacy.url is a common
+    // location and it needs to be modified in place rather than transferred to
+    // a new object with a subset of the keys. this doesn't apply to the other
+    // legacy keys as they all point to objects/arrays
     if (URL_KEYS.has(key) && isTrackedUrl(value)) {
         const { seen, unresolved } = state
 
@@ -317,6 +305,23 @@ const replacerFor = state => /** @this {any} */ function replacer (key, value) {
 
             targets.push({ target: this, key })
         }
+    }
+
+    // reduce the keys under this.legacy (typically around 30) to the handful we
+    // care about
+    if (key === 'legacy' && isPlainObject(value)) {
+        // we could use an array, but it doesn't appear to be faster (in v8)
+        const filtered = {}
+
+        for (let i = 0; i < LEGACY_KEYS.length; ++i) {
+            const key = LEGACY_KEYS[i]
+
+            if (key in value) {
+                filtered[key] = value[key]
+            }
+        }
+
+        return filtered
     }
 
     // shrink terminals (don't waste space/memory in the (discarded) JSON)
