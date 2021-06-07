@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.1
+// @version       2.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -51,6 +51,7 @@ const LEGACY_KEYS = [
     'extended_entities',
     'quoted_status_permalink',
     'retweeted_status',
+    'retweeted_status_result',
     'user_refs',
 ]
 
