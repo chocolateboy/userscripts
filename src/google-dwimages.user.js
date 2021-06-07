@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.4.2
+// @version       2.4.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -13,27 +13,30 @@
 // @grant         GM_log
 // ==/UserScript==
 
-// selector for image result elements (DIVs) which haven't been processed
-// @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
-const SELECTOR = 'div[data-ri][data-ved][jsaction]'
-
-// events to intercept (stop propagating) in result elements
-const EVENTS = 'auxclick click focus focusin mousedown touchstart'
-
 // metadata cache which maps an image's 0-based index to its URL
 const CACHE = new Map()
 
-// the first child of a node (array) contains the node's type (integer)
-const NODE_TYPE = 0
+// events to intercept (stop propagating) in result elements
+const EVENTS = 'auxclick click focus focusin mousedown touchstart'
 
 // the type of image-metadata nodes; other types may be found in the tree, e.g.
 // the type of nodes containing metadata for "Related searches" widgets is 7
 const IMAGE_METADATA = 1
 
+// a pattern which matches the endpoint for image metadata requests
+const IMAGE_METADATA_ENDPOINT = /\/batchexecute\?rpcids=/
+
+// the first child of a node (array) contains the node's type (integer)
+const NODE_TYPE = 0
+
 // the field (index) in an image-metadata node which contains its 0-based index
 // within the list of results. this corresponds to the value of the data-ri
 // attribute
 const RESULT_INDEX = 4
+
+// selector for image result elements (DIVs) which haven't been processed
+// @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
+const UNPROCESSED_RESULTS = 'div[data-ri][data-ved][jsaction]'
 
 /******************************** helper functions ****************************/
 
@@ -43,7 +46,8 @@ const RESULT_INDEX = 4
  */
 function hookXhrOpen (oldOpen, $container) {
     return /** @this {XMLHttpRequest} */ function open (method, url) {
-        GMCompat.apply(this, oldOpen, arguments) // there's no return value
+        // delegate to the original (there's no return value)
+        GMCompat.apply(this, oldOpen, arguments)
 
         if (!isImageDataRequest(method, url)) {
             return
@@ -67,7 +71,7 @@ function hookXhrOpen (oldOpen, $container) {
             try {
                 mergeImageMetadata(parsed)
                 // process the new images
-                $container.children(SELECTOR).each(onResult)
+                $container.children(UNPROCESSED_RESULTS).each(onResult)
             } catch (e) {
                 console.error("Can't merge new metadata:", e)
             }
@@ -103,7 +107,7 @@ function mergeImageMetadata (root) {
  * determine whether an XHR request is an image-metadata request
  */
 function isImageDataRequest (method, url) {
-    return method.toUpperCase() === 'POST' && /\/batchexecute\?rpcids=/.test(url)
+    return method.toUpperCase() === 'POST' && IMAGE_METADATA_ENDPOINT.test(url)
 }
 
 /*
@@ -131,10 +135,10 @@ function init () {
     mergeImageMetadata(GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
 
     // there's static data for the first ~100 images, but only the first 50 are
-    // shown initially. the next 50 are displayed dynamically and then the
-    // remaining images are fetched in batches of 100. this handles images 50-99
+    // shown initially. the next 50 are displayed lazily and then the remaining
+    // images are fetched in batches of 100. this handles images 50-99
     const callback = (_mutations, observer) => {
-        const $results = $container.children(SELECTOR)
+        const $results = $container.children(UNPROCESSED_RESULTS)
 
         for (const result of $results) {
             const index = $(result).data('ri') // data() converts it to an integer
@@ -149,7 +153,7 @@ function init () {
     }
 
     // process the initial images
-    const $initial = $container.children(SELECTOR)
+    const $initial = $container.children(UNPROCESSED_RESULTS)
     const observer = new MutationObserver(callback)
     const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
 
@@ -173,10 +177,7 @@ function onResult () {
     const index = $result.data('ri') // 0-based index of the result
     const imageUrl = CACHE.get(index)
 
-    if (imageUrl) {
-        // no longer needed: release the memory
-        CACHE.delete(index)
-    } else {
+    if (!imageUrl) {
         console.error(`Can't find image URL for result (${index})`)
         return // continue
     }
@@ -187,8 +188,11 @@ function onResult () {
         $(this).removeAttr('jsaction').on(EVENTS, stopPropagation)
     })
 
-    // assign the correct URI to the image link
+    // assign the correct URL to the image link
     $result.find('a').eq(0).attr('href', imageUrl)
+
+    // the URL is no longer needed: release the memory
+    CACHE.delete(index)
 }
 
 try {
