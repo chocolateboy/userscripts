@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       http://*.imdb.tld/title/tt*
@@ -396,12 +396,26 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         }
     }
 
-    let { RTConsensus: consensus, CriticRating: rating, RTUrl: url } = movie
+    let { RTConsensus: consensus, CriticRating: rating, RTUrl: rtUrl } = movie
     let updated = false
+    let url
 
-    if (url) {
+    if (rtUrl) {
         // the new way: the RT URL is provided: scrape the consensus from
         // that page
+
+        /*
+         * remove cruft from the RT URL:
+         *
+         * - before:
+         *
+         *     https://www.rottentomatoes.com/m/foo&amp;bar=123abc
+         *
+         * - after:
+         *
+         *     https://www.rottentomatoes.com/m/foo
+         */
+        url = rtUrl.split('&')[0]
 
         log(`loading RT URL: ${url}`)
         const res = await asyncGet(url)
@@ -524,7 +538,7 @@ async function run () {
     log('id:', imdbId)
 
     const $classicReviewBar = $('.titleReviewBar')
-    const $reactReviewBar = $('[class^="TitleBlock__ButtonContainer-"]')
+    const $reactReviewBar = $('[class^="RatingBar__ButtonContainer-"]:visible')
     const $target = [$classicReviewBar, $reactReviewBar].find(it => it.length)
 
     if (!$target) {
