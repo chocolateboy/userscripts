@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.1
+// @version       3.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       http://*.imdb.tld/title/tt*
@@ -48,6 +48,10 @@
  *
  *     - https://www.imdb.com/title/tt0120755/ - Mission: Impossible II
  */
+
+/// <reference type="greasemonkey/v3">
+/// <reference types="jquery" />
+/// <reference type="tampermonkey">
 
 // [1] unaliased and incorrectly aliased titles are common:
 // http://web.archive.org/web/20151105080717/http://developer.rottentomatoes.com/forum/read/110751/2
@@ -248,47 +252,54 @@ function addLegacyWidget ($target, { balloonOptions, rating, style, url }) {
 }
 
 // add a Rotten Tomatoes widget to the review bar in the new UI
+/** @param {JQuery} $target */
 function addReactWidget ($target, { balloonOptions, rating, style, url }) {
     log('adding widget')
 
     // clone the IMDb rating widget: https://git.io/JtXpQ
     const $imdbRating = $target.children().first()
-    const $rtRating = $imdbRating.clone().attr('id', 'rt-rating')
+    const $rtRating = $imdbRating.clone()
 
-    // 1) set the star (SVG) to the right color
+    // 1) assign a unique ID
+    $rtRating.attr('id', 'rt-rating')
+
+    // 2) set the star (SVG) to the right color
     GM_addStyle(`#rt-rating svg { color: ${COLOR[style]} }`)
 
-    // 2) remove the review count and its preceding spacer element
-    const $reviewCount = $rtRating
+    // 3) remove the review count and its preceding spacer element
+    $rtRating
         .find('[class^="AggregateRatingButton__TotalRatingAmount-"]')
+        .prev()
+        .addBack()
+        .remove()
 
-    $reviewCount.add($reviewCount.prev()).remove()
-
-    // 3) replace "IMDb Rating" with "RT Rating"
-    $rtRating.find('[class^="TitleBlockButtonBase__Header-"]')
+    // 4) replace "IMDb Rating" with "RT Rating"
+    $rtRating.find('[class^="RatingBarButtonBase__Header-"]')
         .text('RT RATING')
 
-    // 4) remove the "/ 10" suffix
-    const $score = $rtRating
-        .find('[data-testid="hero-title-block__aggregate-rating__score"]')
-        .children()
-
-    $score.last().remove()
-
-    // 5) replace the IMDb rating with the RT score
+    // 5) replace the IMDb rating with the RT score and remove the "/ 10" suffix
     const score = rating === -1 ? 'N/A' : `${rating}%`
+    $rtRating
+        .find('[class^="AggregateRatingButton__RatingScore-"]')
+        .text(score)
+        .next()
+        .remove()
 
-    $score.first().text(score)
+    // 7) rename the testids, e.g.:
+    // hero-rating-bar__aggregate-rating -> hero-rating-bar__rt-rating
+    $rtRating.find('[data-testid]').addBack().each(function () {
+        $(this).attr('data-testid', (_, id) => id.replace('aggregate', 'rt'))
+    })
 
-    // 6) add the tooltip class to the link and update its label and URL
+    // 8) add the tooltip class to the link and update its label and URL
     $rtRating.find('a[role="button"]')
         .addClass('rt-consensus')
+        // @ts-ignore
         .balloon(balloonOptions)
         .attr('aria-label', 'View RT Rating')
         .attr('href', url)
 
-    // 7) prepend the element to the review bar
-
+    // 9) prepend the element to the review bar
     // defer to work around React reconciliation
     onPageShow(() => {
         $target.prepend($rtRating)
@@ -297,6 +308,7 @@ function addReactWidget ($target, { balloonOptions, rating, style, url }) {
 }
 
 // add a Rotten Tomatoes widget to the review bar
+/** @type {(target: JQuery, data: any) => void} */
 function addWidget ($target, data) {
     const { consensus, rating } = data
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
