@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.2
+// @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       http://*.imdb.tld/title/tt*
@@ -96,9 +96,10 @@ const DATA_VERSION = SCHEMA_VERSION + '/' + SCRIPT_VERSION.replace(/\.\d+$/, '')
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
     css: {
-        maxWidth: '31rem',
         fontFamily: 'Roboto, Helvetica, Arial, sans-serif',
         fontSize: '0.9rem',
+        lineHeight: '1.26rem',
+        maxWidth: '31rem',
         padding: '0.75rem',
     },
     html: true,
