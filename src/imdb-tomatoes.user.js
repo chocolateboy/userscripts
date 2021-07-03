@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.2.0
+// @version       4.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       http://*.imdb.tld/title/tt*
@@ -12,9 +12,10 @@
 // @include       https://*.imdb.tld/*/title/tt*
 // @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
+// @require       https://unpkg.com/dayjs@1.10.5/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.10.5/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
-// @require       https://unpkg.com/@chocolatey/when@1.2.0/dist/index.umd.min.js
 // @resource      query https://pastebin.com/raw/rynukt2g
 // @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
 // @grant         GM_addStyle
@@ -30,19 +31,7 @@
 // ==/UserScript==
 
 /*
- * OK:
- *
- *   - https://www.imdb.com/title/tt0309698/ - 4 widgets
- *   - https://www.imdb.com/title/tt0086312/ - 3 widgets
- *   - https://www.imdb.com/title/tt0037638/ - 2 widgets
- *
  * Fixed:
- *
- *   layout:
- *
- *     - https://www.imdb.com/title/tt0162346/  - 4 widgets
- *     - https://www.imdb.com/title/tt0159097/  - 4 widgets
- *     - https://www.imdb.com/title/tt0129387/ - 2 .plot_summary_wrapper DIVs
  *
  *   RT/OMDb alias [1]:
  *
@@ -63,13 +52,16 @@
 
 'use strict';
 
-const NO_CONSENSUS   = 'No consensus yet.'
-const NO_RESULTS     = 'no results found'
-const ONE_DAY        = 1000 * 60 * 60 * 24
-const ONE_WEEK       = ONE_DAY * 7
-const SCRIPT_NAME    = GM_info.script.name
-const SCRIPT_VERSION = GM_info.script.version
-const THIS_YEAR      = new Date().getFullYear()
+/* begin */ {
+
+const INACTIVE_MONTHS = 6
+const NO_CONSENSUS    = 'No consensus yet.'
+const NO_RESULTS      = 'no results found'
+const ONE_DAY         = 1000 * 60 * 60 * 24
+const ONE_WEEK        = ONE_DAY * 7
+const SCRIPT_NAME     = GM_info.script.name
+const SCRIPT_VERSION  = GM_info.script.version
+const THIS_YEAR       = new Date().getFullYear()
 
 const COLOR = {
     tbd: '#d9d9d9',
@@ -77,21 +69,20 @@ const COLOR = {
     unfavorable: '#ff0000',
 }
 
-const COMPACT_LAYOUT = [
-    '.plot_summary_wrapper .minPlotHeightWithPoster', // XXX probably obsolete
-    '.plot_summary_wrapper .minPlotHeightWithPosterAndWatchlistButton', // XXX probably obsolete
-    '.minPosterWithPlotSummaryHeight .plot_summary_wrapper',
-].join(', ')
-
 // the version of each cached record is a combination of the schema version and
-// the <major>.<minor> parts of the script's (SemVer) version, e.g. 3 (schema
-// version) + 1.7.0 (script version) gives a version of "3/1.7"
+// the major part of the script's (SemVer) version, and an additional number
+// (the cache-generation) which can be incremented to force the cache to be
+// cleared. the generation is reset when the schema or major versions change
 //
-// this means cached records are invalidated either a) when the schema changes
-// or b) when the major or minor version (i.e. not the patch version) of the
-// script changes
+// e.g. 4 (schema) + 3 (major) + 0 (generation) gives a version of "4/3.0"
+//
+// this means cached records are invalidated either a) when the schema changes,
+// b) when the major version of the script changes, or c) when the generation is
+// bumped
 const SCHEMA_VERSION = 4
-const DATA_VERSION = SCHEMA_VERSION + '/' + SCRIPT_VERSION.replace(/\.\d+$/, '') // e.g. 3/1.7
+const SCRIPT_MAJOR = SCRIPT_VERSION.split('.')[0]
+const CACHE_GENERATION = 0
+const DATA_VERSION = `${SCHEMA_VERSION}/${SCRIPT_MAJOR}.${CACHE_GENERATION}`
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -107,11 +98,7 @@ const BALLOON_OPTIONS = {
 }
 
 // log a message to the console
-const log = console.log
-
-// run a function when the +pageshow+ event fires, or immediately if it has fired
-// already
-const onPageShow = exports.when(done => $(window).one('pageshow', done))
+const { debug, info, log } = console
 
 // a custom version of get-wild's `get` function which uses a simpler/faster
 // path parser since we don't use the extended syntax
@@ -120,9 +107,7 @@ const pluck = exports.getter({ split: '.' })
 // register a jQuery plugin which extracts and returns JSON-LD data for the
 // current page.
 //
-// used to extract metadata on legacy IMDb and Rotten Tomatoes
-//
-// @ts-ignore
+// used to extract metadata on Rotten Tomatoes
 $.fn.jsonLd = function jsonLd (id) {
     const $script = this.find('script[type="application/ld+json"]')
 
@@ -177,95 +162,45 @@ function adaptOmdbData (data) {
     }
 }
 
-// add a Rotten Tomatoes widget to the review bar in the legacy UI
-function addLegacyWidget ($target, { balloonOptions, rating, style, url }) {
-    // reduce the amount of space taken up by the Metacritic widget
-    // and make it consistent with our style (i.e. site name rather
-    // than domain name)
-    $target.find('a[href="http://www.metacritic.com"]').text('Metacritic')
+/**
+ * add a Rotten Tomatoes widget to the ratings bar
+ *
+ * @param {JQuery} $ratings
+ * @param {JQuery} $imdbRating
+ * @param {Object} data
+ * @param {string} data.url
+ * @param {string} data.consensus
+ * @param {number} data.rating
+ */
+function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
+    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
 
-    // 4 review widgets is too many for the "compact" layout (i.e.
-    // a poster but no trailer). it's designed for a maximum of 3.
-    // to work around this, we hoist the review bar out of the
-    // movie-info block (.plot_summary_wrapper) and float it left
-    // beneath the poster, e.g.:
-    //
-    // before:
-    //
-    // [  [        ] [                    ] ]
-    // [  [        ] [                    ] ]
-    // [  [ Poster ] [        Info        ] ]
-    // [  [        ] [                    ] ]
-    // [  [        ] [ [MC] [IMDb] [etc.] ] ]
-    //
-    // after:
-    //
-    // [  [        ] [                    ] ]
-    // [  [        ] [                    ] ]
-    // [  [ Poster ] [        Info        ] ]
-    // [  [        ] [                    ] ]
-    // [  [        ] [                    ] ]
-    // [                                    ]
-    // [  [RT] [MC] [IMDb] [etc.]           ]
+    let style
 
-    if ($(COMPACT_LAYOUT).length && $target.find('.titleReviewBarItem').length > 2) {
-        const $clear = $('<div class="clear">&nbsp;</div>')
-
-        // sometimes there are two Info (.plot_summary_wrapper) DIVs (e.g.
-        // [1]). the first is (currently) empty and the second contains the
-        // actual markup. this may be a transient error in the markup, or
-        // may be used somehow (e.g. for mobile). if targeted, the first one
-        // is displayed above the visible Plot/Info row, whereas the second
-        // one is to the right of the poster, as expected, so we target that
-        //
-        // [1] https://www.imdb.com/title/tt0129387/
-        $('.plot_summary_wrapper').last().after($target.remove())
-
-        $target.before($clear).after($clear).css({
-            'float':          'left',
-            'padding-top':    '11px',
-            'padding-bottom': '0px',
-        })
+    if (rating === -1) {
+        style = 'tbd'
+    } else if (rating < 60) {
+        style = 'unfavorable'
+    } else {
+        style = 'favorable'
     }
 
-    const score = rating === -1 ? 'N/A' : rating
-
-    const html = `
-        <div id="rt-rating" class="titleReviewBarItem">
-            <a href="${url}"><div
-                class="rt-consensus metacriticScore score_${style} titleReviewBarSubItem"><span>${score}</span></div></a>
-           <div class="titleReviewBarSubItem">
-               <div>
-                   <a href="${url}">Tomatometer</a>
-               </div>
-               <div>
-                   <span class="subText">
-                       From <a href="https://www.rottentomatoes.com" target="_blank">Rotten Tomatoes</a>
-                   </span>
-               </div>
-            </div>
-        </div>
-        <div class="divider"></div>
-    `
-    $target.prepend(html)
-    $target.find('.rt-consensus').balloon(balloonOptions)
-    log('added widget')
-}
-
-// add a Rotten Tomatoes widget to the review bar in the new UI
-/** @param {JQuery} $target */
-function addReactWidget ($target, { balloonOptions, rating, style, url }) {
-    log('adding widget')
-
-    // clone the IMDb rating widget: https://git.io/JtXpQ
-    const $imdbRating = $target.children().first()
+    // clone the IMDb rating widget
     const $rtRating = $imdbRating.clone()
 
     // 1) assign a unique ID
     $rtRating.attr('id', 'rt-rating')
 
-    // 2) set the star (SVG) to the right color
-    GM_addStyle(`#rt-rating svg { color: ${COLOR[style]} }`)
+    // 2) add a custom stylesheet which:
+    //
+    // - sets the star (SVG) to the right color
+    // - restores support for italics in the consensus text
+    // - reorders the appended widget (see attachWidget)
+    GM_addStyle(`
+        #rt-rating svg { color: ${COLOR[style]}; }
+        #rt-rating { order: -1; }
+        .rt-consensus-balloon em { font-style: italic; }
+    `)
 
     // 3) remove the review count and its preceding spacer element
     $rtRating
@@ -286,51 +221,21 @@ function addReactWidget ($target, { balloonOptions, rating, style, url }) {
         .next()
         .remove()
 
-    // 7) rename the testids, e.g.:
+    // 6) rename the testids, e.g.:
     // hero-rating-bar__aggregate-rating -> hero-rating-bar__rt-rating
     $rtRating.find('[data-testid]').addBack().each(function () {
         $(this).attr('data-testid', (_, id) => id.replace('aggregate', 'rt'))
     })
 
-    // 8) add the tooltip class to the link and update its label and URL
+    // 7) add the tooltip class to the link and update its label and URL
     $rtRating.find('a[role="button"]')
         .addClass('rt-consensus')
-        // @ts-ignore
         .balloon(balloonOptions)
         .attr('aria-label', 'View RT Rating')
         .attr('href', url)
 
-    // 9) prepend the element to the review bar
-    // defer to work around React reconciliation
-    onPageShow(() => {
-        $target.prepend($rtRating)
-        log('added widget')
-    })
-}
-
-// add a Rotten Tomatoes widget to the review bar
-/** @type {(target: JQuery, data: any) => void} */
-function addWidget ($target, data) {
-    const { consensus, rating } = data
-    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
-
-    let style
-
-    if (rating === -1) {
-        style = 'tbd'
-    } else if (rating < 60) {
-        style = 'unfavorable'
-    } else {
-        style = 'favorable'
-    }
-
-    const options = { ...data, balloonOptions, style }
-
-    if ($target.hasClass('titleReviewBar')) { // legacy UI
-        addLegacyWidget($target, options)
-    } else { // new UI
-        addReactWidget($target, options)
-    }
+    // 8) prepend the element to the ratings bar
+    attachWidget($ratings, $rtRating)
 }
 
 // promisified cross-origin HTTP requests
@@ -351,6 +256,54 @@ function asyncGet (url, options = {}) {
 
         GM_xmlhttpRequest(request)
     })
+}
+
+/*
+ * attach the RT ratings widget to the ratings bar
+ *
+ * although the widget appears to be prepended to the bar, we need to append it
+ * (and reorder it via CSS) to work around React reconciliation (syncing the DOM
+ * to its underlying model (props)) after we've added the RT widget
+ *
+ * when this synchronisation is performed, React will try to restore nodes
+ * (attributes, text, elements) within each widget to match the widget's props,
+ * so the first widget will be updated in place to match the data for the IMDb
+ * rating etc. this changes some, but not all nodes within an element, and most
+ * (all?) attributes added to/changed in the RT widget remain in the updated
+ * IMDb widget, including its ID attribute (rt-rating) which controls the color
+ * of the rating star. as a result, we end up with a restored IMDb widget but
+ * with an RT-colored star (and with the RT widget removed since it's not in the
+ * ratings-bar model)
+ *
+ * if we *append* the RT widget, none of the other widgets will need to be
+ * changed/updated if the DOM is re-synced so we won't end up with a mangled
+ * IMDb widget; however, our RT widget will still be removed since it's not in
+ * the model. to rectify this, we use a mutation observer to detect the deletion
+ * and reinstate the widget
+ *
+ * @param {JQuery} $target
+ * @param {JQuery} $rtRating
+ */
+function attachWidget ($target, $rtRating) {
+    const init = { childList: true }
+    const target = $target.get(0)
+    const rtRating = $rtRating.get(0)
+    const callback = mutations => {
+        debug('mutations:', mutations)
+
+        // we could detect it in mutations[*].removedNodes, but this is simpler
+        if (target.lastElementChild !== rtRating) {
+            observer.disconnect()
+            target.appendChild(rtRating)
+            observer.observe(target, init)
+            debug('restored widget')
+        }
+    }
+
+    const observer = new MutationObserver(callback)
+    debug('added widget')
+    target.appendChild(rtRating)
+    observer.observe(target, init)
 }
 
 // URL-encode the supplied query parameter and replace encoded spaces ("%20")
@@ -376,7 +329,7 @@ function encodeParams (params) {
 //
 // if there's no consensus, default to "No consensus yet."
 // if there's no rating, default to -1
-async function getRTData ({ response, imdbId, title, fallback }) {
+async function getRTData ({ response, imdbId, fallback }) {
     function fail (message) {
         throw new Error(message)
     }
@@ -410,13 +363,9 @@ async function getRTData ({ response, imdbId, title, fallback }) {
     }
 
     let { RTConsensus: consensus, CriticRating: rating, RTUrl: rtUrl } = movie
-    let updated = false
-    let url
+    let updated, url
 
     if (rtUrl) {
-        // the new way: the RT URL is provided: scrape the consensus from
-        // that page
-
         /*
          * remove cruft from the RT URL:
          *
@@ -444,20 +393,35 @@ async function getRTData ({ response, imdbId, title, fallback }) {
         }
 
         // update the rating
-        // @ts-ignore
         const meta = $rt.jsonLd(url)
         const newRating = meta.aggregateRating.ratingValue
 
-        if (newRating !== rating) {
+        if (newRating != rating) { // string != number
             log(`updating rating: ${rating} -> ${newRating}`)
             rating = newRating
-            updated = true
+        }
+
+        if (meta.review?.length) {
+            debug('reviews:', meta.review.length)
+            const [latest] = meta.review
+                .flatMap(review => {
+                    return review.dateCreated
+                        ? [{ review, mtime: dayjs(review.dateCreated).unix() }]
+                        : []
+                })
+                .sort((a, b) => b.mtime - a.mtime)
+
+            if (latest) {
+                updated = latest.review.dateCreated
+                debug('updated (most recent review):', updated)
+            }
+        }
+
+        if (!updated && (updated = meta.dateModified)) {
+            debug('updated (page modified):', updated)
         }
     } else {
-        // the old way: a rating but no RT URL (or consensus).
-        // may still be used for some old and new releases
-        log(`no Rotten Tomatoes URL for ${imdbId}`)
-        url = `https://www.rottentomatoes.com/search/?search=${encodeURIComponent(title)}`
+        fail(NO_RESULTS)
     }
 
     if (rating == null) {
@@ -470,7 +434,7 @@ async function getRTData ({ response, imdbId, title, fallback }) {
 }
 
 // extract metadata from the GraphQL data embedded in the page
-function graphQlMetadata (imdbId) {
+function getMetadata (imdbId) {
     const meta = JSON.parse($('#__NEXT_DATA__').text())
     const pageType = pluck(meta, 'props.requestContext.pageType')
 
@@ -498,44 +462,14 @@ function graphQlMetadata (imdbId) {
     return { pageType, title, type }
 }
 
-// extract metadata from the JSON+LD data embedded in the page and from metadata
-// elements
-function jsonLdMetadata (imdbId) {
-    // @ts-ignore
-    const meta = $(document).jsonLd(imdbId)
-
-    // override the original title (e.g. "Le fabuleux destin d'Amélie Poulain")
-    // with the English language (US) title (e.g. "Amélie") if available
-    // (the API only supports English-language titles)
-    const title = $('#star-rating-widget').data('title') || meta.name
-
-    return {
-        pageType: prop('pageType'),
-        title,
-        type: meta['@type']
-    }
-}
-
-// extract a property from a META element, or return null if the property is
-// not defined
-function prop (name) {
-    const $meta = $(`meta[property="${name}"]`)
-    return $meta.length ? $meta.attr('content') : null
-}
-
 // purge expired entries
 function purgeCached (date) {
     for (const key of GM_listValues()) {
         const json = GM_getValue(key)
         const value = JSON.parse(json)
 
-        if (value.expires === -1) { // persistent storage (currently unused)
-            if (value.version !== SCHEMA_VERSION) {
-                log(`purging invalid value (obsolete schema version): ${key}`)
-                GM_deleteValue(key)
-            }
-        } else if (value.version !== DATA_VERSION) {
-            log(`purging invalid value (obsolete data version): ${key}`)
+        if (value.version !== DATA_VERSION) {
+            log(`purging invalid value (obsolete data version (${value.version})): ${key}`)
             GM_deleteValue(key)
         } else if (date === -1 || (typeof value.expires !== 'number') || (date > value.expires)) {
             log(`purging expired value: ${key}`)
@@ -545,30 +479,30 @@ function purgeCached (date) {
 }
 
 async function run () {
-    // @ts-ignore
-    const imdbId = location.pathname.match(/\/title\/(tt\d+)/)[1]
+    const imdbId = $('meta[property="imdb:pageConst"]').attr('content')
 
-    log('id:', imdbId)
-
-    const $classicReviewBar = $('.titleReviewBar')
-    const $reactReviewBar = $('[class^="RatingBar__ButtonContainer-"]:visible')
-    const $target = [$classicReviewBar, $reactReviewBar].find(it => it.length)
-
-    if (!$target) {
-        console.info(`Can't find target for ${imdbId}`)
+    if (!imdbId) {
+        // XXX shouldn't get here
+        console.error("can't find IMDb ID:", location.href)
         return
     }
 
-    let meta
+    log('id:', imdbId)
 
-    if ($target === $classicReviewBar) {
-        meta = jsonLdMetadata(imdbId)
-        /* make the background color more legible (darker) if the rating is N/A */
-        GM_addStyle(`.score_tbd { background-color: ${COLOR.tbd} }`)
-    } else if ($target === $reactReviewBar) {
-        meta = graphQlMetadata(imdbId)
-    } else {
-        console.warn(`can't find metadata for ${imdbId}`)
+    // we clone the IMDb widget, so make sure it exists before navigating up to
+    // its container
+    const $imdbRating = $('[data-testid="hero-rating-bar__aggregate-rating"]:visible')
+
+    if (!$imdbRating.length) {
+        info(`can't find IMDb rating for ${imdbId}`)
+        return
+    }
+
+    const $ratings = $imdbRating.parent()
+    const meta = getMetadata(imdbId)
+
+    if (!meta) {
+        console.error(`can't find metadata for ${imdbId}`)
         return
     }
 
@@ -577,17 +511,18 @@ async function run () {
     const { pageType, title, type } = meta
 
     if (type !== 'Movie') {
-        console.info(`invalid type for ${imdbId}: ${type}`)
+        info(`invalid type for ${imdbId}: ${type}`)
         return
     }
 
     if (pageType !== 'title') {
-        console.info(`invalid page type for ${imdbId}: ${pageType}`)
+        info(`invalid page type for ${imdbId}: ${pageType}`)
         return
     }
 
     const now = Date.now()
 
+    debug('data version:', DATA_VERSION)
     purgeCached(now)
 
     // get the cached result for this page
@@ -600,7 +535,7 @@ async function run () {
             log(`cached error (expires: ${expires}):`, cached.error)
         } else {
             log(`cached result (expires: ${expires}):`, cached.data)
-            addWidget($target, cached.data)
+            addWidget($ratings, $imdbRating, cached.data)
         }
 
         return
@@ -630,14 +565,24 @@ async function run () {
 
         log(`response: ${response.status} ${response.statusText}`)
 
-        const { data, updated } = await getRTData({
+        const { data, updated: $updated } = await getRTData({
             response: response.responseText,
             imdbId,
-            title,
             fallback: fallback[imdbId],
         })
 
-        if (updated) {
+        log('RT data:', data)
+
+        dayjs.extend(dayjs_plugin_relativeTime)
+
+        const updated = dayjs($updated)
+        const date = dayjs()
+        const delta = date.diff(updated, 'month')
+        const ago = date.to(updated)
+
+        log(`last update: ${updated.format('YYYY-MM-DD')} (${ago})`)
+
+        if (delta <= INACTIVE_MONTHS) {
             log(`caching result for: one day`)
             store({ data }, ONE_DAY)
         } else {
@@ -645,7 +590,7 @@ async function run () {
             store({ data }, ONE_WEEK)
         }
 
-        addWidget($target, data)
+        addWidget($ratings, $imdbRating, data)
     } catch (error) {
         const message = error.message || String(error) // stringify
 
@@ -662,3 +607,5 @@ async function run () {
 GM_registerMenuCommand(SCRIPT_NAME + ': clear cache', () => { purgeCached(-1) })
 
 $(window).on('DOMContentLoaded', run)
+
+/* end */ }
