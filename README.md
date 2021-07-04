@@ -75,7 +75,7 @@ supported. Some scripts work, but most haven't been tested. <br />
 ### IMDb
 
 - [IMDb Full Summary](https://greasyfork.org/scripts/23433-imdb-full-summary "Homepage") - automatically show the full plot summary on IMDb
-- [IMDb Tomatoes](https://greasyfork.org/scripts/15222-imdb-tomatoes/ "Homepage") - add Rotten Tomatoes ratings to IMDb movie pages
+- [IMDb Tomatoes](https://greasyfork.org/scripts/15222-imdb-tomatoes/ "Homepage") - add Rotten Tomatoes ratings to IMDb movie and TV show pages
 
 ### Last.fm
 

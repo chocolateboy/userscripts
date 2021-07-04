@@ -1,23 +1,21 @@
 // ==UserScript==
 // @name          IMDb Tomatoes
-// @description   Add Rotten Tomatoes ratings to IMDb movie pages
+// @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
 // @version       4.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       http://*.imdb.tld/title/tt*
-// @include       http://*.imdb.tld/*/title/tt*
-// @include       https://*.imdb.tld/title/tt*
-// @include       https://*.imdb.tld/*/title/tt*
+// @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
 // @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @require       https://unpkg.com/dayjs@1.10.5/dayjs.min.js
 // @require       https://unpkg.com/dayjs@1.10.5/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
-// @resource      query https://pastebin.com/raw/rynukt2g
-// @resource      fallback https://cdn.jsdelivr.net/gh/chocolateboy/corrigenda@0.2.2/data/omdb-tomatoes.json
+// @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
+// @resource      api https://pastebin.com/raw/hcN4ysZD
+// @resource      fallback https://pastebin.com/raw/RpaikqH0
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -26,48 +24,35 @@
 // @grant         GM_registerMenuCommand
 // @grant         GM_setValue
 // @grant         GM_xmlhttpRequest
+// @connect       www.rottentomatoes.com
 // @run-at        document-start
 // @noframes
 // ==/UserScript==
 
-/*
- * Fixed:
- *
- *   RT/OMDb alias [1]:
- *
- *     - https://www.imdb.com/title/tt0120755/ - Mission: Impossible II
- */
-
-/// <reference type="greasemonkey/v3">
+/// <reference types="greasemonkey" />
 /// <reference types="jquery" />
-/// <reference type="tampermonkey">
+/// <reference types="tampermonkey" />
 
-// [1] unaliased and incorrectly aliased titles are common:
-// http://web.archive.org/web/20151105080717/http://developer.rottentomatoes.com/forum/read/110751/2
-
-// XXX metadata mismatch: Zéro de conduite [2] is a "Movie" in the old UI, but a
-// "Short" in the new one
-//
-// [2] https://www.imdb.com/title/tt0024803/
+/**
+ * @typedef {Object} AsyncGetOptions
+ *
+ * @prop {Record<string, string | number | boolean>} [params]
+ * @prop {string} [title]
+ * @prop {Partial<Tampermonkey.Request>} [request]
+ */
 
 'use strict';
 
 /* begin */ {
 
-const INACTIVE_MONTHS = 6
+const INACTIVE_MONTHS = 3
 const NO_CONSENSUS    = 'No consensus yet.'
-const NO_RESULTS      = 'no results found'
+const NO_MATCH        = 'no matching results'
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
+const RT_BASE         = 'https://www.rottentomatoes.com'
 const SCRIPT_NAME     = GM_info.script.name
 const SCRIPT_VERSION  = GM_info.script.version
-const THIS_YEAR       = new Date().getFullYear()
-
-const COLOR = {
-    tbd: '#d9d9d9',
-    favorable: '#66cc33',
-    unfavorable: '#ff0000',
-}
 
 // the version of each cached record is a combination of the schema version and
 // the major part of the script's (SemVer) version, and an additional number
@@ -97,12 +82,39 @@ const BALLOON_OPTIONS = {
     position: 'bottom',
 }
 
+const COLOR = {
+    tbd: '#d9d9d9',
+    fresh: '#66cc33',
+    rotten: '#ff0000',
+}
+
+const RT_TYPE = {
+    movie: 'movie',
+    tvMovie: 'movie',
+    tvSeries: 'tvSeries',
+    tvMiniSeries: 'tvSeries',
+}
+
+const UNSHARED = Object.freeze({
+    got: -1,
+    want: 1,
+    max: 0,
+})
+
+/*
+ * the minimum number of elements shared between two arrays for them to be
+ * deemed similar
+ *
+ * @type {<T>(smallest: Set<T>, largest: Set<T>) => number}
+ */
+const MINIMUM_SHARED = smallest => Math.round(smallest.size / 2)
+
 // log a message to the console
 const { debug, info, log } = console
 
 // a custom version of get-wild's `get` function which uses a simpler/faster
 // path parser since we don't use the extended syntax
-const pluck = exports.getter({ split: '.' })
+const get = exports.getter({ split: '.' })
 
 // register a jQuery plugin which extracts and returns JSON-LD data for the
 // current page.
@@ -126,40 +138,43 @@ $.fn.jsonLd = function jsonLd (id) {
     return data
 }
 
-// take a record (object) from the OMDb fallback data (object) and convert it
-// into the parsed format we expect to get back from the API, e.g.:
-//
-// before:
-//
-//     {
-//         Title: "Example",
-//         Ratings: [
-//             {
-//                 Source: "Rotten Tomatoes",
-//                 Value: "42%"
-//             }
-//         ],
-//         tomatoURL: "https://www.rottentomatoes.com/m/example"
-//     }
-//
-// after:
-//
-//     {
-//         CriticRating: 42,
-//         RTConsensus: undefined,
-//         RTUrl: "https://www.rottentomatoes.com/m/example",
-//     }
-
-function adaptOmdbData (data) {
-    const ratings = data.Ratings || []
-    const rating = ratings.find(it => it.Source === 'Rotten Tomatoes') || {}
-    const score = rating.Value && parseInt(rating.Value)
-
-    return {
-        CriticRating: (Number.isInteger(score) ? score : null),
-        RTConsensus: rating.tomatoConsensus,
-        RTUrl: data.tomatoURL,
+/**
+ * a helper class which keeps a running total of scores for two values (a and
+ * b). used to rank values in a sort function
+ *
+ * @param {number} order
+ * @return {void}
+ */
+class Score {
+    constructor () {
+        this.a = 0
+        this.b = 0
     }
+
+    /**
+     * add a score to the total
+     *
+     * @param {number} order
+     * @param {number=} points
+     * @return {void}
+     */
+    add (order, points = 1) {
+        if (order < 0) {
+            this.a += points
+        } else if (order > 0) {
+            this.b += points
+        }
+    }
+}
+
+/**
+ * raise a non-error exception indicating no matching result has been found
+ *
+ * @param {string} message
+ * @throws {Error}
+ */
+function abort (message) {
+    throw Object.assign(new Error(message), { abort: true })
 }
 
 /**
@@ -173,16 +188,14 @@ function adaptOmdbData (data) {
  * @param {number} data.rating
  */
 function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
-    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
-
     let style
 
     if (rating === -1) {
         style = 'tbd'
     } else if (rating < 60) {
-        style = 'unfavorable'
+        style = 'rotten'
     } else {
-        style = 'favorable'
+        style = 'fresh'
     }
 
     // clone the IMDb rating widget
@@ -228,6 +241,7 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
     })
 
     // 7) add the tooltip class to the link and update its label and URL
+    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
     $rtRating.find('a[role="button"]')
         .addClass('rt-consensus')
         .balloon(balloonOptions)
@@ -238,48 +252,60 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
     attachWidget($ratings, $rtRating)
 }
 
-// promisified cross-origin HTTP requests
+/**
+ * promisified cross-origin HTTP requests
+ *
+ * @param {string} url
+ * @param {AsyncGetOptions} [options]
+ */
 function asyncGet (url, options = {}) {
     if (options.params) {
-        url = url + '?' + encodeParams(options.params)
+        url = url + '?' + $.param(options.params)
     }
 
+    const id = options.title || url
     const request = Object.assign({ method: 'GET', url }, options.request || {})
 
     return new Promise((resolve, reject) => {
-        request.onload = resolve
+        request.onload = res => {
+            if (res.status >= 400) {
+                reject(new Error(`error fetching ${id} (${res.status} ${res.statusText})`))
+            } else {
+                resolve(res)
+            }
+        }
 
         // XXX the +onerror+ response object doesn't contain any useful info
         request.onerror = _res => {
-            reject(new Error(`error fetching ${options.title || url}`))
+            reject(new Error(`error fetching ${id}`))
         }
 
         GM_xmlhttpRequest(request)
     })
 }
 
-/*
+/**
  * attach the RT ratings widget to the ratings bar
  *
  * although the widget appears to be prepended to the bar, we need to append it
- * (and reorder it via CSS) to work around React reconciliation (syncing the DOM
- * to its underlying model (props)) after we've added the RT widget
+ * (and reorder it via CSS) to work around React reconciliation (updating the
+ * DOM to match the underlying model) after we've added the RT widget
  *
- * when this synchronisation is performed, React will try to restore nodes
+ * when this synchronisation occurs, React will try to restore nodes
  * (attributes, text, elements) within each widget to match the widget's props,
  * so the first widget will be updated in place to match the data for the IMDb
  * rating etc. this changes some, but not all nodes within an element, and most
- * (all?) attributes added to/changed in the RT widget remain in the updated
- * IMDb widget, including its ID attribute (rt-rating) which controls the color
- * of the rating star. as a result, we end up with a restored IMDb widget but
- * with an RT-colored star (and with the RT widget removed since it's not in the
+ * attributes added to/changed in the RT widget remain in the updated IMDb
+ * widget, including its ID attribute (rt-rating) which controls the color of
+ * the rating star. as a result, we end up with a restored IMDb widget but with
+ * an RT-colored star (and with the RT widget removed since it's not in the
  * ratings-bar model)
  *
  * if we *append* the RT widget, none of the other widgets will need to be
  * changed/updated if the DOM is re-synced so we won't end up with a mangled
  * IMDb widget; however, our RT widget will still be removed since it's not in
- * the model. to rectify this, we use a mutation observer to detect the deletion
- * and reinstate the widget
+ * the model. to rectify this, we use a mutation observer to detect and revert
+ * its removal
  *
  * @param {JQuery} $target
  * @param {JQuery} $rtRating
@@ -288,181 +314,475 @@ function attachWidget ($target, $rtRating) {
     const init = { childList: true }
     const target = $target.get(0)
     const rtRating = $rtRating.get(0)
-    const callback = mutations => {
-        debug('mutations:', mutations)
-
-        // we could detect it in mutations[*].removedNodes, but this is simpler
+    const callback = () => {
         if (target.lastElementChild !== rtRating) {
             observer.disconnect()
             target.appendChild(rtRating)
             observer.observe(target, init)
-            debug('restored widget')
         }
     }
 
     const observer = new MutationObserver(callback)
-    debug('added widget')
     target.appendChild(rtRating)
     observer.observe(target, init)
 }
 
-// URL-encode the supplied query parameter and replace encoded spaces ("%20")
-// with plus signs ("+")
-function encodeParam (param) {
-    return encodeURIComponent(param).replace(/%20/g, '+')
-}
+/**
+ * check the fallback data in case of a failed match, but only use it as a last
+ * resort, i.e. try the verifier first, if defined, in case the data has
+ * been fixed/updated
+ *
+ * @param {any} matched
+ * @param {string} imdbId
+ */
+function checkFallback (matched, imdbId) {
+    const fallback = JSON.parse(GM_getResourceText('fallback'))
+    const url = fallback[imdbId]
 
-// encode a dictionary of params as a query parameter string. this is similar to
-// jQuery.params, but we additionally replace spaces ("%20") with plus signs
-// ("+")
-function encodeParams (params) {
-    const pairs = []
+    if (url) {
+        const $url = JSON.stringify(url)
+        const { verify } = matched
 
-    for (const [key, value] of Object.entries(params)) {
-        pairs.push(`${encodeParam(key)}=${encodeParam(value)}`)
+        if (!matched.match) { // missing result
+            debug('fallback:', $url)
+            matched.match = { url }
+        } else if (matched.match.url !== url) { // wrong result
+            const $overridden = JSON.stringify(matched.match.url)
+            debug(`override: ${$overridden} -> ${$url}`)
+            matched.match.url = url
+        }
+
+        if (verify) {
+            matched.verify = $rt => {
+                if (!verify($rt)) { // missing/incompatible RT data
+                    debug('force:', true)
+                }
+
+                return true
+            }
+        }
     }
 
-    return pairs.join('&')
+    return matched
+}
+
+/**
+ * extract IMDb metadata from the GraphQL data embedded in the page
+ *
+ * @param {string} imdbId
+ * @returns {any}
+ */
+function getIMDbMetadata (imdbId) {
+    const data = JSON.parse($('#__NEXT_DATA__').text())
+    const pageType = get(data, 'props.requestContext.pageType')
+
+    const decorate = data => {
+        return { data, size: Object.keys(data).length }
+    }
+
+    // there are multiple matching subtrees (with different but partially
+    // overlapping keys). order them in descending order of size (number of keys)
+    const titles = get(data, 'props.urqlState.*.data.title', [])
+        .filter(title => title.id === imdbId)
+        .map(decorate)
+        .sort((a, b) => b.size - a.size)
+        .map(it => it.data)
+
+    const [main, extra] = titles
+    const mainCast = get(main, 'principalCast.*.credits.*.name.nameText.text', [])
+    const extraCast = get(main, 'cast.edges.*.node.name.nameText.text', [])
+    const fullCast = Array.from(new Set([...mainCast, ...extraCast]))
+    const title = get(main, 'titleText.text', '')
+    const originalTitle = get(main, 'originalTitleText.text', '')
+    const type = get(main, 'titleType.id', '')
+    const year = get(main, 'releaseYear.year') || 0
+    const meta = {
+        id: imdbId,
+        cast: mainCast,
+        fullCast,
+        title,
+        originalTitle,
+        type,
+    }
+
+    if (RT_TYPE[type] === 'tvSeries') {
+        meta.startYear = year
+        meta.endYear = get(extra, 'releaseYear.endYear') || 0
+        meta.seasons = get(main, 'episodes.seasons.length') || 0
+    } else if (RT_TYPE[type] === 'movie') {
+        meta.directors = get(main, 'directors.*.credits.*.name.nameText.text', [])
+        meta.year = year
+    }
+
+    return { meta, pageType }
 }
 
 // parse the API's response and extract the RT rating and consensus.
 //
 // if there's no consensus, default to "No consensus yet."
 // if there's no rating, default to -1
-async function getRTData ({ response, imdbId, fallback }) {
+async function getRTData (imdb) {
+    /**
+     * @throws {Error}
+     */
     function fail (message) {
         throw new Error(message)
     }
 
+    const rtType = RT_TYPE[imdb.type]
+
+    log(`querying API for ${JSON.stringify(imdb.title)}`)
+
+    /** @type {AsyncGetOptions} */
+    const request = {
+        params: { t: rtType, q: imdb.title, limit: 100 },
+        request: { responseType: 'json' },
+        title: 'API',
+    }
+
+    const api = GM_getResourceText('api')
+    const response = await asyncGet(api, request)
+    log(`response: ${response.status} ${response.statusText}`)
+
     let results
 
     try {
-        results = JSON.parse(JSON.parse(response)) // ಠ_ಠ
+        results = JSON.parse(response.responseText)
     } catch (e) {
         fail(`can't parse response: ${e}`)
     }
 
     if (!results) {
-        fail('no response')
+        fail('invalid JSON type')
     }
 
-    if (!Array.isArray(results)) {
-        const type = {}.toString.call(results)
-        fail(`invalid response: ${type}`)
+    debug('results:', results)
+
+    const matcher = rtType === 'movie' ? matchMovie : matchTV
+    const matched = matcher(results, imdb) || {}
+    const { match, verify } = checkFallback(matched, imdb.id)
+
+    if (!match) {
+        abort(NO_MATCH)
     }
 
-    let movie = results.find(it => it.imdbID === imdbId)
+    debug('match:', match)
+    // @ts-ignore
+    const url = RT_BASE + match.url
+    log(`loading RT URL: ${url}`)
+    const res = await asyncGet(url)
+    log(`response: ${res.status} ${res.statusText}`)
 
-    if (!movie) {
-        if (fallback) {
-            log(`no results for ${imdbId} - using fallback data`)
-            movie = adaptOmdbData(fallback)
-        } else {
-            fail(NO_RESULTS)
-        }
-    }
+    const parser = new DOMParser()
+    const dom = parser.parseFromString(res.responseText, 'text/html')
+    const $rt = $(dom)
+    const $consensus = $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
 
-    let { RTConsensus: consensus, CriticRating: rating, RTUrl: rtUrl } = movie
-    let updated, url
+    let consensus
 
-    if (rtUrl) {
-        /*
-         * remove cruft from the RT URL:
-         *
-         * - before:
-         *
-         *     https://www.rottentomatoes.com/m/foo&amp;bar=123abc
-         *
-         * - after:
-         *
-         *     https://www.rottentomatoes.com/m/foo
-         */
-        url = rtUrl.split('&')[0]
-
-        log(`loading RT URL: ${url}`)
-        const res = await asyncGet(url)
-        log(`response: ${res.status} ${res.statusText}`)
-
-        const parser = new DOMParser()
-        const dom = parser.parseFromString(res.responseText, 'text/html')
-        const $rt = $(dom)
-        const $consensus = $rt.find('.what-to-know__section-body > span')
-
-        if ($consensus.length) {
-            consensus = $consensus.html().trim()
-        }
-
-        // update the rating
-        const meta = $rt.jsonLd(url)
-        const newRating = meta.aggregateRating.ratingValue
-
-        if (newRating != rating) { // string != number
-            log(`updating rating: ${rating} -> ${newRating}`)
-            rating = newRating
-        }
-
-        if (meta.review?.length) {
-            debug('reviews:', meta.review.length)
-            const [latest] = meta.review
-                .flatMap(review => {
-                    return review.dateCreated
-                        ? [{ review, mtime: dayjs(review.dateCreated).unix() }]
-                        : []
-                })
-                .sort((a, b) => b.mtime - a.mtime)
-
-            if (latest) {
-                updated = latest.review.dateCreated
-                debug('updated (most recent review):', updated)
-            }
-        }
-
-        if (!updated && (updated = meta.dateModified)) {
-            debug('updated (page modified):', updated)
-        }
+    if ($consensus.length && (consensus = $consensus.html().trim())) {
+        consensus = consensus.replace(/--/g, '&#8212;')
     } else {
-        fail(NO_RESULTS)
+        consensus = NO_CONSENSUS
     }
 
-    if (rating == null) {
-        rating = -1
+    const meta = $rt.jsonLd(url)
+
+    if (verify) {
+        Object.assign($rt, { meta })
+
+        if (!verify($rt)) {
+            abort(NO_MATCH)
+        }
     }
 
-    consensus = consensus ? consensus.replace(/--/g, '&#8212;') : NO_CONSENSUS
+    const updated = getUpdated(meta, rtType)
+    const $rating = meta.aggregateRating
+    const rating = Number(($rating.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
 
     return { data: { consensus, rating, url }, updated }
 }
 
-// extract metadata from the GraphQL data embedded in the page
-function getMetadata (imdbId) {
-    const meta = JSON.parse($('#__NEXT_DATA__').text())
-    const pageType = pluck(meta, 'props.requestContext.pageType')
+/**
+ * get the timestamp (ISO-8601 string) of the last time the RT page was updated,
+ * e.g. the date of the most-recently published review
+ *
+ * @param {any} rtMeta
+ * @param {'movie' | 'tvSeries'} rtType
+ */
+function getUpdated (rtMeta, rtType) {
+    const [reviewProp, rootProp] = rtType === 'movie'
+        ? ['dateCreated', 'dateModified']
+        : ['datePublished', 'datePublished']
 
-    // there are multiple matching subtrees (with different but partially
-    // overlapping keys). select the first one with the required properties
-    let title, type
+    let updated
 
-    const found = pluck(meta, 'props.urqlState.*.data', [])
-        .find(it => {
-            return pluck(it, 'title.id') === imdbId
-                && (title = pluck(it, 'title.titleText.text'))
-                && (type = pluck(it, 'title.titleType.text'))
-        })
+    if (rtMeta.review?.length) {
+        debug('reviews:', rtMeta.review.length)
 
-    if (!found) {
-        if (!title) {
-            throw new TypeError("Can't find title in metadata")
-        }
+        const [latest] = rtMeta.review
+            .flatMap(review => {
+                return review[reviewProp]
+                    ? [{ review, mtime: dayjs(review[reviewProp]).unix() }]
+                    : []
+            })
+            .sort((a, b) => b.mtime - a.mtime)
 
-        if (!type) {
-            throw new TypeError("Can't find type in metadata")
+        if (latest) {
+            updated = latest.review[reviewProp]
+            debug('updated (most recent review):', updated)
         }
     }
 
-    return { pageType, title, type }
+    if (!updated && (updated = rtMeta[rootProp])) {
+        debug('updated (page modified):', updated)
+    }
+
+    return updated
 }
 
-// purge expired entries
+/**
+ * return a movie record ({ url: string }) from the API results which
+ * matches the supplied IMDb data
+ *
+ * @param {any} rtResults
+ * @param {any} imdb
+ * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
+ */
+function matchMovie (rtResults, imdb) {
+    const sorted = rtResults.movies
+        .flatMap((rt, index) => {
+            if (!(rt.name && rt.url && rt.castItems)) {
+                return []
+            }
+
+            const { name: title } = rt
+            const rtCast = pluck(rt.castItems, 'name').map(stripRtName)
+
+            let castMatch
+
+            if (rtCast.length) {
+                const { got, want } = shared(rtCast, imdb.fullCast)
+
+                if (got < want) {
+                    return []
+                } else {
+                    castMatch = got
+                }
+            } else {
+                castMatch = -1
+            }
+
+            const yearDiff = (imdb.year && rt.year)
+                ? { value: Math.abs(imdb.year - rt.year) }
+                : null
+
+            if (yearDiff && yearDiff.value > 3) {
+                return []
+            }
+
+            const titleMatch = titleSimilarity({ imdb, rt: { title } })
+
+            const result = {
+                title,
+                url: rt.url,
+                rating: rt.meterScore,
+                popularity: (rt.meterScore == null ? 0 : 1),
+                cast: rtCast,
+                year: rt.year,
+                index,
+                titleMatch,
+                castMatch,
+                yearDiff
+            }
+
+            return [result]
+        })
+        .sort((a, b) => {
+            // combine the title and the year
+            //
+            // being a year or two out shouldn't be a dealbreaker, and it's not
+            // uncommon for an RT title to differ from the IMDb title (e.g. an
+            // AKA), so we don't want one of these to pre-empt the other (just yet)
+            const score = new Score()
+
+            score.add(b.titleMatch - a.titleMatch)
+
+            if (a.yearDiff && b.yearDiff) {
+                score.add(a.yearDiff.value - b.yearDiff.value)
+            }
+
+            return (b.castMatch - a.castMatch)
+                || (score.b - score.a)
+                || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
+                || (b.popularity - a.popularity) // last resort
+        })
+
+    debug('matches:', sorted)
+
+    if (sorted.length) {
+        const [match] = sorted
+
+        if (match.cast.length) { // already verified
+            return { match }
+        } else {
+            // in theory, we can verify the cast when the page is loaded. in
+            // practice, it doesn't work: if the cast is missing from the API
+            // results, it's also missing from the page's metadata
+            //
+            // when the cast is missing from the metadata, the directors are
+            // often missing from the metadata as well, so we try to scrape them
+            // instead
+
+            const verify = $rt => {
+                const rtDirectors = $rt.meta.director?.length
+                    ? pluck($rt.meta.director, 'name').map(stripRtName)
+                    : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent)
+                return verifyShared({ imdb: imdb.directors, rt: rtDirectors, name: 'directors' })
+            }
+
+            return { match, verify }
+        }
+    }
+}
+
+/**
+ * return a TV show record ({ url: string }) from the API results
+ * which matches the supplied IMDb data
+ *
+ * returns an additional validation function to run against the RT page's
+ * metadata to confirm the match
+ *
+ * @param {any} rtResults
+ * @param {any} imdb
+ * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
+ */
+function matchTV (rtResults, imdb) {
+    const verify = ({ meta }) => {
+        const rtCast = pluck(meta.actor, 'name').map(stripRtName)
+        const diff1 = Math.abs(rtCast.length - imdb.fullCast.length)
+        const diff2 = Math.abs(rtCast.length - imdb.cast.length)
+        const imdbCast = diff1 > diff2 ? imdb.fullCast : imdb.cast
+        return verifyShared({ imdb: imdbCast, rt: rtCast })
+    }
+
+    const sorted = rtResults.tvSeries
+        .flatMap((rt, index) => {
+            const { title, startYear, endYear, url } = rt
+
+            if (!(title && (startYear || endYear) && url)) {
+                return []
+            }
+
+            const titleMatch = titleSimilarity({ imdb, rt })
+
+            if (titleMatch < 0.6) {
+                return []
+            }
+
+            const dateDiffs = {}
+
+            for (const dateProp of ['startYear', 'endYear']) {
+                if (imdb[dateProp] && rt[dateProp]) {
+                    const diff = Math.abs(imdb[dateProp] - rt[dateProp])
+
+                    if (diff > 3) {
+                        return []
+                    } else {
+                        dateDiffs[dateProp] = { value: diff }
+                    }
+                }
+            }
+
+            const seasonsDiff = (url.endsWith('/s01') && imdb.seasons)
+                ? { value: imdb.seasons - 1 }
+                : null
+
+            const score = {
+                title,
+                url,
+                rating: rt.meterScore,
+                popularity: (rt.meterScore == null ? 0 : 1),
+                startYear,
+                endYear,
+                index,
+                titleMatch,
+                startYearDiff: dateDiffs.startYear,
+                endYearDiff: dateDiffs.endYear,
+                seasonsDiff,
+            }
+
+            return [score]
+        })
+        .sort((a, b) => {
+            const score = new Score()
+
+            score.add(b.titleMatch - a.titleMatch)
+
+            if (a.startYearDiff && b.startYearDiff) {
+                score.add(a.startYearDiff.value - b.startYearDiff.value)
+            }
+
+            if (a.endYearDiff && b.endYearDiff) {
+                score.add(a.endYearDiff.value - b.endYearDiff.value)
+            }
+
+            if (a.seasonsDiff && b.seasonsDiff) {
+                score.add(a.seasonsDiff.value - b.seasonsDiff.value)
+            }
+
+            return (score.b - score.a)
+                || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
+                || (b.popularity - a.popularity) // last resort
+        })
+
+    debug('matches:', sorted)
+
+    const [match] = sorted
+
+    if (match) {
+        if (match.url.match(/^\/tv\/[^/]+$/)) {
+            match.url += '/s01'
+        }
+
+        return { match, verify }
+    }
+}
+
+/**
+ * normalize names so matches don't fail due to minor differences in casing or
+ * punctuation
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+function normalize (name) {
+    return name
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036F]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+}
+
+/**
+ * extract the value of a property (+name+ by default) from each member of an
+ * array
+ *
+ * @param {any[] | undefined} array
+ * @param {string} path
+ * @returns {any[]}
+ */
+function pluck (array, path) {
+    return (array || []).map(it => get(it, path))
+}
+
+/**
+ * purge expired entries from the cache
+ *
+ * @param {number} date
+ */
 function purgeCached (date) {
     for (const key of GM_listValues()) {
         const json = GM_getValue(key)
@@ -478,8 +798,146 @@ function purgeCached (date) {
     }
 }
 
+/**
+ * given two arrays of strings, return an object containing:
+ *
+ *   - got: the number of strings common to both
+ *   - want: the required number of shared strings (minimum: 1)
+ *   - max: the maximum number of shared strings
+ *
+ * if either array is empty, the number of strings they have in commin is -1
+ *
+ * @param {Iterable<string>} a
+ * @param {Iterable<string>} b
+ * @param {Object} [options]
+ * @param {(smallest: Set<string>, largest: Set<string>) => number} [options.min]
+ * @param {(value: string) => string} [options.map]
+ * @return {{ got: number, want: number, max: number }}
+ */
+function shared (a, b, { min = MINIMUM_SHARED, map: transform = normalize } = {}) {
+    const $a = new Set(Array.from(a, transform))
+
+    if ($a.size === 0) {
+        return UNSHARED
+    }
+
+    const $b = new Set(Array.from(b, transform))
+
+    if ($b.size === 0) {
+        return UNSHARED
+    }
+
+    const [smallest, largest] = $a.size < $b.size ? [$a, $b] : [$b, $a]
+
+    // we always want at least 1 even if the maximum is 0
+    const want = Math.max(min(smallest, largest), 1)
+
+    let count = 0
+
+    for (const value of smallest) {
+        if (largest.has(value)) {
+            ++count
+        }
+    }
+
+    return { got: count, want, max: smallest.size }
+}
+
+/**
+ * return the similarity between two strings, ranging from 0 (no similarity) to
+ * 2 (identical)
+ *
+ * @param {string} a
+ * @param {string} b
+ */
+function similarity (a, b) {
+    return a === b ? 2 : exports.dice(normalize(a), normalize(b))
+}
+
+/**
+ * strip trailing sequence numbers in names in RT metadata (they're not present
+ * in the search results), e.g.
+ *
+ *   - "Meng Li (IX)"       -> "Meng Li"
+ *   - "Michael Dwyer (X) " -> "Michael Dwyer"
+ *
+ * @param {string} name
+ * @return string
+ */
+function stripRtName (name) {
+    return name.replace(/\s+\([IVXLCDM]+\)\s*$/, '')
+}
+
+/*
+ * measure the similarity of an IMDb title and an RT title returned by the API
+ *
+ * the latter sometimes contain the original title at the end in brackets for
+ * foreign-language films/shows, so we take that into account
+ *
+ * note, we only use this if the original IMDb title differs from the main IMDb
+ * title
+ *
+ *   similarity("The Swarm", "The Swarm (La Nuée)")                    // 0.66
+ *   titleSimilarity({ imdb: "The Swarm", rt: "The Swarm (La Nuée)" }) // 2
+ *
+ * @param {Object} options
+ * @param {{ title: string }} options.imdb
+ * @param {{ title: string }} options.rt
+ * @return {number}
+ */
+function titleSimilarity ({ imdb, rt }) {
+    const rtTitle = rt.title
+        .trim()
+        .replace(/\s+/, ' ') // remove extraneous spaces, e.g. tt2521668
+        .replace(/\s+\((?:US|UK)\)$/, '')
+
+    if (imdb.originalTitle && imdb.title !== imdb.originalTitle) {
+        const match = rtTitle.match(/^(.+?)\s+\(([^)]+)\)$/)
+
+        if (match) {
+            const s1 = similarity(imdb.title, match[1])
+            const s2 = similarity(imdb.title, match[2])
+            const s3 = similarity(imdb.title, rtTitle)
+            return Math.max(s1, s2, s3)
+        } else {
+            const s1 = similarity(imdb.title, rtTitle)
+            const s2 = similarity(imdb.originalTitle, rtTitle)
+            return Math.max(s1, s2)
+        }
+    }
+
+    return similarity(imdb.title, rtTitle)
+}
+
+/**
+ * return true if the supplied arrays are similar (sufficiently overlap), false
+ * otherwise
+ *
+ * @param {Object} options
+ * @param {string[]} options.imdb
+ * @param {string=} options.name
+ * @param {string[]} options.rt
+ */
+function verifyShared ({ imdb, rt, name = 'cast' }) {
+    debug(`verifying ${name}`)
+    debug(`imdb ${name}:`, imdb)
+    debug(`rt ${name}:`, rt)
+    const $shared = shared(rt, imdb)
+    debug(`shared ${name}:`, $shared)
+    const verified = $shared.got >= $shared.want
+    debug('verified:', verified)
+    return verified
+}
+
+/******************************************************************************/
+
 async function run () {
-    const imdbId = $('meta[property="imdb:pageConst"]').attr('content')
+    const now = Date.now()
+
+    // purgeCached(-1) // disable the cache
+    purgeCached(now)
+
+    const imdbId = $(`meta[property="imdb:pageConst"]`).attr('content')
 
     if (!imdbId) {
         // XXX shouldn't get here
@@ -491,7 +949,7 @@ async function run () {
 
     // we clone the IMDb widget, so make sure it exists before navigating up to
     // its container
-    const $imdbRating = $('[data-testid="hero-rating-bar__aggregate-rating"]:visible')
+    const $imdbRating = $('[data-testid="hero-rating-bar__aggregate-rating"]').first()
 
     if (!$imdbRating.length) {
         info(`can't find IMDb rating for ${imdbId}`)
@@ -499,31 +957,6 @@ async function run () {
     }
 
     const $ratings = $imdbRating.parent()
-    const meta = getMetadata(imdbId)
-
-    if (!meta) {
-        console.error(`can't find metadata for ${imdbId}`)
-        return
-    }
-
-    log('metadata:', meta)
-
-    const { pageType, title, type } = meta
-
-    if (type !== 'Movie') {
-        info(`invalid type for ${imdbId}: ${type}`)
-        return
-    }
-
-    if (pageType !== 'title') {
-        info(`invalid page type for ${imdbId}: ${pageType}`)
-        return
-    }
-
-    const now = Date.now()
-
-    debug('data version:', DATA_VERSION)
-    purgeCached(now)
 
     // get the cached result for this page
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
@@ -543,6 +976,25 @@ async function run () {
         log('not cached')
     }
 
+    const { meta: imdb, pageType } = getIMDbMetadata(imdbId)
+
+    if (!imdb) {
+        console.error(`can't find metadata for ${imdbId}`)
+        return
+    }
+
+    log('metadata:', imdb)
+
+    if (pageType !== 'title') {
+        info(`invalid page type for ${imdbId}: ${pageType}`)
+        return
+    }
+
+    if (!RT_TYPE[imdb.type]) {
+        info(`invalid type for ${imdbId}: ${imdb.type}`)
+        return
+    }
+
     // add a { version, expires, data|error } entry to the cache
     const store = (dataOrError, ttl) => {
         const expires = now + ttl
@@ -552,24 +1004,8 @@ async function run () {
         GM_setValue(imdbId, json)
     }
 
-    const query = JSON.parse(GM_getResourceText('query'))
-
-    Object.assign(query.params, { title, yearMax: THIS_YEAR })
-
     try {
-        log(`querying API for ${JSON.stringify(title)}`)
-
-        const requestOptions = Object.assign({}, query, { title: `data for ${imdbId}` })
-        const response = await asyncGet(query.api, requestOptions)
-        const fallback = JSON.parse(GM_getResourceText('fallback'))
-
-        log(`response: ${response.status} ${response.statusText}`)
-
-        const { data, updated: $updated } = await getRTData({
-            response: response.responseText,
-            imdbId,
-            fallback: fallback[imdbId],
-        })
+        const { data, updated: $updated } = await getRTData(imdb)
 
         log('RT data:', data)
 
@@ -583,10 +1019,10 @@ async function run () {
         log(`last update: ${updated.format('YYYY-MM-DD')} (${ago})`)
 
         if (delta <= INACTIVE_MONTHS) {
-            log(`caching result for: one day`)
+            log('caching result for: one day')
             store({ data }, ONE_DAY)
         } else {
-            log(`caching result for: one week`)
+            log('caching result for: one week')
             store({ data }, ONE_WEEK)
         }
 
@@ -597,15 +1033,25 @@ async function run () {
         log(`caching error for one day: ${message}`)
         store({ error: message }, ONE_DAY)
 
-        if (message !== NO_RESULTS) {
+        if (!error.abort) {
             console.error(error)
         }
     }
 }
 
 // register this first so data can be cleared even if there's an error
-GM_registerMenuCommand(SCRIPT_NAME + ': clear cache', () => { purgeCached(-1) })
+GM_registerMenuCommand(`${SCRIPT_NAME}: clear cache`, () => {
+    purgeCached(-1)
+});
 
-$(window).on('DOMContentLoaded', run)
+// DOMContentLoaded typically fires several seconds after the IMDb ratings
+// widget is displayed, which leads to an unacceptable delay if the result is
+// already cached, so we hook into the earliest event which fires after the
+// widget is loaded.
+//
+// this occurs when document.readyState transitions from "loading" to
+// "interactive", which should be the first readystatechange event a script
+// sees. on my system, this can occur up to 4 seconds before DOMContentLoaded
+$(document).one('readystatechange', run)
 
 /* end */ }
