@@ -3,36 +3,35 @@
 // @description   Automatically show the full plot summary on IMDb
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.6.1
+// @version       2.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: https://www.gnu.org/copyleft/gpl.html
-// @include       http://*.imdb.tld/title/tt*
-// @include       http://*.imdb.tld/*/title/tt*
-// @include       https://*.imdb.tld/title/tt*
-// @include       https://*.imdb.tld/*/title/tt*
-// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
-// @grant         GM_log
+// @license       GPL
+// @include       https://www.imdb.com/title/tt*
+// @grant         none
 // ==/UserScript==
-
-// XXX note: the unused grant is a workaround for a Greasemonkey bug:
-// https://github.com/greasemonkey/greasemonkey/issues/1614
 
 /*
  * Tests:
  *
- *     - truncated movie:   https://www.imdb.com/title/tt4920360/
- *     - truncated TV show: https://www.imdb.com/title/tt4507204/
- *     - not truncated:     https://www.imdb.com/title/tt7131622/
+ *  - movie:   https://www.imdb.com/title/tt7638460/
+ *  - TV show: https://www.imdb.com/title/tt0108983/
  */
 
 // the truncated summary
-const $summary = $('.summary_text').has('a[href*="/plotsummary"]')
+const summary = document.querySelector('[data-testid="plot-xl"]')
 
-if ($summary.length) {
-    // the full summary (usually)
-    const $storyline = $('#titleStoryLine > div.inline').first()
+// the full summary
+const storyline = document.querySelector('[data-testid="storyline-plot-summary"] > div > div')
 
-    if ($storyline.length) {
-        $summary.html($storyline.text().trim())
+if (summary && storyline && storyline.firstChild) {
+    const init = { childList: true }
+
+    const replaceSummary = (_mutations, observer) => {
+        observer.disconnect()
+        // @ts-ignore
+        summary.textContent = storyline.firstChild.textContent
+        observer.observe(summary, init)
     }
+
+    replaceSummary([], new MutationObserver(replaceSummary))
 }
