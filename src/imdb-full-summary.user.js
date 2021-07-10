@@ -3,7 +3,7 @@
 // @description   Automatically show the full plot summary on IMDb
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.0
+// @version       2.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.imdb.com/title/tt*
@@ -20,7 +20,15 @@
 (function () {
     // the truncated summaries: separate elements for the small/medium
     // ("plot-xs_to_m"), large ("plot-l"), and extra large ("plot-xl") layouts
-    const summaries = document.querySelectorAll('span[data-testid^="plot-"]')
+    //
+    // const summaries = document.querySelectorAll('span[data-testid^="plot-"]:has(> a[data-testid="plot-read-all-link"])')
+
+    /** @type Element[] */
+    // @ts-ignore https://github.com/microsoft/TypeScript/issues/23405
+    const summaries = Array.from(
+        document.querySelectorAll('span[data-testid^="plot-"] > a[data-testid="plot-read-all-link"]'),
+        link => link.parentElement
+    )
 
     if (!summaries.length) {
         return
