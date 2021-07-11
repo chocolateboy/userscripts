@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.0
+// @version       4.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -15,7 +15,7 @@
 // @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      fallback https://pastebin.com/raw/RpaikqH0
+// @resource      fallback https://pastebin.com/raw/st41GA15
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -110,16 +110,21 @@ const UNSHARED = Object.freeze({
 const MINIMUM_SHARED = smallest => Math.round(smallest.size / 2)
 
 // log a message to the console
-const { debug, info, log } = console
+const { debug, info, log, warn } = console
 
 // a custom version of get-wild's `get` function which uses a simpler/faster
 // path parser since we don't use the extended syntax
 const get = exports.getter({ split: '.' })
 
-// register a jQuery plugin which extracts and returns JSON-LD data for the
-// current page.
-//
-// used to extract metadata on Rotten Tomatoes
+/**
+ * register a jQuery plugin which extracts and returns JSON-LD data for the
+ * loaded document
+ *
+ * used to extract metadata on Rotten Tomatoes
+ *
+ * @param {string} id
+ * @return {any}
+ */
 $.fn.jsonLd = function jsonLd (id) {
     const $script = this.find('script[type="application/ld+json"]')
 
@@ -136,6 +141,248 @@ $.fn.jsonLd = function jsonLd (id) {
     }
 
     return data
+}
+
+const MovieMatcher = {
+    /**
+     * return the consensus from a movie page as a HTML string
+     *
+     * @param {JQuery<Document>} $rt
+     * @return {string | undefined}
+     */
+    getConsensus ($rt) {
+        return $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
+            .first()
+            .html()
+    },
+
+    /**
+     * return a movie record ({ url: string }) from the API results which
+     * matches the supplied IMDb data
+     *
+     * @param {any} rtResults
+     * @param {any} imdb
+     * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
+     */
+    match (rtResults, imdb) {
+        const sorted = rtResults.movies
+            .flatMap((rt, index) => {
+                if (!(rt.name && rt.url && rt.castItems)) {
+                    return []
+                }
+
+                const { name: title } = rt
+                const rtCast = pluck(rt.castItems, 'name').map(stripRtName)
+
+                let castMatch
+
+                if (rtCast.length) {
+                    const { got, want } = shared(rtCast, imdb.fullCast)
+
+                    if (got < want) {
+                        return []
+                    } else {
+                        castMatch = got
+                    }
+                } else {
+                    castMatch = -1
+                }
+
+                const yearDiff = (imdb.year && rt.year)
+                    ? { value: Math.abs(imdb.year - rt.year) }
+                    : null
+
+                if (yearDiff && yearDiff.value > 3) {
+                    return []
+                }
+
+                const titleMatch = titleSimilarity({ imdb, rt: { title } })
+
+                const result = {
+                    title,
+                    url: rt.url,
+                    rating: rt.meterScore,
+                    popularity: (rt.meterScore == null ? 0 : 1),
+                    cast: rtCast,
+                    year: rt.year,
+                    index,
+                    titleMatch,
+                    castMatch,
+                    yearDiff
+                }
+
+                return [result]
+            })
+            .sort((a, b) => {
+                // combine the title and the year
+                //
+                // being a year or two out shouldn't be a dealbreaker, and it's not
+                // uncommon for an RT title to differ from the IMDb title (e.g. an
+                // AKA), so we don't want one of these to pre-empt the other (just yet)
+                const score = new Score()
+
+                score.add(b.titleMatch - a.titleMatch)
+
+                if (a.yearDiff && b.yearDiff) {
+                    score.add(a.yearDiff.value - b.yearDiff.value)
+                }
+
+                return (b.castMatch - a.castMatch)
+                    || (score.b - score.a)
+                    || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
+                    || (b.popularity - a.popularity) // last resort
+            })
+
+        debug('matches:', sorted)
+
+        if (sorted.length) {
+            const [match] = sorted
+
+            if (match.cast.length) { // already verified
+                return { match }
+            } else {
+                // in theory, we can verify the cast when the page is loaded. in
+                // practice, it doesn't work: if the cast is missing from the API
+                // results, it's also missing from the page's metadata
+                //
+                // when the cast is missing from the metadata, the directors are
+                // often missing from the metadata as well, so we try to scrape them
+                // instead
+
+                const verify = $rt => {
+                    const rtDirectors = $rt.meta.director?.length
+                        ? pluck($rt.meta.director, 'name').map(stripRtName)
+                        : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent)
+                    return verifyShared({ imdb: imdb.directors, rt: rtDirectors, name: 'directors' })
+                }
+
+                return { match, verify }
+            }
+        }
+    },
+}
+
+const TVMatcher = {
+    /**
+     * return the consensus from a TV page as a HTML string
+     *
+     * @param {JQuery<Document>} $rt
+     * @return {string | undefined}
+     */
+    getConsensus ($rt) {
+        return $rt.find('season-list-item[consensus]').last().attr('consensus')
+    },
+
+    /**
+     * return a TV show record ({ url: string }) from the API results which
+     * matches the supplied IMDb data
+     *
+     * returns an additional validation function to run against the RT page's
+     * metadata to confirm the match
+     *
+     * @param {any} rtResults
+     * @param {any} imdb
+     * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
+     */
+    match (rtResults, imdb) {
+        const verify = ({ meta }) => {
+            const rtCast = pluck(meta.actor, 'name').map(stripRtName)
+            const diff1 = Math.abs(rtCast.length - imdb.fullCast.length)
+            const diff2 = Math.abs(rtCast.length - imdb.cast.length)
+            const imdbCast = diff1 > diff2 ? imdb.fullCast : imdb.cast
+            return verifyShared({ imdb: imdbCast, rt: rtCast })
+        }
+
+        const sorted = rtResults.tvSeries
+            .flatMap((rt, index) => {
+                const { title, startYear, endYear, url } = rt
+
+                if (!(title && (startYear || endYear) && url)) {
+                    return []
+                }
+
+                const titleMatch = titleSimilarity({ imdb, rt })
+
+                if (titleMatch < 0.6) {
+                    return []
+                }
+
+                const dateDiffs = {}
+
+                for (const dateProp of ['startYear', 'endYear']) {
+                    if (imdb[dateProp] && rt[dateProp]) {
+                        const diff = Math.abs(imdb[dateProp] - rt[dateProp])
+
+                        if (diff > 3) {
+                            return []
+                        } else {
+                            dateDiffs[dateProp] = { value: diff }
+                        }
+                    }
+                }
+
+                let suffix, $url
+
+                const match = url.match(/^(\/tv\/[^/]+)(?:\/(.+))?$/)
+
+                if (match) {
+                    suffix = match[2]
+                    $url = match[1]
+                } else {
+                    warn("can't parse RT URL:", url)
+                    return []
+                }
+
+                const seasonsDiff = (suffix === 's01' && imdb.seasons)
+                    ? { value: imdb.seasons - 1 }
+                    : null
+
+                const score = {
+                    title,
+                    url: $url,
+                    rating: rt.meterScore,
+                    popularity: (rt.meterScore == null ? 0 : 1),
+                    startYear,
+                    endYear,
+                    index,
+                    titleMatch,
+                    startYearDiff: dateDiffs.startYear,
+                    endYearDiff: dateDiffs.endYear,
+                    seasonsDiff,
+                }
+
+                return [score]
+            })
+            .sort((a, b) => {
+                const score = new Score()
+
+                score.add(b.titleMatch - a.titleMatch)
+
+                if (a.startYearDiff && b.startYearDiff) {
+                    score.add(a.startYearDiff.value - b.startYearDiff.value)
+                }
+
+                if (a.endYearDiff && b.endYearDiff) {
+                    score.add(a.endYearDiff.value - b.endYearDiff.value)
+                }
+
+                if (a.seasonsDiff && b.seasonsDiff) {
+                    score.add(a.seasonsDiff.value - b.seasonsDiff.value)
+                }
+
+                return (score.b - score.a)
+                    || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
+                    || (b.popularity - a.popularity) // last resort
+            })
+
+        debug('matches:', sorted)
+
+        const [match] = sorted
+
+        if (match) {
+            return { match, verify }
+        }
+    },
 }
 
 /**
@@ -166,6 +413,8 @@ class Score {
         }
     }
 }
+
+/******************************************************************************/
 
 /**
  * raise a non-error exception indicating no matching result has been found
@@ -289,7 +538,8 @@ function asyncGet (url, options = {}) {
  *
  * although the widget appears to be prepended to the bar, we need to append it
  * (and reorder it via CSS) to work around React reconciliation (updating the
- * DOM to match the underlying model) after we've added the RT widget
+ * DOM to match (the virtual DOM representation of) the underlying model) after
+ * we've added the RT widget
  *
  * when this synchronisation occurs, React will try to restore nodes
  * (attributes, text, elements) within each widget to match the widget's props,
@@ -370,11 +620,9 @@ function checkFallback (matched, imdbId) {
  * extract IMDb metadata from the GraphQL data embedded in the page
  *
  * @param {string} imdbId
- * @returns {any}
  */
 function getIMDbMetadata (imdbId) {
     const data = JSON.parse($('#__NEXT_DATA__').text())
-    const pageType = get(data, 'props.requestContext.pageType')
 
     const decorate = data => {
         return { data, size: Object.keys(data).length }
@@ -396,6 +644,7 @@ function getIMDbMetadata (imdbId) {
     const originalTitle = get(main, 'originalTitleText.text', '')
     const type = get(main, 'titleType.id', '')
     const year = get(main, 'releaseYear.year') || 0
+    const rtType = RT_TYPE[type]
     const meta = {
         id: imdbId,
         cast: mainCast,
@@ -405,31 +654,35 @@ function getIMDbMetadata (imdbId) {
         type,
     }
 
-    if (RT_TYPE[type] === 'tvSeries') {
+    if (rtType === 'tvSeries') {
         meta.startYear = year
         meta.endYear = get(extra, 'releaseYear.endYear') || 0
         meta.seasons = get(main, 'episodes.seasons.length') || 0
-    } else if (RT_TYPE[type] === 'movie') {
+    } else if (rtType === 'movie') {
         meta.directors = get(main, 'directors.*.credits.*.name.nameText.text', [])
         meta.year = year
     }
 
-    return { meta, pageType }
+    return { meta, rtType }
 }
 
-// parse the API's response and extract the RT rating and consensus.
-//
-// if there's no consensus, default to "No consensus yet."
-// if there's no rating, default to -1
-async function getRTData (imdb) {
+/**
+ * parse the API's response and extract the RT rating and consensus.
+ *
+ * if there's no consensus, default to "No consensus yet."
+ * if there's no rating, default to -1
+ *
+ * @param {any} imdb
+ * @param {"tvSeries" | "movie"} rtType
+ * @return {Promise<{data: { consensus: string, rating: number, url: string }, updated: string}>}
+ */
+async function getRTData (imdb, rtType) {
     /**
      * @throws {Error}
      */
     function fail (message) {
         throw new Error(message)
     }
-
-    const rtType = RT_TYPE[imdb.type]
 
     log(`querying API for ${JSON.stringify(imdb.title)}`)
 
@@ -458,8 +711,8 @@ async function getRTData (imdb) {
 
     debug('results:', results)
 
-    const matcher = rtType === 'movie' ? matchMovie : matchTV
-    const matched = matcher(results, imdb) || {}
+    const matcher = rtType === 'movie' ? MovieMatcher : TVMatcher
+    const matched = matcher.match(results, imdb) || {}
     const { match, verify } = checkFallback(matched, imdb.id)
 
     if (!match) {
@@ -476,16 +729,7 @@ async function getRTData (imdb) {
     const parser = new DOMParser()
     const dom = parser.parseFromString(res.responseText, 'text/html')
     const $rt = $(dom)
-    const $consensus = $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
-
-    let consensus
-
-    if ($consensus.length && (consensus = $consensus.html().trim())) {
-        consensus = consensus.replace(/--/g, '&#8212;')
-    } else {
-        consensus = NO_CONSENSUS
-    }
-
+    const consensus = matcher.getConsensus($rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
     const meta = $rt.jsonLd(url)
 
     if (verify) {
@@ -509,6 +753,7 @@ async function getRTData (imdb) {
  *
  * @param {any} rtMeta
  * @param {'movie' | 'tvSeries'} rtType
+ * @return {string}
  */
 function getUpdated (rtMeta, rtType) {
     const [reviewProp, rootProp] = rtType === 'movie'
@@ -542,214 +787,6 @@ function getUpdated (rtMeta, rtType) {
 }
 
 /**
- * return a movie record ({ url: string }) from the API results which
- * matches the supplied IMDb data
- *
- * @param {any} rtResults
- * @param {any} imdb
- * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
- */
-function matchMovie (rtResults, imdb) {
-    const sorted = rtResults.movies
-        .flatMap((rt, index) => {
-            if (!(rt.name && rt.url && rt.castItems)) {
-                return []
-            }
-
-            const { name: title } = rt
-            const rtCast = pluck(rt.castItems, 'name').map(stripRtName)
-
-            let castMatch
-
-            if (rtCast.length) {
-                const { got, want } = shared(rtCast, imdb.fullCast)
-
-                if (got < want) {
-                    return []
-                } else {
-                    castMatch = got
-                }
-            } else {
-                castMatch = -1
-            }
-
-            const yearDiff = (imdb.year && rt.year)
-                ? { value: Math.abs(imdb.year - rt.year) }
-                : null
-
-            if (yearDiff && yearDiff.value > 3) {
-                return []
-            }
-
-            const titleMatch = titleSimilarity({ imdb, rt: { title } })
-
-            const result = {
-                title,
-                url: rt.url,
-                rating: rt.meterScore,
-                popularity: (rt.meterScore == null ? 0 : 1),
-                cast: rtCast,
-                year: rt.year,
-                index,
-                titleMatch,
-                castMatch,
-                yearDiff
-            }
-
-            return [result]
-        })
-        .sort((a, b) => {
-            // combine the title and the year
-            //
-            // being a year or two out shouldn't be a dealbreaker, and it's not
-            // uncommon for an RT title to differ from the IMDb title (e.g. an
-            // AKA), so we don't want one of these to pre-empt the other (just yet)
-            const score = new Score()
-
-            score.add(b.titleMatch - a.titleMatch)
-
-            if (a.yearDiff && b.yearDiff) {
-                score.add(a.yearDiff.value - b.yearDiff.value)
-            }
-
-            return (b.castMatch - a.castMatch)
-                || (score.b - score.a)
-                || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
-                || (b.popularity - a.popularity) // last resort
-        })
-
-    debug('matches:', sorted)
-
-    if (sorted.length) {
-        const [match] = sorted
-
-        if (match.cast.length) { // already verified
-            return { match }
-        } else {
-            // in theory, we can verify the cast when the page is loaded. in
-            // practice, it doesn't work: if the cast is missing from the API
-            // results, it's also missing from the page's metadata
-            //
-            // when the cast is missing from the metadata, the directors are
-            // often missing from the metadata as well, so we try to scrape them
-            // instead
-
-            const verify = $rt => {
-                const rtDirectors = $rt.meta.director?.length
-                    ? pluck($rt.meta.director, 'name').map(stripRtName)
-                    : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent)
-                return verifyShared({ imdb: imdb.directors, rt: rtDirectors, name: 'directors' })
-            }
-
-            return { match, verify }
-        }
-    }
-}
-
-/**
- * return a TV show record ({ url: string }) from the API results
- * which matches the supplied IMDb data
- *
- * returns an additional validation function to run against the RT page's
- * metadata to confirm the match
- *
- * @param {any} rtResults
- * @param {any} imdb
- * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
- */
-function matchTV (rtResults, imdb) {
-    const verify = ({ meta }) => {
-        const rtCast = pluck(meta.actor, 'name').map(stripRtName)
-        const diff1 = Math.abs(rtCast.length - imdb.fullCast.length)
-        const diff2 = Math.abs(rtCast.length - imdb.cast.length)
-        const imdbCast = diff1 > diff2 ? imdb.fullCast : imdb.cast
-        return verifyShared({ imdb: imdbCast, rt: rtCast })
-    }
-
-    const sorted = rtResults.tvSeries
-        .flatMap((rt, index) => {
-            const { title, startYear, endYear, url } = rt
-
-            if (!(title && (startYear || endYear) && url)) {
-                return []
-            }
-
-            const titleMatch = titleSimilarity({ imdb, rt })
-
-            if (titleMatch < 0.6) {
-                return []
-            }
-
-            const dateDiffs = {}
-
-            for (const dateProp of ['startYear', 'endYear']) {
-                if (imdb[dateProp] && rt[dateProp]) {
-                    const diff = Math.abs(imdb[dateProp] - rt[dateProp])
-
-                    if (diff > 3) {
-                        return []
-                    } else {
-                        dateDiffs[dateProp] = { value: diff }
-                    }
-                }
-            }
-
-            const seasonsDiff = (url.endsWith('/s01') && imdb.seasons)
-                ? { value: imdb.seasons - 1 }
-                : null
-
-            const score = {
-                title,
-                url,
-                rating: rt.meterScore,
-                popularity: (rt.meterScore == null ? 0 : 1),
-                startYear,
-                endYear,
-                index,
-                titleMatch,
-                startYearDiff: dateDiffs.startYear,
-                endYearDiff: dateDiffs.endYear,
-                seasonsDiff,
-            }
-
-            return [score]
-        })
-        .sort((a, b) => {
-            const score = new Score()
-
-            score.add(b.titleMatch - a.titleMatch)
-
-            if (a.startYearDiff && b.startYearDiff) {
-                score.add(a.startYearDiff.value - b.startYearDiff.value)
-            }
-
-            if (a.endYearDiff && b.endYearDiff) {
-                score.add(a.endYearDiff.value - b.endYearDiff.value)
-            }
-
-            if (a.seasonsDiff && b.seasonsDiff) {
-                score.add(a.seasonsDiff.value - b.seasonsDiff.value)
-            }
-
-            return (score.b - score.a)
-                || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
-                || (b.popularity - a.popularity) // last resort
-        })
-
-    debug('matches:', sorted)
-
-    const [match] = sorted
-
-    if (match) {
-        if (match.url.match(/^\/tv\/[^/]+$/)) {
-            match.url += '/s01'
-        }
-
-        return { match, verify }
-    }
-}
-
-/**
  * normalize names so matches don't fail due to minor differences in casing or
  * punctuation
  *
@@ -772,7 +809,6 @@ function normalize (name) {
  *
  * @param {any[] | undefined} array
  * @param {string} path
- * @returns {any[]}
  */
 function pluck (array, path) {
     return (array || []).map(it => get(it, path))
@@ -976,36 +1012,30 @@ async function run () {
         log('not cached')
     }
 
-    const { meta: imdb, pageType } = getIMDbMetadata(imdbId)
+    const { meta: imdb, rtType } = getIMDbMetadata(imdbId)
 
-    if (!imdb) {
+    if (!imdb?.type) {
         console.error(`can't find metadata for ${imdbId}`)
         return
     }
 
+    if (!rtType) {
+        info(`invalid page type for ${imdbId}: ${imdb.type}`)
+        return
+    }
+
     log('metadata:', imdb)
-
-    if (pageType !== 'title') {
-        info(`invalid page type for ${imdbId}: ${pageType}`)
-        return
-    }
-
-    if (!RT_TYPE[imdb.type]) {
-        info(`invalid type for ${imdbId}: ${imdb.type}`)
-        return
-    }
 
     // add a { version, expires, data|error } entry to the cache
     const store = (dataOrError, ttl) => {
         const expires = now + ttl
         const cached = { version: DATA_VERSION, expires, ...dataOrError }
         const json = JSON.stringify(cached)
-
         GM_setValue(imdbId, json)
     }
 
     try {
-        const { data, updated: $updated } = await getRTData(imdb)
+        const { data, updated: $updated } = await getRTData(imdb, rtType)
 
         log('RT data:', data)
 
