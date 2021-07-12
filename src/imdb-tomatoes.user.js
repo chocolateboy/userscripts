@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.1.0
+// @version       4.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -84,8 +84,8 @@ const BALLOON_OPTIONS = {
 
 const COLOR = {
     tbd: '#d9d9d9',
-    fresh: '#66cc33',
-    rotten: '#ff0000',
+    fresh: '#67ad4b',
+    rotten: '#fb3c3c',
 }
 
 const RT_TYPE = {
@@ -162,7 +162,7 @@ const MovieMatcher = {
      *
      * @param {any} rtResults
      * @param {any} imdb
-     * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
+     * @return {{ match: { url: string }, verify?: ($rt: JQuery & { meta: any }) => boolean } | void}
      */
     match (rtResults, imdb) {
         const sorted = rtResults.movies
@@ -216,9 +216,10 @@ const MovieMatcher = {
             .sort((a, b) => {
                 // combine the title and the year
                 //
-                // being a year or two out shouldn't be a dealbreaker, and it's not
-                // uncommon for an RT title to differ from the IMDb title (e.g. an
-                // AKA), so we don't want one of these to pre-empt the other (just yet)
+                // being a year or two out shouldn't be a dealbreaker, and it's
+                // not uncommon for an RT title to differ from the IMDb title
+                // (e.g. an AKA), so we don't want one of these to pre-empt the
+                // other (yet)
                 const score = new Score()
 
                 score.add(b.titleMatch - a.titleMatch)
@@ -282,7 +283,7 @@ const TVMatcher = {
      *
      * @param {any} rtResults
      * @param {any} imdb
-     * @return {{ match: { url: string }, verify?: (meta: any, $rt: JQuery) => boolean } | void}
+     * @return {{ match: { url: string }, verify?: ($rt: JQuery & { meta: any }) => boolean } | void}
      */
     match (rtResults, imdb) {
         const verify = ({ meta }) => {
@@ -642,8 +643,8 @@ function getIMDbMetadata (imdbId) {
     const fullCast = Array.from(new Set([...mainCast, ...extraCast]))
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', '')
-    const type = get(main, 'titleType.id', '')
     const year = get(main, 'releaseYear.year') || 0
+    const type = get(main, 'titleType.id', '')
     const rtType = RT_TYPE[type]
     const meta = {
         id: imdbId,
@@ -677,13 +678,6 @@ function getIMDbMetadata (imdbId) {
  * @return {Promise<{data: { consensus: string, rating: number, url: string }, updated: string}>}
  */
 async function getRTData (imdb, rtType) {
-    /**
-     * @throws {Error}
-     */
-    function fail (message) {
-        throw new Error(message)
-    }
-
     log(`querying API for ${JSON.stringify(imdb.title)}`)
 
     /** @type {AsyncGetOptions} */
@@ -695,6 +689,7 @@ async function getRTData (imdb, rtType) {
 
     const api = GM_getResourceText('api')
     const response = await asyncGet(api, request)
+
     log(`response: ${response.status} ${response.statusText}`)
 
     let results
@@ -702,11 +697,11 @@ async function getRTData (imdb, rtType) {
     try {
         results = JSON.parse(response.responseText)
     } catch (e) {
-        fail(`can't parse response: ${e}`)
+        throw new Error(`can't parse response: ${e}`)
     }
 
     if (!results) {
-        fail('invalid JSON type')
+        throw new Error('invalid JSON type')
     }
 
     debug('results:', results)
@@ -804,8 +799,7 @@ function normalize (name) {
 }
 
 /**
- * extract the value of a property (+name+ by default) from each member of an
- * array
+ * extract the value of a property (dotted path) from each member of an array
  *
  * @param {any[] | undefined} array
  * @param {string} path
@@ -815,7 +809,8 @@ function pluck (array, path) {
 }
 
 /**
- * purge expired entries from the cache
+ * purge expired entries from the cache older than the supplied date
+ * (milliseconds since the epoch). if the date is -1, purge all entries
  *
  * @param {number} date
  */
@@ -837,11 +832,11 @@ function purgeCached (date) {
 /**
  * given two arrays of strings, return an object containing:
  *
- *   - got: the number of strings common to both
+ *   - got: the number of shared strings (strings common to both)
  *   - want: the required number of shared strings (minimum: 1)
- *   - max: the maximum number of shared strings
+ *   - max: the maximum possible number of shared strings
  *
- * if either array is empty, the number of strings they have in commin is -1
+ * if either array is empty, the number of strings they have in common is -1
  *
  * @param {Iterable<string>} a
  * @param {Iterable<string>} b
@@ -883,6 +878,10 @@ function shared (a, b, { min = MINIMUM_SHARED, map: transform = normalize } = {}
  * return the similarity between two strings, ranging from 0 (no similarity) to
  * 2 (identical)
  *
+ *   similarity("John Woo", "John Woo")                   // 2
+ *   similarity("Matthew Macfadyen", "Matthew MacFadyen") // 1
+ *   similarity("Alan Arkin", "Zazie Beetz")              // 0
+ *
  * @param {string} a
  * @param {string} b
  */
@@ -891,8 +890,7 @@ function similarity (a, b) {
 }
 
 /**
- * strip trailing sequence numbers in names in RT metadata (they're not present
- * in the search results), e.g.
+ * strip trailing sequence numbers in names in RT metadata, e.g.
  *
  *   - "Meng Li (IX)"       -> "Meng Li"
  *   - "Michael Dwyer (X) " -> "Michael Dwyer"
@@ -907,11 +905,11 @@ function stripRtName (name) {
 /*
  * measure the similarity of an IMDb title and an RT title returned by the API
  *
- * the latter sometimes contain the original title at the end in brackets for
- * foreign-language films/shows, so we take that into account
+ * RT titles for foreign-language films/shows sometimes contain the original
+ * title at the end in brackets, so we take that into account
  *
- * note, we only use this if the original IMDb title differs from the main IMDb
- * title
+ * note, we only use this if the original IMDb title differs from the main
+ * IMDb title
  *
  *   similarity("The Swarm", "The Swarm (La Nuée)")                    // 0.66
  *   titleSimilarity({ imdb: "The Swarm", rt: "The Swarm (La Nuée)" }) // 2
@@ -1043,7 +1041,7 @@ async function run () {
 
         const updated = dayjs($updated)
         const date = dayjs()
-        const delta = date.diff(updated, 'month')
+        const delta = date.diff(updated, 'month', /* float */ true)
         const ago = date.to(updated)
 
         log(`last update: ${updated.format('YYYY-MM-DD')} (${ago})`)
