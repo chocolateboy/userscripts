@@ -3,14 +3,14 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.1.1
+// @version       4.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
 // @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.10.5/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.10.5/plugin/relativeTime.js
+// @require       https://unpkg.com/dayjs@1.10.6/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.10.6/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
@@ -253,7 +253,7 @@ const MovieMatcher = {
                 const verify = $rt => {
                     const rtDirectors = $rt.meta.director?.length
                         ? pluck($rt.meta.director, 'name').map(stripRtName)
-                        : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent)
+                        : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent?.trim())
                     return verifyShared({ imdb: imdb.directors, rt: rtDirectors, name: 'directors' })
                 }
 
@@ -286,8 +286,10 @@ const TVMatcher = {
      * @return {{ match: { url: string }, verify?: ($rt: JQuery & { meta: any }) => boolean } | void}
      */
     match (rtResults, imdb) {
-        const verify = ({ meta }) => {
-            const rtCast = pluck(meta.actor, 'name').map(stripRtName)
+        const verify = $rt => {
+            const rtCast = $rt.meta.actor?.length
+                ? pluck($rt.meta.actor, 'name').map(stripRtName)
+                : $rt.find('[data-qa="cast-member"]').get().map(it => it.textContent?.trim())
             const diff1 = Math.abs(rtCast.length - imdb.fullCast.length)
             const diff2 = Math.abs(rtCast.length - imdb.cast.length)
             const imdbCast = diff1 > diff2 ? imdb.fullCast : imdb.cast
