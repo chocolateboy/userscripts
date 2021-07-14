@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.2.0
+// @version       4.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -102,7 +102,7 @@ const UNSHARED = Object.freeze({
 })
 
 /*
- * the minimum number of elements shared between two arrays for them to be
+ * the minimum number of elements shared between two Sets for them to be
  * deemed similar
  *
  * @type {<T>(smallest: Set<T>, largest: Set<T>) => number}
@@ -208,7 +208,7 @@ const MovieMatcher = {
                     index,
                     titleMatch,
                     castMatch,
-                    yearDiff
+                    yearDiff,
                 }
 
                 return [result]
@@ -243,13 +243,12 @@ const MovieMatcher = {
                 return { match }
             } else {
                 // in theory, we can verify the cast when the page is loaded. in
-                // practice, it doesn't work: if the cast is missing from the API
-                // results, it's also missing from the page's metadata
+                // practice, it doesn't work: if the cast is missing from the
+                // API results, it's also missing from the page's metadata
                 //
                 // when the cast is missing from the metadata, the directors are
-                // often missing from the metadata as well, so we try to scrape them
-                // instead
-
+                // often missing from the metadata as well, so we try to scrape
+                // them instead
                 const verify = $rt => {
                     const rtDirectors = $rt.meta.director?.length
                         ? pluck($rt.meta.director, 'name').map(stripRtName)
@@ -271,7 +270,9 @@ const TVMatcher = {
      * @return {string | undefined}
      */
     getConsensus ($rt) {
-        return $rt.find('season-list-item[consensus]').last().attr('consensus')
+        return $rt.find('season-list-item[consensus]')
+            .last()
+            .attr('consensus')
     },
 
     /**
@@ -293,6 +294,7 @@ const TVMatcher = {
             const diff1 = Math.abs(rtCast.length - imdb.fullCast.length)
             const diff2 = Math.abs(rtCast.length - imdb.cast.length)
             const imdbCast = diff1 > diff2 ? imdb.fullCast : imdb.cast
+
             return verifyShared({ imdb: imdbCast, rt: rtCast })
         }
 
@@ -340,7 +342,7 @@ const TVMatcher = {
                     ? { value: imdb.seasons - 1 }
                     : null
 
-                const score = {
+                const result = {
                     title,
                     url: $url,
                     rating: rt.meterScore,
@@ -354,7 +356,7 @@ const TVMatcher = {
                     seasonsDiff,
                 }
 
-                return [score]
+                return [result]
             })
             .sort((a, b) => {
                 const score = new Score()
