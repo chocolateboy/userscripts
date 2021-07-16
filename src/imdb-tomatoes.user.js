@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.2.1
+// @version       4.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -89,10 +89,8 @@ const COLOR = {
 }
 
 const RT_TYPE = {
-    movie: 'movie',
-    tvMovie: 'movie',
-    tvSeries: 'tvSeries',
-    tvMiniSeries: 'tvSeries',
+    TVSeries: 'tvSeries',
+    Movie: 'movie',
 }
 
 const UNSHARED = Object.freeze({
@@ -120,7 +118,7 @@ const get = exports.getter({ split: '.' })
  * register a jQuery plugin which extracts and returns JSON-LD data for the
  * loaded document
  *
- * used to extract metadata on Rotten Tomatoes
+ * used to extract metadata on IMDb and Rotten Tomatoes
  *
  * @param {string} id
  * @return {any}
@@ -625,8 +623,9 @@ function checkFallback (matched, imdbId) {
  * extract IMDb metadata from the GraphQL data embedded in the page
  *
  * @param {string} imdbId
+ * @param {string} rtType
  */
-function getIMDbMetadata (imdbId) {
+function getIMDbMetadata (imdbId, rtType) {
     const data = JSON.parse($('#__NEXT_DATA__').text())
 
     const decorate = data => {
@@ -649,7 +648,6 @@ function getIMDbMetadata (imdbId) {
     const originalTitle = get(main, 'originalTitleText.text', '')
     const year = get(main, 'releaseYear.year') || 0
     const type = get(main, 'titleType.id', '')
-    const rtType = RT_TYPE[type]
     const meta = {
         id: imdbId,
         cast: mainCast,
@@ -668,7 +666,7 @@ function getIMDbMetadata (imdbId) {
         meta.year = year
     }
 
-    return { meta, rtType }
+    return meta
 }
 
 /**
@@ -1014,15 +1012,19 @@ async function run () {
         log('not cached')
     }
 
-    const { meta: imdb, rtType } = getIMDbMetadata(imdbId)
+    const imdbType = $(document).jsonLd(location.href)?.['@type']
+    const rtType = RT_TYPE[imdbType]
 
-    if (!imdb?.type) {
-        console.error(`can't find metadata for ${imdbId}`)
+    if (!rtType) {
+        info(`invalid type for ${imdbId}: ${imdbType}`)
         return
     }
 
-    if (!rtType) {
-        info(`invalid page type for ${imdbId}: ${imdb.type}`)
+    const imdb = getIMDbMetadata(imdbId, rtType)
+
+    // do a basic sanity check to make sure it's valid
+    if (!imdb?.type) {
+        console.error(`can't find metadata for ${imdbId}`)
         return
     }
 
