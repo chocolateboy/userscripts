@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.3.0
+// @version       4.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -12,10 +12,11 @@
 // @require       https://unpkg.com/dayjs@1.10.6/dayjs.min.js
 // @require       https://unpkg.com/dayjs@1.10.6/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
+// @require       https://unpkg.com/bury@0.1.0/dist/bury.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
+// @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      fallback https://pastebin.com/raw/st41GA15
+// @resource      overrides https://pastebin.com/raw/SjPAGJuz
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -45,29 +46,16 @@
 
 /* begin */ {
 
-const INACTIVE_MONTHS = 3
-const NO_CONSENSUS    = 'No consensus yet.'
-const NO_MATCH        = 'no matching results'
-const ONE_DAY         = 1000 * 60 * 60 * 24
-const ONE_WEEK        = ONE_DAY * 7
-const RT_BASE         = 'https://www.rottentomatoes.com'
-const SCRIPT_NAME     = GM_info.script.name
-const SCRIPT_VERSION  = GM_info.script.version
-
-// the version of each cached record is a combination of the schema version and
-// the major part of the script's (SemVer) version, and an additional number
-// (the cache-generation) which can be incremented to force the cache to be
-// cleared. the generation is reset when the schema or major versions change
-//
-// e.g. 4 (schema) + 3 (major) + 0 (generation) gives a version of "4/3.0"
-//
-// this means cached records are invalidated either a) when the schema changes,
-// b) when the major version of the script changes, or c) when the generation is
-// bumped
-const SCHEMA_VERSION = 4
-const SCRIPT_MAJOR = SCRIPT_VERSION.split('.')[0]
-const CACHE_GENERATION = 0
-const DATA_VERSION = `${SCHEMA_VERSION}/${SCRIPT_MAJOR}.${CACHE_GENERATION}`
+const DATA_VERSION     = 1
+const INACTIVE_MONTHS  = 3
+const MAX_YEAR_DIFF    = 3
+const METADATA_VERSION = { stats: 1 }
+const NO_CONSENSUS     = 'No consensus yet.'
+const NO_MATCH         = 'no matching results'
+const ONE_DAY          = 1000 * 60 * 60 * 24
+const ONE_WEEK         = ONE_DAY * 7
+const RT_BASE          = 'https://www.rottentomatoes.com'
+const SCRIPT_NAME      = GM_info.script.name
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -88,9 +76,24 @@ const COLOR = {
     rotten: '#fb3c3c',
 }
 
+const CONNECTION_ERROR = {
+    status: 420,
+    statusText: 'Connection Error',
+}
+
 const RT_TYPE = {
     TVSeries: 'tvSeries',
     Movie: 'movie',
+}
+
+const STATS = {
+    request: 0,
+    hit: 0,
+    miss: 0,
+    preload: {
+        hit:   0,
+        miss:  0,
+    },
 }
 
 const UNSHARED = Object.freeze({
@@ -110,6 +113,13 @@ const MINIMUM_SHARED = smallest => Math.round(smallest.size / 2)
 // log a message to the console
 const { debug, info, log, warn } = console
 
+/**
+ * deep-clone a JSON-serializable value
+ *
+ * @type {<T>(value: T) => T}
+ */
+const clone = value => JSON.parse(JSON.stringify(value))
+
 // a custom version of get-wild's `get` function which uses a simpler/faster
 // path parser since we don't use the extended syntax
 const get = exports.getter({ split: '.' })
@@ -121,7 +131,6 @@ const get = exports.getter({ split: '.' })
  * used to extract metadata on IMDb and Rotten Tomatoes
  *
  * @param {string} id
- * @return {any}
  */
 $.fn.jsonLd = function jsonLd (id) {
     const $script = this.find('script[type="application/ld+json"]')
@@ -146,12 +155,46 @@ const MovieMatcher = {
      * return the consensus from a movie page as a HTML string
      *
      * @param {JQuery<Document>} $rt
-     * @return {string | undefined}
      */
     getConsensus ($rt) {
         return $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
             .first()
             .html()
+    },
+
+    /**
+     * get the timestamp (ISO-8601 string) of the last time an RT movie page was
+     * updated, e.g. the date of the most-recently published review
+     *
+     * @param {any} rtMeta
+     * @param {string[]} dateProps
+     * @return {string | undefined}
+     */
+    lastModified ({ meta: rtMeta }) {
+        let updated
+
+        if (rtMeta.review?.length) {
+            debug('reviews:', rtMeta.review.length)
+
+            const [latest] = rtMeta.review
+                .flatMap(review => {
+                    return review.dateCreated
+                        ? [{ review, mtime: dayjs(review.dateCreated).unix() }]
+                        : []
+                })
+                .sort((a, b) => b.mtime - a.mtime)
+
+            if (latest) {
+                updated = latest.review.dateCreated
+                debug('updated (most recent review):', updated)
+            }
+        }
+
+        if (!updated && (updated = rtMeta.dateModified)) {
+            debug('updated (page modified):', updated)
+        }
+
+        return updated
     },
 
     /**
@@ -172,25 +215,24 @@ const MovieMatcher = {
                 const { name: title } = rt
                 const rtCast = pluck(rt.castItems, 'name').map(stripRtName)
 
-                let castMatch
+                let castMatch = -1, verify = true
 
                 if (rtCast.length) {
                     const { got, want } = shared(rtCast, imdb.fullCast)
 
-                    if (got < want) {
-                        return []
-                    } else {
+                    if (got >= want) {
+                        verify = false
                         castMatch = got
+                    } else {
+                        return []
                     }
-                } else {
-                    castMatch = -1
                 }
 
                 const yearDiff = (imdb.year && rt.year)
                     ? { value: Math.abs(imdb.year - rt.year) }
                     : null
 
-                if (yearDiff && yearDiff.value > 3) {
+                if (yearDiff && yearDiff.value > MAX_YEAR_DIFF) {
                     return []
                 }
 
@@ -207,12 +249,13 @@ const MovieMatcher = {
                     titleMatch,
                     castMatch,
                     yearDiff,
+                    verify,
                 }
 
                 return [result]
             })
             .sort((a, b) => {
-                // combine the title and the year
+                // combine the title and the year into a single score
                 //
                 // being a year or two out shouldn't be a dealbreaker, and it's
                 // not uncommon for an RT title to differ from the IMDb title
@@ -234,29 +277,45 @@ const MovieMatcher = {
 
         debug('matches:', sorted)
 
-        if (sorted.length) {
-            const [match] = sorted
+        return sorted[0]
+    },
 
-            if (match.cast.length) { // already verified
-                return { match }
-            } else {
-                // in theory, we can verify the cast when the page is loaded. in
-                // practice, it doesn't work: if the cast is missing from the
-                // API results, it's also missing from the page's metadata
-                //
-                // when the cast is missing from the metadata, the directors are
-                // often missing from the metadata as well, so we try to scrape
-                // them instead
-                const verify = $rt => {
-                    const rtDirectors = $rt.meta.director?.length
-                        ? pluck($rt.meta.director, 'name').map(stripRtName)
-                        : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent?.trim())
-                    return verifyShared({ imdb: imdb.directors, rt: rtDirectors, name: 'directors' })
-                }
+    /**
+     * return the likely RT path for an IMDb movie title, e.g.:
+     *
+     *   title: "Bolt"
+     *   path:  "/m/bolt"
+     *
+     * @param {string} title
+     */
+    rtPath (title) {
+        return `/m/${rtName(title)}`
+    },
 
-                return { match, verify }
-            }
-        }
+    /**
+     * @param {any} imdb
+     * @param {JQuery<Document> & { meta: any }} $rt
+     */
+    verify (imdb, $rt) {
+        // in theory, we can verify the cast when the page is loaded. in
+        // practice, it doesn't work: if the cast is missing from the
+        // API results, it's also missing from the page's metadata
+        //
+        // when the cast is missing from the metadata, the directors are
+        // often missing from the metadata as well, so we try to scrape
+        // them instead
+
+        /** @type {string[]} */
+        // @ts-ignore
+        const rtDirectors = $rt.meta.director?.length
+            ? pluck($rt.meta.director, 'name').map(stripRtName)
+            : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent?.trim())
+
+        return verifyShared({
+            imdb: imdb.directors,
+            rt: rtDirectors,
+            name: 'directors',
+        })
     },
 }
 
@@ -265,12 +324,24 @@ const TVMatcher = {
      * return the consensus from a TV page as a HTML string
      *
      * @param {JQuery<Document>} $rt
-     * @return {string | undefined}
      */
     getConsensus ($rt) {
         return $rt.find('season-list-item[consensus]')
             .last()
             .attr('consensus')
+    },
+
+    /**
+     * return the last-modified date for a TV show
+     *
+     * we can't extract this value from TV show overview pages, so we return
+     * undefined, which selects the default caching period (currently one week).
+     *
+     * @param {JQuery<Document> & { meta: any, document: Document }} $rt
+     * @return {string | undefined}
+     */
+    lastModified () {
+        return undefined
     },
 
     /**
@@ -285,17 +356,6 @@ const TVMatcher = {
      * @return {{ match: { url: string }, verify?: ($rt: JQuery & { meta: any }) => boolean } | void}
      */
     match (rtResults, imdb) {
-        const verify = $rt => {
-            const rtCast = $rt.meta.actor?.length
-                ? pluck($rt.meta.actor, 'name').map(stripRtName)
-                : $rt.find('[data-qa="cast-member"]').get().map(it => it.textContent?.trim())
-            const diff1 = Math.abs(rtCast.length - imdb.fullCast.length)
-            const diff2 = Math.abs(rtCast.length - imdb.cast.length)
-            const imdbCast = diff1 > diff2 ? imdb.fullCast : imdb.cast
-
-            return verifyShared({ imdb: imdbCast, rt: rtCast })
-        }
-
         const sorted = rtResults.tvSeries
             .flatMap((rt, index) => {
                 const { title, startYear, endYear, url } = rt
@@ -316,7 +376,7 @@ const TVMatcher = {
                     if (imdb[dateProp] && rt[dateProp]) {
                         const diff = Math.abs(imdb[dateProp] - rt[dateProp])
 
-                        if (diff > 3) {
+                        if (diff > MAX_YEAR_DIFF) {
                             return []
                         } else {
                             dateDiffs[dateProp] = { value: diff }
@@ -352,6 +412,7 @@ const TVMatcher = {
                     startYearDiff: dateDiffs.startYear,
                     endYearDiff: dateDiffs.endYear,
                     seasonsDiff,
+                    verify: true,
                 }
 
                 return [result]
@@ -380,20 +441,52 @@ const TVMatcher = {
 
         debug('matches:', sorted)
 
-        const [match] = sorted
-
-        if (match) {
-            return { match, verify }
-        }
+        return sorted[0] // may be undefined
     },
+
+    /**
+     * return the likely RT path for an IMDb TV show title, e.g.:
+     *
+     *   title: "Sesame Street"
+     *   path:  "/tv/sesame_street"
+     *
+     * @param {string} title
+     */
+    rtPath (title) {
+        return `/tv/${rtName(title)}`
+    },
+
+    /**
+     * @param {any} imdb
+     * @param {JQuery<Document> & { meta: any }} $rt
+     */
+    verify (imdb, $rt) {
+        /** @type {string[]} */
+        // @ts-ignore
+        const rtCast = $rt.meta.actor?.length
+            ? pluck($rt.meta.actor, 'name').map(stripRtName)
+            : $rt.find('[data-qa="cast-member"]').get().map(it => it.textContent?.trim())
+
+        // compare the RT cast with the partial IMDb cast and the full IMDb cast
+        // and return the one with the best match
+        const partialShared = shared(rtCast, imdb.cast)
+        const fullShared = shared(rtCast, imdb.fullCast)
+        const partialDiff = partialShared.got - partialShared.want
+        const fullDiff = fullShared.got - fullShared.want
+        const imdbCast = partialDiff > fullDiff ? imdb.cast : imdb.fullCast
+
+        return verifyShared({ imdb: imdbCast, rt: rtCast })
+    }
 }
 
-/**
+const Matcher = {
+    tvSeries: TVMatcher,
+    movie: MovieMatcher,
+}
+
+/*
  * a helper class which keeps a running total of scores for two values (a and
  * b). used to rank values in a sort function
- *
- * @param {number} order
- * @return {void}
  */
 class Score {
     constructor () {
@@ -406,7 +499,6 @@ class Score {
      *
      * @param {number} order
      * @param {number=} points
-     * @return {void}
      */
     add (order, points = 1) {
         if (order < 0) {
@@ -521,15 +613,27 @@ function asyncGet (url, options = {}) {
     return new Promise((resolve, reject) => {
         request.onload = res => {
             if (res.status >= 400) {
-                reject(new Error(`error fetching ${id} (${res.status} ${res.statusText})`))
+                const error = Object.assign(
+                    new Error(`error fetching ${id} (${res.status} ${res.statusText})`),
+                    { status: res.status, statusText: res.statusText }
+                )
+
+                reject(error)
             } else {
                 resolve(res)
             }
         }
 
-        // XXX the +onerror+ response object doesn't contain any useful info
+        // XXX apart from +finalUrl+, the +onerror+ response object doesn't
+        // contain any useful info
         request.onerror = _res => {
-            reject(new Error(`error fetching ${id}`))
+            const { status, statusText } = CONNECTION_ERROR
+            const error = Object.assign(
+                new Error(`error fetching ${id} (${status} ${statusText})`),
+                { status, statusText },
+            )
+
+            reject(error)
         }
 
         GM_xmlhttpRequest(request)
@@ -541,7 +645,7 @@ function asyncGet (url, options = {}) {
  *
  * although the widget appears to be prepended to the bar, we need to append it
  * (and reorder it via CSS) to work around React reconciliation (updating the
- * DOM to match (the virtual DOM representation of) the underlying model) after
+ * DOM to match the (virtual DOM representation of) underlying model) after
  * we've added the RT widget
  *
  * when this synchronisation occurs, React will try to restore nodes
@@ -581,42 +685,33 @@ function attachWidget ($target, $rtRating) {
 }
 
 /**
- * check the fallback data in case of a failed match, but only use it as a last
+ * check the override data in case of a failed match, but only use it as a last
  * resort, i.e. try the verifier first, if defined, in case the data has
  * been fixed/updated
  *
- * @param {any} matched
+ * @param {any} match
  * @param {string} imdbId
  */
-function checkFallback (matched, imdbId) {
-    const fallback = JSON.parse(GM_getResourceText('fallback'))
-    const url = fallback[imdbId]
+function checkOverrides (match, imdbId) {
+    const overrides = JSON.parse(GM_getResourceText('overrides'))
+    const url = overrides[imdbId]
 
     if (url) {
         const $url = JSON.stringify(url)
-        const { verify } = matched
 
-        if (!matched.match) { // missing result
+        if (!match) { // missing result
             debug('fallback:', $url)
-            matched.match = { url }
-        } else if (matched.match.url !== url) { // wrong result
-            const $overridden = JSON.stringify(matched.match.url)
+            match = { url }
+        } else if (match.url !== url) { // wrong result
+            const $overridden = JSON.stringify(match.url)
             debug(`override: ${$overridden} -> ${$url}`)
-            matched.match.url = url
+            match.url = url
         }
 
-        if (verify) {
-            matched.verify = $rt => {
-                if (!verify($rt)) { // missing/incompatible RT data
-                    debug('force:', true)
-                }
-
-                return true
-            }
-        }
+        Object.assign(match, { verify: true, force: true })
     }
 
-    return matched
+    return match
 }
 
 /**
@@ -677,27 +772,79 @@ function getIMDbMetadata (imdbId, rtType) {
  *
  * @param {any} imdb
  * @param {"tvSeries" | "movie"} rtType
- * @return {Promise<{data: { consensus: string, rating: number, url: string }, updated: string}>}
  */
 async function getRTData (imdb, rtType) {
     log(`querying API for ${JSON.stringify(imdb.title)}`)
 
     /** @type {AsyncGetOptions} */
-    const request = {
+    const apiRequest = {
         params: { t: rtType, q: imdb.title, limit: 100 },
         request: { responseType: 'json' },
         title: 'API',
     }
 
-    const api = GM_getResourceText('api')
-    const response = await asyncGet(api, request)
+    const matcher = Matcher[rtType]
 
-    log(`response: ${response.status} ${response.statusText}`)
+    // we preload the anticipated RT page URL at the same time as the API request.
+    // the URL is the obvious path-formatted version of the IMDb title, e.g.:
+    //
+    //   movie:       "Bolt"
+    //   preload URL: https://www.rottentomatoes.com/m/bolt
+    //
+    //   tvSeries:    "Sesame Street"
+    //   preload URL: https://www.rottentomatoes.com/tv/sesame_street
+    //
+    // this guess produces the correct URL most (e.g. > 80%) of the time
+    //
+    // preloading this page serves two purposes:
+    //
+    // 1) it reduces the time spent waiting for the RT widget to be displayed.
+    // rather than querying the API and *then* loading the page, the requests
+    // run concurrently, effectively halving the waiting time in most cases
+    //
+    // 2) it serves as a fallback if the API result:
+    //
+    //  a) is missing
+    //  b) is invalid/fails to load
+    //  c) loads but fails the verification check
+    //
+    const preload = (function () {
+        const path = matcher.rtPath(imdb.title)
+        const url = RT_BASE + path
+
+        debug('preloading fallback URL:', url)
+
+        /** @type {Promise<Tampermonkey.Response>} */
+        const promise = asyncGet(url)
+            .then(res => {
+                debug(`preload response: ${res.status} ${res.statusText}`)
+                return res
+            })
+            .catch(e => {
+                debug(`error preloading ${url} (${e.status} ${e.statusText})`)
+                preload.error = e
+            })
+
+        return {
+            unused: false,
+            error: null,
+            fullUrl: url,
+            promise,
+            url: path,
+        }
+    })()
+
+    const api = GM_getResourceText('api')
+
+    /** @type {Tampermonkey.Response} */
+    let res = await asyncGet(api, apiRequest)
+
+    log(`API response: ${res.status} ${res.statusText}`)
 
     let results
 
     try {
-        results = JSON.parse(response.responseText)
+        results = JSON.parse(res.responseText)
     } catch (e) {
         throw new Error(`can't parse response: ${e}`)
     }
@@ -708,79 +855,115 @@ async function getRTData (imdb, rtType) {
 
     debug('results:', results)
 
-    const matcher = rtType === 'movie' ? MovieMatcher : TVMatcher
-    const matched = matcher.match(results, imdb) || {}
-    const { match, verify } = checkFallback(matched, imdb.id)
-
-    if (!match) {
-        abort(NO_MATCH)
+    const matched = matcher.match(results, imdb)
+    const match = checkOverrides(matched, imdb.id) || {
+        url: preload.url,
+        verify: true,
+        fallback: true,
     }
 
     debug('match:', match)
-    // @ts-ignore
-    const url = RT_BASE + match.url
-    log(`loading RT URL: ${url}`)
-    const res = await asyncGet(url)
-    log(`response: ${res.status} ${res.statusText}`)
+    log('matched:', !match.fallback)
 
-    const parser = new DOMParser()
-    const dom = parser.parseFromString(res.responseText, 'text/html')
-    const $rt = $(dom)
-    const consensus = matcher.getConsensus($rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
-    const meta = $rt.jsonLd(url)
+    let url = RT_BASE + match.url
+    let requestType = match.fallback ? 'fallback' : 'match'
 
-    if (verify) {
-        Object.assign($rt, { meta })
+    log(`loading ${requestType} URL:`, url)
 
-        if (!verify($rt)) {
+    if (match.url === preload.url) {
+        res = await preload.promise
+
+        if (!res) {
+            // @ts-ignore
+            log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
             abort(NO_MATCH)
+        }
+    } else {
+        try {
+            res = await asyncGet(url)
+            preload.unused = true // only set if the request succeeds
+        } catch (error) { // bogus URL in API result (or transient server error)
+            log(`error loading ${url} (${error.status} ${error.statusText})`)
+
+            if (match.force) { // URL locked in checkOverrides
+                abort(NO_MATCH)
+            } else {
+                requestType = 'fallback'
+                url = preload.fullUrl
+                log(`loading ${requestType} URL:`, url)
+
+                res = await preload.promise
+
+                if (!res) {
+                    // @ts-ignore
+                    log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
+                    abort(NO_MATCH)
+                }
+            }
         }
     }
 
-    const updated = getUpdated(meta, rtType)
-    const $rating = meta.aggregateRating
+    log(`${requestType} response: ${res.status} ${res.statusText}`)
+
+    let $rt = loadRT(res, match.url)
+
+    if (match.verify) {
+        let verified = matcher.verify(imdb, $rt)
+
+        if (!verified) {
+            if (match.force) {
+                log('force:', true)
+                verified = true
+            } else if (preload.unused) {
+                requestType = 'fallback'
+                url = preload.fullUrl
+                log(`loading ${requestType} URL:`, url)
+
+                res = await preload.promise
+
+                if (res) {
+                    log(`${requestType} response: ${res.status} ${res.statusText}`)
+                    $rt = loadRT(res, preload.url)
+                    verified = matcher.verify(imdb, $rt)
+                } else {
+                    // @ts-ignore
+                    log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
+                }
+            }
+
+            if (!verified) {
+                abort(NO_MATCH)
+            }
+        }
+    }
+
+    const consensus = matcher.getConsensus($rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
+    const updated = matcher.lastModified($rt)
+    const $rating = $rt.meta.aggregateRating
     const rating = Number(($rating.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
 
-    return { data: { consensus, rating, url }, updated }
+    return {
+        data: { consensus, rating, url },
+        preloadUrl: preload.fullUrl,
+        updated,
+    }
 }
 
 /**
- * get the timestamp (ISO-8601 string) of the last time the RT page was updated,
- * e.g. the date of the most-recently published review
  *
- * @param {any} rtMeta
- * @param {'movie' | 'tvSeries'} rtType
- * @return {string}
+ * take an XHR response object and transform it into a JQuery document wrapper
+ * with a +meta+ property
+ *
+ * @param {Tampermonkey.Response} res
+ * @param {string} id
+ * return {JQuery<Document> & { meta: any, document: Document }}
  */
-function getUpdated (rtMeta, rtType) {
-    const [reviewProp, rootProp] = rtType === 'movie'
-        ? ['dateCreated', 'dateModified']
-        : ['datePublished', 'datePublished']
-
-    let updated
-
-    if (rtMeta.review?.length) {
-        debug('reviews:', rtMeta.review.length)
-
-        const [latest] = rtMeta.review
-            .flatMap(review => {
-                return review[reviewProp]
-                    ? [{ review, mtime: dayjs(review[reviewProp]).unix() }]
-                    : []
-            })
-            .sort((a, b) => b.mtime - a.mtime)
-
-        if (latest) {
-            updated = latest.review[reviewProp]
-            debug('updated (most recent review):', updated)
-        }
-    }
-
-    if (!updated && (updated = rtMeta[rootProp])) {
-        debug('updated (page modified):', updated)
-    }
-
-    return updated
+function loadRT (res, id) {
+    const parser = new DOMParser()
+    const dom = parser.parseFromString(res.responseText, 'text/html')
+    const $rt = $(dom)
+    const meta = $rt.jsonLd(id)
+    return Object.assign($rt, { meta, document: dom })
 }
 
 /**
@@ -788,7 +971,6 @@ function getUpdated (rtMeta, rtType) {
  * punctuation
  *
  * @param {string} name
- * @returns {string}
  */
 function normalize (name) {
     return name
@@ -818,17 +1000,42 @@ function pluck (array, path) {
  */
 function purgeCached (date) {
     for (const key of GM_listValues()) {
-        const json = GM_getValue(key)
+        const json = GM_getValue(key, '{}')
         const value = JSON.parse(json)
+        const metadataVersion = METADATA_VERSION[key]
 
-        if (value.version !== DATA_VERSION) {
-            log(`purging invalid value (obsolete data version (${value.version})): ${key}`)
+        if (metadataVersion) { // persistent (until the next METADATA_VERSION[key] change)
+            if (value.version !== metadataVersion) {
+                log(`purging invalid metadata (obsolete version: ${value.version}): ${key}`)
+                GM_deleteValue(key)
+            }
+        } else if (value.version !== DATA_VERSION) {
+            log(`purging invalid data (obsolete version: ${value.version}): ${key}`)
             GM_deleteValue(key)
-        } else if (date === -1 || (typeof value.expires !== 'number') || (date > value.expires)) {
+        } else if (date === -1 || (typeof value.expires !== 'number') || date > value.expires) {
             log(`purging expired value: ${key}`)
             GM_deleteValue(key)
         }
     }
+}
+
+/**
+ * convert an IMDb title into the most likely basename (final part of the URL)
+ * for that title on Rotten Tomatoes, e.g.:
+ *
+ *   "A Stitch in Time" -> "a_stitch_in_time"
+ *   "Lilo & Stitch"    -> "lilo_and_stitch"
+ *   "Peter's Friends"  -> "peters_friends"
+ *
+ * @param {string} title
+ */
+
+function rtName (title) {
+    const name = title
+        .replace(/\s+&\s+/g, ' and ')
+        .replace(/'/g, '')
+
+    return normalize(name).replace(/\s+/g, '_')
 }
 
 /**
@@ -845,7 +1052,6 @@ function purgeCached (date) {
  * @param {Object} [options]
  * @param {(smallest: Set<string>, largest: Set<string>) => number} [options.min]
  * @param {(value: string) => string} [options.map]
- * @return {{ got: number, want: number, max: number }}
  */
 function shared (a, b, { min = MINIMUM_SHARED, map: transform = normalize } = {}) {
     const $a = new Set(Array.from(a, transform))
@@ -886,6 +1092,7 @@ function shared (a, b, { min = MINIMUM_SHARED, map: transform = normalize } = {}
  *
  * @param {string} a
  * @param {string} b
+ * @return {number}
  */
 function similarity (a, b) {
     return a === b ? 2 : exports.dice(normalize(a), normalize(b))
@@ -898,13 +1105,12 @@ function similarity (a, b) {
  *   - "Michael Dwyer (X) " -> "Michael Dwyer"
  *
  * @param {string} name
- * @return string
  */
 function stripRtName (name) {
     return name.replace(/\s+\([IVXLCDM]+\)\s*$/, '')
 }
 
-/*
+/**
  * measure the similarity of an IMDb title and an RT title returned by the API
  *
  * RT titles for foreign-language films/shows sometimes contain the original
@@ -917,15 +1123,14 @@ function stripRtName (name) {
  *   titleSimilarity({ imdb: "The Swarm", rt: "The Swarm (La Nuée)" }) // 2
  *
  * @param {Object} options
- * @param {{ title: string }} options.imdb
+ * @param {{ title: string, originalTitle: string }} options.imdb
  * @param {{ title: string }} options.rt
- * @return {number}
  */
 function titleSimilarity ({ imdb, rt }) {
     const rtTitle = rt.title
         .trim()
         .replace(/\s+/, ' ') // remove extraneous spaces, e.g. tt2521668
-        .replace(/\s+\((?:US|UK)\)$/, '')
+        .replace(/\s+\((?:US|UK|(?:(?:19|20)\d\d))\)$/, '')
 
     if (imdb.originalTitle && imdb.title !== imdb.originalTitle) {
         const match = rtTitle.match(/^(.+?)\s+\(([^)]+)\)$/)
@@ -961,7 +1166,7 @@ function verifyShared ({ imdb, rt, name = 'cast' }) {
     const $shared = shared(rt, imdb)
     debug(`shared ${name}:`, $shared)
     const verified = $shared.got >= $shared.want
-    debug('verified:', verified)
+    log('verified:', verified)
     return verified
 }
 
@@ -1038,21 +1243,42 @@ async function run () {
         GM_setValue(imdbId, json)
     }
 
+    /** @type {{ version: number, data: typeof STATS}} */
+    const stats = JSON.parse(GM_getValue('stats', 'null')) || {
+        version: METADATA_VERSION.stats,
+        data: clone(STATS),
+    }
+
+    /** @type {(path: string) => void} */
+    const bump = path => {
+        exports.bury(stats.data, path, get(stats.data, path, 0) + 1)
+    }
+
+    bump('request')
+
     try {
-        const { data, updated: $updated } = await getRTData(imdb, rtType)
+        const { data, updated: $updated, preloadUrl } = await getRTData(imdb, rtType)
 
         log('RT data:', data)
+        bump('hit')
+        bump(data.url === preloadUrl ? 'preload.hit' : 'preload.miss')
 
-        dayjs.extend(dayjs_plugin_relativeTime)
+        let active = false
 
-        const updated = dayjs($updated)
-        const date = dayjs()
-        const delta = date.diff(updated, 'month', /* float */ true)
-        const ago = date.to(updated)
+        if ($updated) {
+            dayjs.extend(dayjs_plugin_relativeTime)
 
-        log(`last update: ${updated.format('YYYY-MM-DD')} (${ago})`)
+            const updated = dayjs($updated)
+            const date = dayjs()
+            const ago = date.to(updated)
+            const delta = date.diff(updated, 'month', /* float */ true)
 
-        if (delta <= INACTIVE_MONTHS) {
+            active = delta <= INACTIVE_MONTHS
+
+            log(`last update: ${updated.format('YYYY-MM-DD')} (${ago})`)
+        }
+
+        if (active) {
             log('caching result for: one day')
             store({ data }, ONE_DAY)
         } else {
@@ -1062,6 +1288,9 @@ async function run () {
 
         addWidget($ratings, $imdbRating, data)
     } catch (error) {
+        bump('miss')
+        bump('preload.miss')
+
         const message = error.message || String(error) // stringify
 
         log(`caching error for one day: ${message}`)
@@ -1070,13 +1299,23 @@ async function run () {
         if (!error.abort) {
             console.error(error)
         }
+    } finally {
+        debug('stats:', stats.data)
+        GM_setValue('stats', JSON.stringify(stats))
     }
 }
 
 // register this first so data can be cleared even if there's an error
 GM_registerMenuCommand(`${SCRIPT_NAME}: clear cache`, () => {
     purgeCached(-1)
-});
+})
+
+GM_registerMenuCommand(`${SCRIPT_NAME}: clear stats`, () => {
+    if (confirm('Clear stats?')) {
+        log('clearing stats')
+        GM_deleteValue('stats')
+    }
+})
 
 // DOMContentLoaded typically fires several seconds after the IMDb ratings
 // widget is displayed, which leads to an unacceptable delay if the result is
