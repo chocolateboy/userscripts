@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.4.1
+// @version       4.4.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -46,16 +46,18 @@
 
 /* begin */ {
 
-const DATA_VERSION     = 1
-const INACTIVE_MONTHS  = 3
-const MAX_YEAR_DIFF    = 3
-const METADATA_VERSION = { stats: 1 }
-const NO_CONSENSUS     = 'No consensus yet.'
-const NO_MATCH         = 'no matching results'
-const ONE_DAY          = 1000 * 60 * 60 * 24
-const ONE_WEEK         = ONE_DAY * 7
-const RT_BASE          = 'https://www.rottentomatoes.com'
-const SCRIPT_NAME      = GM_info.script.name
+const API_LIMIT             = 100
+const DATA_VERSION          = 1
+const INACTIVE_MONTHS       = 3
+const MAX_YEAR_DIFF         = 3
+const METADATA_VERSION      = { stats: 1 }
+const NO_CONSENSUS          = 'No consensus yet.'
+const NO_MATCH              = 'no matching results'
+const ONE_DAY               = 1000 * 60 * 60 * 24
+const ONE_WEEK              = ONE_DAY * 7
+const RT_BASE               = 'https://www.rottentomatoes.com'
+const SCRIPT_NAME           = GM_info.script.name
+const TITLE_MATCH_THRESHOLD = 0.6
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -365,7 +367,7 @@ const TVMatcher = {
 
                 const titleMatch = titleSimilarity({ imdb, rt })
 
-                if (titleMatch < 0.6) {
+                if (titleMatch < TITLE_MATCH_THRESHOLD) {
                     return []
                 }
 
@@ -469,7 +471,7 @@ const TVMatcher = {
             : $rt.find('[data-qa="cast-member"]').get().map(it => it.textContent?.trim())
 
         // compare the RT cast with the partial IMDb cast and the full IMDb cast
-        // and select the one with the best match
+        // and select the one which produces the best match
         const partialShared = shared(rtCast, imdb.cast)
         const fullShared = shared(rtCast, imdb.fullCast)
         const partialDiff = partialShared.got - partialShared.want
@@ -551,9 +553,9 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
 
     // 2) add a custom stylesheet which:
     //
-    // - sets the star (SVG) to the right color
-    // - restores support for italics in the consensus text
-    // - reorders the appended widget (see attachWidget)
+    //   - sets the star (SVG) to the right color
+    //   - restores support for italics in the consensus text
+    //   - reorders the appended widget (see attachWidget)
     GM_addStyle(`
         #rt-rating svg { color: ${COLOR[style]}; }
         #rt-rating { order: -1; }
@@ -585,15 +587,16 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
         $(this).attr('data-testid', (_, id) => id.replace('aggregate', 'rt'))
     })
 
-    // 7) add the tooltip class to the link and update its label and URL
-    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
-    $rtRating.find('a[role="button"]')
-        .addClass('rt-consensus')
-        .balloon(balloonOptions)
-        .attr('aria-label', 'View RT Rating')
-        .attr('href', url)
+    // 7) update the link's label and URL
+    $rtRating
+        .find('a[role="button"]')
+        .attr({ 'aria-label': 'View RT Rating', href: url })
 
-    // 8) prepend the element to the ratings bar
+    // 8) attach the tooltip to the widget
+    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
+    $rtRating.balloon(balloonOptions)
+
+    // 9) prepend the widget to the ratings bar
     attachWidget($ratings, $rtRating)
 }
 
@@ -771,14 +774,14 @@ function getIMDbMetadata (imdbId, rtType) {
  * if there's no rating, default to -1
  *
  * @param {any} imdb
- * @param {"tvSeries" | "movie"} rtType
+ * @param {keyof Matcher} rtType
  */
 async function getRTData (imdb, rtType) {
     log(`querying API for ${JSON.stringify(imdb.title)}`)
 
     /** @type {AsyncGetOptions} */
     const apiRequest = {
-        params: { t: rtType, q: imdb.title, limit: 100 },
+        params: { t: rtType, q: imdb.title, limit: API_LIMIT },
         request: { responseType: 'json' },
         title: 'API',
     }
@@ -804,9 +807,9 @@ async function getRTData (imdb, rtType) {
     //
     // 2) it serves as a fallback if the API result:
     //
-    //  a) is missing
-    //  b) is invalid/fails to load
-    //  c) loads but fails the verification check
+    //   a) is missing
+    //   b) is invalid/fails to load
+    //   c) loads but fails the verification check
     //
     const preload = (function () {
         const path = matcher.rtPath(imdb.title)
@@ -952,11 +955,10 @@ async function getRTData (imdb, rtType) {
 /**
  *
  * take an XHR response object and transform it into a JQuery document wrapper
- * with a +meta+ property
+ * with a +meta+ property containing the page's parsed JSON-LD data
  *
  * @param {Tampermonkey.Response} res
  * @param {string} id
- * return {JQuery<Document> & { meta: any, document: Document }}
  */
 function loadRT (res, id) {
     const parser = new DOMParser()
@@ -1029,7 +1031,6 @@ function purgeCached (date) {
  *
  * @param {string} title
  */
-
 function rtName (title) {
     const name = title
         .replace(/\s+&\s+/g, ' and ')
@@ -1094,8 +1095,8 @@ function shared (a, b, { min = MINIMUM_SHARED, map: transform = normalize } = {}
  * @param {string} b
  * @return {number}
  */
-function similarity (a, b) {
-    return a === b ? 2 : exports.dice(normalize(a), normalize(b))
+function similarity (a, b, map = normalize) {
+    return a === b ? 2 : exports.dice(map(a), map(b))
 }
 
 /**
@@ -1305,7 +1306,7 @@ async function run () {
     }
 }
 
-// register this first so data can be cleared even if there's an error
+// register these first so data can be cleared even if there's an error
 GM_registerMenuCommand(`${SCRIPT_NAME}: clear cache`, () => {
     purgeCached(-1)
 })
@@ -1323,7 +1324,7 @@ GM_registerMenuCommand(`${SCRIPT_NAME}: clear stats`, () => {
 // widget is loaded.
 //
 // this occurs when document.readyState transitions from "loading" to
-// "interactive", which should be the first readystatechange event a script
+// "interactive", which should be the first readystatechange event a userscript
 // sees. on my system, this can occur up to 4 seconds before DOMContentLoaded
 $(document).one('readystatechange', run)
 
