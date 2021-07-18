@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.4.0
+// @version       4.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -293,6 +293,8 @@ const MovieMatcher = {
     },
 
     /**
+     * confirm the supplied RT page data matches the IMDb metadata
+     *
      * @param {any} imdb
      * @param {JQuery<Document> & { meta: any }} $rt
      */
@@ -347,9 +349,6 @@ const TVMatcher = {
     /**
      * return a TV show record ({ url: string }) from the API results which
      * matches the supplied IMDb data
-     *
-     * returns an additional validation function to run against the RT page's
-     * metadata to confirm the match
      *
      * @param {any} rtResults
      * @param {any} imdb
@@ -457,6 +456,8 @@ const TVMatcher = {
     },
 
     /**
+     * confirm the supplied RT page data matches the IMDb metadata
+     *
      * @param {any} imdb
      * @param {JQuery<Document> & { meta: any }} $rt
      */
@@ -468,7 +469,7 @@ const TVMatcher = {
             : $rt.find('[data-qa="cast-member"]').get().map(it => it.textContent?.trim())
 
         // compare the RT cast with the partial IMDb cast and the full IMDb cast
-        // and return the one with the best match
+        // and select the one with the best match
         const partialShared = shared(rtCast, imdb.cast)
         const fullShared = shared(rtCast, imdb.fullCast)
         const partialDiff = partialShared.got - partialShared.want
@@ -517,7 +518,7 @@ class Score {
  * @param {string} message
  * @throws {Error}
  */
-function abort (message) {
+function abort (message = NO_MATCH) {
     throw Object.assign(new Error(message), { abort: true })
 }
 
@@ -645,7 +646,7 @@ function asyncGet (url, options = {}) {
  *
  * although the widget appears to be prepended to the bar, we need to append it
  * (and reorder it via CSS) to work around React reconciliation (updating the
- * DOM to match the (virtual DOM representation of) underlying model) after
+ * DOM to match the (virtual DOM representation of the) underlying model) after
  * we've added the RT widget
  *
  * when this synchronisation occurs, React will try to restore nodes
@@ -686,8 +687,7 @@ function attachWidget ($target, $rtRating) {
 
 /**
  * check the override data in case of a failed match, but only use it as a last
- * resort, i.e. try the verifier first, if defined, in case the data has
- * been fixed/updated
+ * resort, i.e. try the verifier first in case the data has been fixed/updated
  *
  * @param {any} match
  * @param {string} imdbId
@@ -876,7 +876,7 @@ async function getRTData (imdb, rtType) {
         if (!res) {
             // @ts-ignore
             log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
-            abort(NO_MATCH)
+            abort()
         }
     } else {
         try {
@@ -886,7 +886,7 @@ async function getRTData (imdb, rtType) {
             log(`error loading ${url} (${error.status} ${error.statusText})`)
 
             if (match.force) { // URL locked in checkOverrides
-                abort(NO_MATCH)
+                abort()
             } else {
                 requestType = 'fallback'
                 url = preload.fullUrl
@@ -897,7 +897,7 @@ async function getRTData (imdb, rtType) {
                 if (!res) {
                     // @ts-ignore
                     log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
-                    abort(NO_MATCH)
+                    abort()
                 }
             }
         }
@@ -932,7 +932,7 @@ async function getRTData (imdb, rtType) {
             }
 
             if (!verified) {
-                abort(NO_MATCH)
+                abort()
             }
         }
     }
@@ -1243,7 +1243,7 @@ async function run () {
         GM_setValue(imdbId, json)
     }
 
-    /** @type {{ version: number, data: typeof STATS}} */
+    /** @type {{ version: number, data: typeof STATS }} */
     const stats = JSON.parse(GM_getValue('stats', 'null')) || {
         version: METADATA_VERSION.stats,
         data: clone(STATS),
