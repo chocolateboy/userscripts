@@ -3,7 +3,7 @@
 // @description   Add a link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.1.2
+// @version       1.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
@@ -73,7 +73,7 @@ function run () {
         return
     }
 
-    let prop, query = `involves:${self}`, path = '/issues'
+    let prop, query = `involves:${self} sort:updated-desc`, path = '/issues'
 
     if (prop = meta(PAGE_REPO)) { // user/repo
         path = `/${prop}/issues`
