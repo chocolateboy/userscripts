@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.5.0
+// @version       4.5.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -167,12 +167,17 @@ const MovieMatcher = {
     match (rtResults, imdb) {
         const sorted = rtResults.movies
             .flatMap((rt, index) => {
-                if (!(rt.name && rt.url && rt.castItems)) {
+                const { castItems, name: title, url } = rt
+
+                if (!(title && url && castItems)) {
                     return []
                 }
 
-                const { name: title } = rt
-                const rtCast = pluck(rt.castItems, 'name').map(stripRtName)
+                if (url === '/m/null') {
+                    return []
+                }
+
+                const rtCast = pluck(castItems, 'name').map(stripRtName)
 
                 let castMatch = -1, verify = true
 
@@ -199,7 +204,7 @@ const MovieMatcher = {
 
                 const result = {
                     title,
-                    url: rt.url,
+                    url,
                     rating: rt.meterScore,
                     popularity: (rt.meterScore == null ? 0 : 1),
                     cast: rtCast,
@@ -309,6 +314,22 @@ const TVMatcher = {
                     return []
                 }
 
+                let suffix, $url
+
+                const match = url.match(/^(\/tv\/[^/]+)(?:\/(.+))?$/)
+
+                if (match) {
+                    if (match[1] === '/tv/null') {
+                        return []
+                    }
+
+                    suffix = match[2]
+                    $url = suffix ? url : `${url}/s01`
+                } else {
+                    warn("can't parse RT URL:", url)
+                    return []
+                }
+
                 const titleMatch = titleSimilarity({ imdb, rt })
 
                 if (titleMatch < TITLE_MATCH_THRESHOLD) {
@@ -327,18 +348,6 @@ const TVMatcher = {
                             dateDiffs[dateProp] = { value: diff }
                         }
                     }
-                }
-
-                let suffix, $url
-
-                const match = url.match(/^(\/tv\/[^/]+)(?:\/(.+))?$/)
-
-                if (match) {
-                    suffix = match[2]
-                    $url = suffix ? url : `${url}/s01`
-                } else {
-                    warn("can't parse RT URL:", url)
-                    return []
                 }
 
                 const seasonsDiff = (suffix === 's01' && imdb.seasons)
@@ -958,10 +967,11 @@ async function getRTData (imdb, rtType) {
         }
     }
 
-    const $rating = state.$rt.meta.aggregateRating
+    const { $rt } = state
+    const $rating = $rt.meta.aggregateRating
     const rating = Number(($rating?.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
-    const consensus = getConsensus(state.$rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
-    const updated = matcher.lastModified(state.$rt)
+    const consensus = getConsensus($rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
+    const updated = matcher.lastModified($rt)
 
     return {
         data: { consensus, rating, url: state.url },
