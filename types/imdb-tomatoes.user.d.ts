@@ -9,4 +9,21 @@ declare global {
         balloon: (options: any) => JQuery;
         jsonLd: (id: string) => any;
     }
+
+    type AsyncGetOptions = {
+        params?: Record<string, string | number | boolean>;
+        title?: string;
+        request?: Partial<Tampermonkey.Request>;
+    };
+
+    type RTDoc = JQuery<Document> & {
+        meta: any;
+        document: Document;
+    };
+
+    type RTMatch = {
+        rating: number | undefined;
+        url: string;
+        verify?: ($rt: RTDoc) => boolean;
+    };
 }

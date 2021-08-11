@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.4.2
+// @version       4.5.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -34,20 +34,12 @@
 /// <reference types="jquery" />
 /// <reference types="tampermonkey" />
 
-/**
- * @typedef {Object} AsyncGetOptions
- *
- * @prop {Record<string, string | number | boolean>} [params]
- * @prop {string} [title]
- * @prop {Partial<Tampermonkey.Request>} [request]
- */
-
 'use strict';
 
 /* begin */ {
 
 const API_LIMIT             = 100
-const DATA_VERSION          = 1
+const DATA_VERSION          = 1.1
 const INACTIVE_MONTHS       = 3
 const MAX_YEAR_DIFF         = 3
 const METADATA_VERSION      = { stats: 1 }
@@ -154,49 +146,14 @@ $.fn.jsonLd = function jsonLd (id) {
 
 const MovieMatcher = {
     /**
-     * return the consensus from a movie page as a HTML string
+     * return the timestamp (ISO-8601 string) of the last time an RT movie page
+     * was updated, e.g. the date of the most-recently published review
      *
-     * @param {JQuery<Document>} $rt
-     */
-    getConsensus ($rt) {
-        return $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
-            .first()
-            .html()
-    },
-
-    /**
-     * get the timestamp (ISO-8601 string) of the last time an RT movie page was
-     * updated, e.g. the date of the most-recently published review
-     *
-     * @param {any} rtMeta
-     * @param {string[]} dateProps
+     * @param {RTDoc} $rt
      * @return {string | undefined}
      */
-    lastModified ({ meta: rtMeta }) {
-        let updated
-
-        if (rtMeta.review?.length) {
-            debug('reviews:', rtMeta.review.length)
-
-            const [latest] = rtMeta.review
-                .flatMap(review => {
-                    return review.dateCreated
-                        ? [{ review, mtime: dayjs(review.dateCreated).unix() }]
-                        : []
-                })
-                .sort((a, b) => b.mtime - a.mtime)
-
-            if (latest) {
-                updated = latest.review.dateCreated
-                debug('updated (most recent review):', updated)
-            }
-        }
-
-        if (!updated && (updated = rtMeta.dateModified)) {
-            debug('updated (page modified):', updated)
-        }
-
-        return updated
+    lastModified ({ meta }) {
+        return lastModified(meta, 'dateCreated', 'dateModified')
     },
 
     /**
@@ -205,7 +162,7 @@ const MovieMatcher = {
      *
      * @param {any} rtResults
      * @param {any} imdb
-     * @return {{ match: { url: string }, verify?: ($rt: JQuery & { meta: any }) => boolean } | void}
+     * @return {RTMatch | void}
      */
     match (rtResults, imdb) {
         const sorted = rtResults.movies
@@ -298,7 +255,7 @@ const MovieMatcher = {
      * confirm the supplied RT page data matches the IMDb metadata
      *
      * @param {any} imdb
-     * @param {JQuery<Document> & { meta: any }} $rt
+     * @param {RTDoc} $rt
      */
     verify (imdb, $rt) {
         // in theory, we can verify the cast when the page is loaded. in
@@ -325,27 +282,14 @@ const MovieMatcher = {
 
 const TVMatcher = {
     /**
-     * return the consensus from a TV page as a HTML string
+     * return the timestamp (ISO-8601 string) of the last time an RT TV show
+     * page was updated, e.g. the date of the most-recently published review
      *
-     * @param {JQuery<Document>} $rt
-     */
-    getConsensus ($rt) {
-        return $rt.find('season-list-item[consensus]')
-            .last()
-            .attr('consensus')
-    },
-
-    /**
-     * return the last-modified date for a TV show
-     *
-     * we can't extract this value from TV show overview pages, so we return
-     * undefined, which selects the default caching period (currently one week).
-     *
-     * @param {JQuery<Document> & { meta: any, document: Document }} $rt
+     * @param {RTDoc} $rt
      * @return {string | undefined}
      */
-    lastModified () {
-        return undefined
+    lastModified ({ meta }) {
+        return lastModified(meta, 'datePublished')
     },
 
     /**
@@ -354,7 +298,7 @@ const TVMatcher = {
      *
      * @param {any} rtResults
      * @param {any} imdb
-     * @return {{ match: { url: string }, verify?: ($rt: JQuery & { meta: any }) => boolean } | void}
+     * @return {RTMatch | void}
      */
     match (rtResults, imdb) {
         const sorted = rtResults.tvSeries
@@ -391,7 +335,7 @@ const TVMatcher = {
 
                 if (match) {
                     suffix = match[2]
-                    $url = match[1]
+                    $url = suffix ? url : `${url}/s01`
                 } else {
                     warn("can't parse RT URL:", url)
                     return []
@@ -449,19 +393,19 @@ const TVMatcher = {
      * return the likely RT path for an IMDb TV show title, e.g.:
      *
      *   title: "Sesame Street"
-     *   path:  "/tv/sesame_street"
+     *   path:  "/tv/sesame_street/s01"
      *
      * @param {string} title
      */
     rtPath (title) {
-        return `/tv/${rtName(title)}`
+        return `/tv/${rtName(title)}/s01`
     },
 
     /**
      * confirm the supplied RT page data matches the IMDb metadata
      *
      * @param {any} imdb
-     * @param {JQuery<Document> & { meta: any }} $rt
+     * @param {RTDoc} $rt
      */
     verify (imdb, $rt) {
         /** @type {string[]} */
@@ -485,6 +429,115 @@ const TVMatcher = {
 const Matcher = {
     tvSeries: TVMatcher,
     movie: MovieMatcher,
+}
+
+/*
+ * a helper class used to load and verify data from RT pages which transparently
+ * handles the selection of the most suitable URL (match or fallback)
+ */
+class RTClient {
+    constructor ({ match, matcher, preload, state }) {
+        this.match = match
+        this.matcher = matcher
+        this.preload = preload
+        this.state = state
+    }
+
+    /**
+     * transform an XHR response into a JQuery document wrapper with a +meta+
+     * property containing the page's parsed JSON-LD data
+     *
+     * @param {Tampermonkey.Response} res
+     * @param {string} id
+     * @return {RTDoc}
+     */
+    _parseResponse (res, id) {
+        const parser = new DOMParser()
+        const dom = parser.parseFromString(res.responseText, 'text/html')
+        const $rt = $(dom)
+        const meta = $rt.jsonLd(id)
+        return Object.assign($rt, { meta, document: dom })
+    }
+
+    /**
+     * load the RT URL (match or fallback) and return the corresponding XHR
+     * response
+     */
+    async loadPage () {
+        const { match, preload, state } = this
+        let requestType = match.fallback ? 'fallback' : 'match'
+        let res
+
+        log(`loading ${requestType} URL:`, state.url)
+
+        if (match.url === preload.url) {
+            res = await preload.promise
+
+            if (!res) {
+                log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
+                return
+            }
+        } else {
+            try {
+                res = await asyncGet(state.url)
+                preload.unused = true // only set if the request succeeds
+            } catch (error) { // bogus URL in API result (or transient server error)
+                log(`error loading ${state.url} (${error.status} ${error.statusText})`)
+
+                if (match.force) { // URL locked in checkOverrides
+                    return
+                } else {
+                    requestType = 'fallback'
+                    state.url = preload.fullUrl
+                    log(`loading ${requestType} URL:`, state.url)
+
+                    res = await preload.promise
+
+                    if (!res) {
+                        log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
+                        return
+                    }
+                }
+            }
+        }
+
+        log(`${requestType} response: ${res.status} ${res.statusText}`)
+
+        return this._parseResponse(res, state.url)
+    }
+
+    /**
+     * confirm the metadata of the RT page (match or fallback) matches the IMDb
+     * metadata
+     *
+     * @return {Promise<boolean>}
+     */
+    async verify (imdb) {
+        const { match, matcher, preload, state } = this
+        let verified = matcher.verify(imdb, state.$rt)
+
+        if (!verified) {
+            if (match.force) {
+                log('force:', true)
+                verified = true
+            } else if (preload.unused) {
+                state.url = preload.fullUrl
+                log(`loading fallback URL:`, state.url)
+
+                const res = await preload.promise
+
+                if (res) {
+                    log(`fallback response: ${res.status} ${res.statusText}`)
+                    state.$rt = this._parseResponse(res, preload.url)
+                    verified = matcher.verify(imdb, state.$rt)
+                } else {
+                    log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
+                }
+            }
+        }
+
+        return verified
+    }
 }
 
 /*
@@ -718,6 +771,17 @@ function checkOverrides (match, imdbId) {
 }
 
 /**
+ * return the consensus from a movie/TV page as a HTML string
+ *
+ * @param {JQuery<Document>} $rt
+ */
+function getConsensus ($rt) {
+    return $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
+        .first()
+        .html()
+}
+
+/**
  * extract IMDb metadata from the GraphQL data embedded in the page
  *
  * @param {string} imdbId
@@ -795,9 +859,9 @@ async function getRTData (imdb, rtType) {
     //   preload URL: https://www.rottentomatoes.com/m/bolt
     //
     //   tvSeries:    "Sesame Street"
-    //   preload URL: https://www.rottentomatoes.com/tv/sesame_street
+    //   preload URL: https://www.rottentomatoes.com/tv/sesame_street/s01
     //
-    // this guess produces the correct URL most (e.g. > 80%) of the time
+    // this guess produces the correct URL most (e.g. > 75%) of the time
     //
     // preloading this page serves two purposes:
     //
@@ -868,104 +932,78 @@ async function getRTData (imdb, rtType) {
     debug('match:', match)
     log('matched:', !match.fallback)
 
-    let url = RT_BASE + match.url
-    let requestType = match.fallback ? 'fallback' : 'match'
-
-    log(`loading ${requestType} URL:`, url)
-
-    if (match.url === preload.url) {
-        res = await preload.promise
-
-        if (!res) {
-            // @ts-ignore
-            log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
-            abort()
-        }
-    } else {
-        try {
-            res = await asyncGet(url)
-            preload.unused = true // only set if the request succeeds
-        } catch (error) { // bogus URL in API result (or transient server error)
-            log(`error loading ${url} (${error.status} ${error.statusText})`)
-
-            if (match.force) { // URL locked in checkOverrides
-                abort()
-            } else {
-                requestType = 'fallback'
-                url = preload.fullUrl
-                log(`loading ${requestType} URL:`, url)
-
-                res = await preload.promise
-
-                if (!res) {
-                    // @ts-ignore
-                    log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
-                    abort()
-                }
-            }
-        }
+    // values that can be modified by the RT client
+    /** @type {{ url: string, $rt: RTDoc | undefined}} */
+    // @ts-ignore
+    const state = {
+        url: RT_BASE + match.url,
+        $rt: undefined,
     }
 
-    log(`${requestType} response: ${res.status} ${res.statusText}`)
+    const rtClient = new RTClient({ match, matcher, preload, state })
 
-    let $rt = loadRT(res, match.url)
+    state.$rt = await rtClient.loadPage()
+
+    if (!state.$rt) {
+        // XXX `return` to appease TypeScript
+        // https://github.com/microsoft/TypeScript/issues/31329
+        return abort()
+    }
 
     if (match.verify) {
-        let verified = matcher.verify(imdb, $rt)
+        const verified = await rtClient.verify(imdb)
 
         if (!verified) {
-            if (match.force) {
-                log('force:', true)
-                verified = true
-            } else if (preload.unused) {
-                requestType = 'fallback'
-                url = preload.fullUrl
-                log(`loading ${requestType} URL:`, url)
-
-                res = await preload.promise
-
-                if (res) {
-                    log(`${requestType} response: ${res.status} ${res.statusText}`)
-                    $rt = loadRT(res, preload.url)
-                    verified = matcher.verify(imdb, $rt)
-                } else {
-                    // @ts-ignore
-                    log(`error loading ${url} (${preload.error.status} ${preload.error.statusText})`)
-                }
-            }
-
-            if (!verified) {
-                abort()
-            }
+            abort()
         }
     }
 
-    const consensus = matcher.getConsensus($rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
-    const updated = matcher.lastModified($rt)
-    const $rating = $rt.meta.aggregateRating
-    const rating = Number(($rating.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
+    const $rating = state.$rt.meta.aggregateRating
+    const rating = Number(($rating?.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
+    const consensus = getConsensus(state.$rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
+    const updated = matcher.lastModified(state.$rt)
 
     return {
-        data: { consensus, rating, url },
+        data: { consensus, rating, url: state.url },
         preloadUrl: preload.fullUrl,
         updated,
     }
 }
 
 /**
+ * return the last time a movie/TV page was updated based on its JSON-LD
+ * metadata
  *
- * take an XHR response object and transform it into a JQuery document wrapper
- * with a +meta+ property containing the page's parsed JSON-LD data
- *
- * @param {Tampermonkey.Response} res
- * @param {string} id
+ * @param {any} rtMeta
+ * @param {string} reviewProp
+ * @param {string=} pageProp
+ * @returns {string | undefined}
  */
-function loadRT (res, id) {
-    const parser = new DOMParser()
-    const dom = parser.parseFromString(res.responseText, 'text/html')
-    const $rt = $(dom)
-    const meta = $rt.jsonLd(id)
-    return Object.assign($rt, { meta, document: dom })
+function lastModified (rtMeta, reviewProp, pageProp) {
+    let updated
+
+    if (rtMeta.review?.length) {
+        debug('reviews:', rtMeta.review.length)
+
+        const [latest] = rtMeta.review
+            .flatMap(review => {
+                return review[reviewProp]
+                    ? [{ review, mtime: dayjs(review[reviewProp]).unix() }]
+                    : []
+            })
+            .sort((a, b) => b.mtime - a.mtime)
+
+        if (latest) {
+            updated = latest.review[reviewProp]
+            debug('updated (most recent review):', updated)
+        }
+    }
+
+    if (!updated && pageProp && (updated = rtMeta[pageProp])) {
+        debug('updated (page modified):', updated)
+    }
+
+    return updated
 }
 
 /**
