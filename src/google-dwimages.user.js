@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.4.3
+// @version       2.5.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -83,7 +83,10 @@ function hookXhrOpen (oldOpen, $container) {
  * extract image metadata from the full metadata tree and add it to the cache
  */
 function mergeImageMetadata (root) {
-    for (const node of root[31][0][12][2]) {
+    const subtree = root[31]
+    const lastIndex = subtree.length - 1
+
+    for (const node of subtree[lastIndex][12][2]) {
         // the first child is the node's type (1 for image metadata)
         const type = node[NODE_TYPE]
 
