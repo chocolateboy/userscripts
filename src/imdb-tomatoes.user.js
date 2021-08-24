@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.5.2
+// @version       4.6.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -16,7 +16,7 @@
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/DhQ9ta2C
+// @resource      overrides https://pastebin.com/raw/dZZ2ixnB
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -48,6 +48,8 @@ const NO_MATCH              = 'no matching results'
 const ONE_DAY               = 1000 * 60 * 60 * 24
 const ONE_WEEK              = ONE_DAY * 7
 const RT_BASE               = 'https://www.rottentomatoes.com'
+const RT_INVALID_DATE       = new Set(['', 'TODO_MISSING'])
+const RT_INVALID_NAME       = new Set(['', 'NA'])
 const SCRIPT_NAME           = GM_info.script.name
 const TITLE_MATCH_THRESHOLD = 0.6
 
@@ -271,11 +273,18 @@ const MovieMatcher = {
         // often missing from the metadata as well, so we try to scrape
         // them instead
 
+        const metaDirectors = pluck($rt.meta.director, 'name')
+            .flatMap(name => RT_INVALID_NAME.has(name) ? [] : [stripRtName(name)])
+
+        const pageDirectors = $rt.find('[data-qa="movie-info-director"]')
+            .get()
+            .map(el => el.textContent?.trim())
+
+        debug(`movie directors: meta: ${metaDirectors.length}, page: ${pageDirectors.length}`)
+
         /** @type {string[]} */
         // @ts-ignore
-        const rtDirectors = $rt.meta.director?.length
-            ? pluck($rt.meta.director, 'name').map(stripRtName)
-            : $rt.find('[data-qa="movie-info-director"]').get().map(it => it.textContent?.trim())
+        const rtDirectors = metaDirectors.length > pageDirectors.length ? metaDirectors : pageDirectors
 
         return verifyShared({
             imdb: imdb.directors,
@@ -417,11 +426,21 @@ const TVMatcher = {
      * @param {RTDoc} $rt
      */
     verify (imdb, $rt) {
+        const metaCast = pluck($rt.meta.actor, 'name')
+            .flatMap(name => RT_INVALID_NAME.has(name) ? [] : [stripRtName(name)])
+
+        const pageCast = $rt.find('[data-qa="cast-item-name"] > span[title]')
+            .get()
+            .flatMap(el => {
+                const name = el.getAttribute('title') || ''
+                return RT_INVALID_NAME.has(name) ? [] : [name]
+            })
+
+        debug(`TV cast: meta: ${metaCast.length}, page: ${pageCast.length}`)
+
         /** @type {string[]} */
         // @ts-ignore
-        const rtCast = $rt.meta.actor?.length
-            ? pluck($rt.meta.actor, 'name').map(stripRtName)
-            : $rt.find('[data-qa="cast-member"]').get().map(it => it.textContent?.trim())
+        const rtCast = metaCast.length > pageCast.length ? metaCast : pageCast
 
         // compare the RT cast with the partial IMDb cast and the full IMDb cast
         // and select the one which produces the best match
@@ -1009,7 +1028,8 @@ function lastModified (rtMeta, reviewProp, pageProp) {
         }
     }
 
-    if (!updated && pageProp && (updated = rtMeta[pageProp])) {
+    if (!updated && pageProp && !RT_INVALID_DATE.has(rtMeta[pageProp])) {
+        updated = rtMeta[pageProp]
         debug('updated (page modified):', updated)
     }
 
