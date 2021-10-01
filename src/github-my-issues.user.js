@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name          GitHub My Issues
-// @description   Add a link to issues you've contributed to on GitHub
+// @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.0
+// @version       1.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: http://www.gnu.org/copyleft/gpl.html
 // @include       https://github.com/
@@ -50,7 +50,7 @@ const SELF = 'user-login'
 const USER = 'profile:username'
 
 /*
- * helper function which extracts a value from a meta tag
+ * helper function which extracts a value from a META tag
  */
 function meta (name, key = 'name') {
     const quotedName = JSON.stringify(name)
@@ -61,38 +61,41 @@ function meta (name, key = 'name') {
  * add the "My Issues" link
  */
 function run () {
-    const self = meta(SELF)
-    const $issues = $(ISSUES)
-
     // if we're here via a pjax load, there may be an existing "My Issues" link
     // from a previous page load. we can't reuse it as the event handlers may no
     // longer work, so we just replace it
     $(`#${ID}`).remove()
 
-    if (!self || $issues.length !== 1) {
+    const self = meta(SELF)
+
+    if (!self) {
         return
     }
 
-    let prop, query = `involves:${self} sort:updated-desc`, path = '/issues'
+    const $issues = $(ISSUES)
+
+    if ($issues.length !== 1) {
+        return
+    }
+
+    let subqueries = [`involves:${self}`, 'sort:updated-desc']
+    let prop, path = '/issues'
 
     if (prop = meta(PAGE_REPO)) { // user/repo
         path = `/${prop}/issues`
     } else if (prop = $(PJAX_REPO).attr('href')) { // /user/repo
         path = `${prop}/issues`
     } else if (prop = meta(USER, 'property')) { // user
-        let queries
-
         if (prop === self) { // own homepage
-            // user:<self> involves:<self> is:open archived:false
-            queries = [`user:${prop}`, query, 'is:open', 'archived:false']
+            // user:<self> is:open archived:false involves:<self> ...
+            subqueries = [`user:${prop}`, 'is:open', 'archived:false', ...subqueries]
         } else { // other user's homepage
-            // user:<user> involves:<self>
-            queries = [`user:${prop}`, query]
+            // user:<user> involves:<self> ...
+            subqueries = [`user:${prop}`, ...subqueries]
         }
-
-        query = queries.join('+')
     }
 
+    const query = subqueries.join('+')
     const href = `${path}?q=${escape(query)}`
     const $link = $issues.clone()
         .attr({ href, 'data-hotkey': 'g I', id: ID })
