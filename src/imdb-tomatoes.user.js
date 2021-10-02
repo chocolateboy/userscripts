@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.6.0
+// @version       4.6.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -16,7 +16,7 @@
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/dZZ2ixnB
+// @resource      overrides https://pastebin.com/raw/SUP1rYtX
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -498,25 +498,28 @@ class RTClient {
 
         log(`loading ${requestType} URL:`, state.url)
 
+        // match URL (API result) and fallback (guessed) URL are the same
         if (match.url === preload.url) {
-            res = await preload.promise
+            res = await preload.promise // join the in-flight request
 
             if (!res) {
                 log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
                 return
             }
-        } else {
+        } else { // separate match URL and fallback URL
             try {
-                res = await asyncGet(state.url)
-                preload.unused = true // only set if the request succeeds
+                res = await asyncGet(state.url) // load the (absolute) match URL
+                state.fallbackUnused = true // only set if the request succeeds
             } catch (error) { // bogus URL in API result (or transient server error)
                 log(`error loading ${state.url} (${error.status} ${error.statusText})`)
 
                 if (match.force) { // URL locked in checkOverrides
                     return
-                } else {
+                } else { // use (and verify) the fallback URL
                     requestType = 'fallback'
                     state.url = preload.fullUrl
+                    state.verify = true
+
                     log(`loading ${requestType} URL:`, state.url)
 
                     res = await preload.promise
@@ -542,13 +545,13 @@ class RTClient {
      */
     async verify (imdb) {
         const { match, matcher, preload, state } = this
-        let verified = matcher.verify(imdb, state.$rt)
+        let verified = matcher.verify(imdb, state.rtPage)
 
         if (!verified) {
             if (match.force) {
                 log('force:', true)
                 verified = true
-            } else if (preload.unused) {
+            } else if (state.fallbackUnused) {
                 state.url = preload.fullUrl
                 log(`loading fallback URL:`, state.url)
 
@@ -556,8 +559,8 @@ class RTClient {
 
                 if (res) {
                     log(`fallback response: ${res.status} ${res.statusText}`)
-                    state.$rt = this._parseResponse(res, preload.url)
-                    verified = matcher.verify(imdb, state.$rt)
+                    state.rtPage = this._parseResponse(res, preload.url)
+                    verified = matcher.verify(imdb, state.rtPage)
                 } else {
                     log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
                 }
@@ -599,10 +602,12 @@ class Score {
  * raise a non-error exception indicating no matching result has been found
  *
  * @param {string} message
- * @throws {Error}
  */
+
+// XXX return an error object rather than throwing it to work around a
+// TypeScript bug: https://github.com/microsoft/TypeScript/issues/31329
 function abort (message = NO_MATCH) {
-    throw Object.assign(new Error(message), { abort: true })
+    return Object.assign(new Error(message), { abort: true })
 }
 
 /**
@@ -747,7 +752,8 @@ function asyncGet (url, options = {}) {
  * changed/updated if the DOM is re-synced so we won't end up with a mangled
  * IMDb widget; however, our RT widget will still be removed since it's not in
  * the model. to rectify this, we use a mutation observer to detect and revert
- * its removal
+ * its removal (which happens no more than once - the ratings bar is frozen
+ * (i.e. synchronisation is halted) once the page has loaded)
  *
  * @param {JQuery} $target
  * @param {JQuery} $rtRating
@@ -756,6 +762,10 @@ function attachWidget ($target, $rtRating) {
     const init = { childList: true }
     const target = $target.get(0)
     const rtRating = $rtRating.get(0)
+
+    // restore the RT widget if it is removed. only called (once) if the widget
+    // is added "quickly" (i.e. while the ratings bar is still being finalized),
+    // e.g. when the result is cached
     const callback = () => {
         if (target.lastElementChild !== rtRating) {
             observer.disconnect()
@@ -921,7 +931,6 @@ async function getRTData (imdb, rtType) {
             })
 
         return {
-            unused: false,
             error: null,
             fullUrl: url,
             promise,
@@ -961,32 +970,32 @@ async function getRTData (imdb, rtType) {
     log('matched:', !match.fallback)
 
     // values that can be modified by the RT client
-    /** @type {{ url: string, $rt: RTDoc | undefined}} */
+    /** @type {{ fallbackUnused: boolean, rtPage?: RTDoc, url: string, verify: boolean }} */
     // @ts-ignore
     const state = {
+        fallbackUnused: false,
+        rtPage: undefined,
         url: RT_BASE + match.url,
-        $rt: undefined,
+        verify: match.verify,
     }
 
     const rtClient = new RTClient({ match, matcher, preload, state })
 
-    state.$rt = await rtClient.loadPage()
+    state.rtPage = await rtClient.loadPage()
 
-    if (!state.$rt) {
-        // XXX `return` to appease TypeScript
-        // https://github.com/microsoft/TypeScript/issues/31329
-        return abort()
+    if (!state.rtPage) {
+        throw abort()
     }
 
-    if (match.verify) {
+    if (state.verify) {
         const verified = await rtClient.verify(imdb)
 
         if (!verified) {
-            abort()
+            throw abort()
         }
     }
 
-    const { $rt } = state
+    const $rt = state.rtPage
     const $rating = $rt.meta.aggregateRating
     const rating = Number(($rating?.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
     const consensus = getConsensus($rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
