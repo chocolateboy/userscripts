@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.3
+// @version       2.1.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -105,6 +105,7 @@ const TWITTER_API = /^(?:(?:api|mobile)\.)?twitter\.com$/
  * which therefore don't need to be processed
  */
 const URL_BLACKLIST = new Set([
+    '/i/api/1.1/hashflags.json',
     '/i/api/2/badge_count/badge_count.json',
     '/i/api/graphql/articleNudgeDomains',
     '/i/api/graphql/TopicToFollowSidebar',
@@ -276,15 +277,37 @@ const replacerFor = state => /** @this {any} */ function replacer (key, value) {
             return found ? [found] : 0
         } else if (isPlainObject(value)) {
             return { card_url: (value.card_url || 0) }
+        } else {
+            return 0
         }
     }
 
+    // reduce the keys under this.legacy (typically around 30) to the handful we
+    // care about
+    if (key === 'legacy' && isPlainObject(value)) {
+        // expand legacy.url in place
+        //
+        // XXX legacy.url doesn't appear to be used (i.e. not expanding it
+        // doesn't result in unexpanded links in the UI)
+        if (value.url) {
+            replacer.call(value, 'url', value.url)
+        }
+
+        // we could use an array, but it doesn't appear to be faster (in v8)
+        const filtered = {}
+
+        for (let i = 0; i < LEGACY_KEYS.length; ++i) {
+            const key = LEGACY_KEYS[i]
+
+            if (key in value) {
+                filtered[key] = value[key]
+            }
+        }
+
+        return filtered
+    }
+
     // expand t.co URL nodes in place
-    //
-    // note this comes before the "legacy" check because legacy.url is a common
-    // location and it needs to be modified in place rather than transferred to
-    // a new object with a subset of the keys. this doesn't apply to the other
-    // legacy keys as they all point to objects/arrays
     if (URL_KEYS.has(key) && isTrackedUrl(value)) {
         const { seen, unresolved } = state
 
@@ -306,23 +329,8 @@ const replacerFor = state => /** @this {any} */ function replacer (key, value) {
 
             targets.push({ target: this, key })
         }
-    }
 
-    // reduce the keys under this.legacy (typically around 30) to the handful we
-    // care about
-    if (key === 'legacy' && isPlainObject(value)) {
-        // we could use an array, but it doesn't appear to be faster (in v8)
-        const filtered = {}
-
-        for (let i = 0; i < LEGACY_KEYS.length; ++i) {
-            const key = LEGACY_KEYS[i]
-
-            if (key in value) {
-                filtered[key] = value[key]
-            }
-        }
-
-        return filtered
+        return 0
     }
 
     // shrink terminals (don't waste space/memory in the (discarded) JSON)
@@ -356,8 +364,8 @@ const transform = (data, path) => {
         const expandedUrl = seen.get(url)
 
         if (expandedUrl) {
-            for (const target of targets) {
-                target.target[target.key] = expandedUrl
+            for (const { target, key } of targets) {
+                target[key] = expandedUrl
                 ++state.count
             }
 
