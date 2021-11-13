@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.4
+// @version       2.1.5
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -285,13 +285,9 @@ const replacerFor = state => /** @this {any} */ function replacer (key, value) {
     // reduce the keys under this.legacy (typically around 30) to the handful we
     // care about
     if (key === 'legacy' && isPlainObject(value)) {
-        // expand legacy.url in place
-        //
-        // XXX legacy.url doesn't appear to be used (i.e. not expanding it
-        // doesn't result in unexpanded links in the UI)
-        if (value.url) {
-            replacer.call(value, 'url', value.url)
-        }
+        // XXX don't expand legacy.url: leaving it unexpanded results in media
+        // URLs (e.g. YouTube URLs) appearing as clickable links in the tweet
+        // (which we want)
 
         // we could use an array, but it doesn't appear to be faster (in v8)
         const filtered = {}
