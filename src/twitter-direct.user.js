@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.5
+// @version       2.1.6
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -36,14 +36,12 @@ const DOCUMENT_ROOTS = [
 
 /*
  * keys of "legacy" objects which URL data is known to be found in/under, e.g.
- * we're interested in legacy.user_refs.*, legacy.retweeted_status.* and
- * legacy.url, but not in legacy.created_at or legacy.reply_count.
+ * we're interested in legacy.user_refs.* and legacy.retweeted_status.*, but not
+ * in legacy.created_at or legacy.reply_count.
  *
- * objects under the "legacy" key typically contain dozens of keys, but t.co
- * URLs only exist in a handful of these.
- *
- * typically this reduces the number of keys to iterate in a legacy object from
- * 30 on average (max 39) to 2 or 3
+ * legacy objects typically contain dozens of keys, but t.co URLs only exist in
+ * a handful of them. typically this reduces the number of keys to traverse in a
+ * legacy object from 30 on average (max 39) to 2 or 3.
  */
 const LEGACY_KEYS = [
     'binding_values',
