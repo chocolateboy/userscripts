@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.6.1
+// @version       4.6.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -98,7 +98,7 @@ const UNSHARED = Object.freeze({
     max: 0,
 })
 
-/*
+/**
  * the minimum number of elements shared between two Sets for them to be
  * deemed similar
  *
@@ -106,7 +106,9 @@ const UNSHARED = Object.freeze({
  */
 const MINIMUM_SHARED = smallest => Math.round(smallest.size / 2)
 
-// log a message to the console
+/*
+ * log a message to the console
+ */
 const { debug, info, log, warn } = console
 
 /**
@@ -116,8 +118,10 @@ const { debug, info, log, warn } = console
  */
 const clone = value => JSON.parse(JSON.stringify(value))
 
-// a custom version of get-wild's `get` function which uses a simpler/faster
-// path parser since we don't use the extended syntax
+/*
+ * a custom version of get-wild's `get` function which uses a simpler/faster
+ * path parser since we don't use the extended syntax
+ */
 const get = exports.getter({ split: '.' })
 
 /**
