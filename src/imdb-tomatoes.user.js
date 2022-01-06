@@ -3,14 +3,14 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.6.2
+// @version       4.7.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
 // @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.10.6/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.10.6/plugin/relativeTime.js
+// @require       https://unpkg.com/dayjs@1.10.7/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.10.7/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/bury@0.1.0/dist/bury.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
@@ -31,8 +31,9 @@
 // ==/UserScript==
 
 /// <reference types="greasemonkey" />
-/// <reference types="jquery" />
 /// <reference types="tampermonkey" />
+/// <reference types="jquery" />
+/// <reference types="node" />
 
 'use strict';
 
@@ -767,6 +768,14 @@ function attachWidget ($target, $rtRating) {
     const target = $target.get(0)
     const rtRating = $rtRating.get(0)
 
+    if (!target) {
+        throw new ReferenceError("can't find ratings bar")
+    }
+
+    if (!rtRating) {
+        throw new ReferenceError("can't find RT widget")
+    }
+
     // restore the RT widget if it is removed. only called (once) if the widget
     // is added "quickly" (i.e. while the ratings bar is still being finalized),
     // e.g. when the result is cached
@@ -785,7 +794,8 @@ function attachWidget ($target, $rtRating) {
 
 /**
  * check the override data in case of a failed match, but only use it as a last
- * resort, i.e. try the verifier first in case the data has been fixed/updated
+ * resort, i.e. try the verifier first in case the page data has been
+ * fixed/updated
  *
  * @param {any} match
  * @param {string} imdbId
@@ -838,7 +848,7 @@ function getIMDbMetadata (imdbId, rtType) {
 
     // there are multiple matching subtrees (with different but partially
     // overlapping keys). order them in descending order of size (number of keys)
-    const titles = get(data, 'props.urqlState.*.data.title', [])
+    const titles = get(data, 'props.pageProps.urqlState.*.data.title', [])
         .filter(title => title.id === imdbId)
         .map(decorate)
         .sort((a, b) => b.size - a.size)
@@ -903,7 +913,7 @@ async function getRTData (imdb, rtType) {
     //   tvSeries:    "Sesame Street"
     //   preload URL: https://www.rottentomatoes.com/tv/sesame_street/s01
     //
-    // this guess produces the correct URL most (e.g. > 75%) of the time
+    // this guess produces the correct URL most (~75%) of the time
     //
     // preloading this page serves two purposes:
     //
@@ -911,7 +921,7 @@ async function getRTData (imdb, rtType) {
     // rather than querying the API and *then* loading the page, the requests
     // run concurrently, effectively halving the waiting time in most cases
     //
-    // 2) it serves as a fallback if the API result:
+    // 2) it serves as a fallback if the API URL:
     //
     //   a) is missing
     //   b) is invalid/fails to load
@@ -1198,7 +1208,7 @@ function stripRtName (name) {
  * RT titles for foreign-language films/shows sometimes contain the original
  * title at the end in brackets, so we take that into account
  *
- * note, we only use this if the original IMDb title differs from the main
+ * NOTE we only use this if the original IMDb title differs from the main
  * IMDb title
  *
  *   similarity("The Swarm", "The Swarm (La Nuée)")                    // 0.66

@@ -5,8 +5,8 @@ declare global {
     const dayjs: typeof DayJs;
     const dayjs_plugin_relativeTime: typeof DayJsRelativeTime;
 
-    interface JQuery<TElement = HTMLElement> {
-        balloon: (options: any) => JQuery;
+    interface JQuery {
+        balloon: (options: any) => this;
         jsonLd: (id: string) => any;
     }
 
