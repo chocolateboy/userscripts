@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.7.0
+// @version       4.7.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -58,10 +58,10 @@ const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
     css: {
         fontFamily: 'Roboto, Helvetica, Arial, sans-serif',
-        fontSize: '0.9rem',
-        lineHeight: '1.26rem',
-        maxWidth: '31rem',
-        padding: '0.75rem',
+        fontSize: '16px',
+        lineHeight: '24px',
+        maxWidth: '24rem',
+        padding: '10px',
     },
     html: true,
     position: 'bottom',
@@ -747,14 +747,14 @@ function asyncGet (url, options = {}) {
  * (attributes, text, elements) within each widget to match the widget's props,
  * so the first widget will be updated in place to match the data for the IMDb
  * rating etc. this changes some, but not all nodes within an element, and most
- * attributes added to/changed in the RT widget remain in the updated IMDb
- * widget, including its ID attribute (rt-rating) which controls the color of
- * the rating star. as a result, we end up with a restored IMDb widget but with
- * an RT-colored star (and with the RT widget removed since it's not in the
- * ratings-bar model)
+ * attributes added to/changed in a prepended RT widget remain when it's
+ * reverted back to an IMDb widget, including its ID attribute (rt-rating),
+ * which controls the color of the rating star. as a result, we end up with a
+ * restored IMDb widget but with an RT-colored star (and with the RT widget
+ * removed since it's not in the ratings-bar model)
  *
  * if we *append* the RT widget, none of the other widgets will need to be
- * changed/updated if the DOM is re-synced so we won't end up with a mangled
+ * changed/updated if the DOM is re-synced, so we won't end up with a mangled
  * IMDb widget; however, our RT widget will still be removed since it's not in
  * the model. to rectify this, we use a mutation observer to detect and revert
  * its removal (which happens no more than once - the ratings bar is frozen
@@ -823,7 +823,7 @@ function checkOverrides (match, imdbId) {
 }
 
 /**
- * return the consensus from a movie/TV page as a HTML string
+ * return the consensus from an RT movie/TV page as a HTML string
  *
  * @param {JQuery<Document>} $rt
  */
@@ -925,7 +925,7 @@ async function getRTData (imdb, rtType) {
     //
     //   a) is missing
     //   b) is invalid/fails to load
-    //   c) loads but fails the verification check
+    //   c) is wrong (fails the verification check)
     //
     const preload = (function () {
         const path = matcher.rtPath(imdb.title)
