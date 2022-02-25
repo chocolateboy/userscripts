@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.7.1
+// @version       4.8.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -16,7 +16,7 @@
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/SUP1rYtX
+// @resource      overrides https://pastebin.com/raw/ZCuzu72f
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -564,7 +564,7 @@ class RTClient {
 
         if (!verified) {
             if (match.force) {
-                log('force:', true)
+                log('forced:', true)
                 verified = true
             } else if (state.fallbackUnused) {
                 state.url = preload.fullUrl
@@ -852,26 +852,14 @@ function getConsensus ($rt) {
  */
 function getIMDbMetadata (imdbId, rtType) {
     const data = JSON.parse($('#__NEXT_DATA__').text())
-
-    const decorate = data => {
-        return { data, size: Object.keys(data).length }
-    }
-
-    // there are multiple matching subtrees (with different but partially
-    // overlapping keys). order them in descending order of size (number of keys)
-    const titles = get(data, 'props.pageProps.urqlState.*.data.title', [])
-        .filter(title => title.id === imdbId)
-        .map(decorate)
-        .sort((a, b) => b.size - a.size)
-        .map(it => it.data)
-
-    const [main, extra] = titles
+    const main = get(data, 'props.pageProps.mainColumnData')
+    const extra = get(data, 'props.pageProps.aboveTheFoldData')
     const mainCast = get(main, 'principalCast.*.credits.*.name.nameText.text', [])
     const extraCast = get(main, 'cast.edges.*.node.name.nameText.text', [])
     const fullCast = Array.from(new Set([...mainCast, ...extraCast]))
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', '')
-    const year = get(main, 'releaseYear.year') || 0
+    const year = get(extra, 'releaseYear.year') || 0
     const type = get(main, 'titleType.id', '')
 
     /** @type {any} */
