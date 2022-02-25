@@ -34,6 +34,7 @@
 /// <reference types="tampermonkey" />
 /// <reference types="jquery" />
 /// <reference types="node" />
+/// <reference path="../types/imdb-tomatoes.user.d.ts" />
 
 'use strict';
 
@@ -43,7 +44,6 @@ const API_LIMIT             = 100
 const DATA_VERSION          = 1.1
 const INACTIVE_MONTHS       = 3
 const MAX_YEAR_DIFF         = 3
-const METADATA_VERSION      = { stats: 1 }
 const NO_CONSENSUS          = 'No consensus yet.'
 const NO_MATCH              = 'no matching results'
 const ONE_DAY               = 1000 * 60 * 60 * 24
@@ -53,6 +53,9 @@ const RT_INVALID_DATE       = new Set(['', 'TODO_MISSING'])
 const RT_INVALID_NAME       = new Set(['', 'NA'])
 const SCRIPT_NAME           = GM_info.script.name
 const TITLE_MATCH_THRESHOLD = 0.6
+
+/** @type {Record<string, number>} */
+const METADATA_VERSION = { stats: 1 }
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -78,10 +81,10 @@ const CONNECTION_ERROR = {
     statusText: 'Connection Error',
 }
 
-const RT_TYPE = {
+const RT_TYPE = /** @type {const} */ ({
     TVSeries: 'tvSeries',
     Movie: 'movie',
-}
+})
 
 const STATS = {
     request: 0,
@@ -167,9 +170,8 @@ const MovieMatcher = {
      * return a movie record ({ url: string }) from the API results which
      * matches the supplied IMDb data
      *
-     * @param {any} rtResults
+     * @param {{ movies: RTMovieResult[] }} rtResults
      * @param {any} imdb
-     * @return {RTMatch | void}
      */
     match (rtResults, imdb) {
         const sorted = rtResults.movies
@@ -315,9 +317,8 @@ const TVMatcher = {
      * return a TV show record ({ url: string }) from the API results which
      * matches the supplied IMDb data
      *
-     * @param {any} rtResults
+     * @param {{ tvSeries: RTTVResult[] }} rtResults
      * @param {any} imdb
-     * @return {RTMatch | void}
      */
     match (rtResults, imdb) {
         const sorted = rtResults.tvSeries
@@ -350,9 +351,10 @@ const TVMatcher = {
                     return []
                 }
 
+                /** @type {Record<string, { value: number } | null>} */
                 const dateDiffs = {}
 
-                for (const dateProp of ['startYear', 'endYear']) {
+                for (const dateProp of /** @type {const} */ (['startYear', 'endYear'])) {
                     if (imdb[dateProp] && rt[dateProp]) {
                         const diff = Math.abs(imdb[dateProp] - rt[dateProp])
 
@@ -469,6 +471,13 @@ const Matcher = {
  * handles the selection of the most suitable URL (match or fallback)
  */
 class RTClient {
+    /**
+     * @param {Object} options
+     * @param {any} options.match
+     * @param {any} options.matcher
+     * @param {any} options.preload
+     * @param {any} options.state
+     */
     constructor ({ match, matcher, preload, state }) {
         this.match = match
         this.matcher = matcher
@@ -480,7 +489,7 @@ class RTClient {
      * transform an XHR response into a JQuery document wrapper with a +meta+
      * property containing the page's parsed JSON-LD data
      *
-     * @param {Tampermonkey.Response} res
+     * @param {Tampermonkey.Response<any>} res
      * @param {string} id
      * @return {RTDoc}
      */
@@ -546,6 +555,7 @@ class RTClient {
      * confirm the metadata of the RT page (match or fallback) matches the IMDb
      * metadata
      *
+     * @param {any} imdb
      * @return {Promise<boolean>}
      */
     async verify (imdb) {
@@ -626,6 +636,7 @@ function abort (message = NO_MATCH) {
  * @param {number} data.rating
  */
 function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
+    /** @type {"tbd" | "rotten" | "fresh"} */
     let style
 
     if (rating === -1) {
@@ -862,6 +873,8 @@ function getIMDbMetadata (imdbId, rtType) {
     const originalTitle = get(main, 'originalTitleText.text', '')
     const year = get(main, 'releaseYear.year') || 0
     const type = get(main, 'titleType.id', '')
+
+    /** @type {any} */
     const meta = {
         id: imdbId,
         cast: mainCast,
@@ -933,7 +946,7 @@ async function getRTData (imdb, rtType) {
 
         debug('preloading fallback URL:', url)
 
-        /** @type {Promise<Tampermonkey.Response>} */
+        /** @type {Promise<Tampermonkey.Response<any>>} */
         const promise = asyncGet(url)
             .then(res => {
                 debug(`preload response: ${res.status} ${res.statusText}`)
@@ -954,7 +967,7 @@ async function getRTData (imdb, rtType) {
 
     const api = GM_getResourceText('api')
 
-    /** @type {Tampermonkey.Response} */
+    /** @type {Tampermonkey.Response<any>} */
     let res = await asyncGet(api, apiRequest)
 
     log(`API response: ${res.status} ${res.statusText}`)
@@ -1026,7 +1039,7 @@ async function getRTData (imdb, rtType) {
  * return the last time a movie/TV page was updated based on its JSON-LD
  * metadata
  *
- * @param {any} rtMeta
+ * @param {Record<string, any> & { review: any[] }} rtMeta
  * @param {string} reviewProp
  * @param {string=} pageProp
  * @returns {string | undefined}
@@ -1309,6 +1322,7 @@ async function run () {
         log('not cached')
     }
 
+    /** @type {keyof RT_TYPE} */
     const imdbType = $(document).jsonLd(location.href)?.['@type']
     const rtType = RT_TYPE[imdbType]
 
@@ -1327,7 +1341,12 @@ async function run () {
 
     log('metadata:', imdb)
 
-    // add a { version, expires, data|error } entry to the cache
+    /**
+     * add a { version, expires, data|error } entry to the cache
+     *
+     * @param {any} dataOrError
+     * @param {number} ttl
+     */
     const store = (dataOrError, ttl) => {
         const expires = now + ttl
         const cached = { version: DATA_VERSION, expires, ...dataOrError }
