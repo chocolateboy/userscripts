@@ -3,7 +3,7 @@
 // @description   Highlight new stories on Reddit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.0.1
+// @version       1.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL: https://www.gnu.org/copyleft/gpl.html
 // @include       https://*.reddit.com/
@@ -22,4 +22,5 @@ $.highlight({
     item:   'div#siteTable div.thing[data-fullname]',
     target: 'a.title',
     id:     'data-fullname',
+    ttl:    { days: 30 },
 })
