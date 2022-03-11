@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.8.0
+// @version       4.9.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -14,9 +14,9 @@
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/bury@0.1.0/dist/bury.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
-// @require       https://unpkg.com/get-wild@1.5.0/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@2.0.1/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/ZCuzu72f
+// @resource      overrides https://pastebin.com/raw/FqZtiWmN
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -49,8 +49,8 @@ const NO_MATCH              = 'no matching results'
 const ONE_DAY               = 1000 * 60 * 60 * 24
 const ONE_WEEK              = ONE_DAY * 7
 const RT_BASE               = 'https://www.rottentomatoes.com'
-const RT_INVALID_DATE       = new Set(['', 'TODO_MISSING'])
-const RT_INVALID_NAME       = new Set(['', 'NA'])
+const RT_INVALID_DATE       = new Set(['TODO_MISSING'])
+const RT_INVALID_NAME       = new Set(['NA'])
 const SCRIPT_NAME           = GM_info.script.name
 const TITLE_MATCH_THRESHOLD = 0.6
 
@@ -127,6 +127,27 @@ const clone = value => JSON.parse(JSON.stringify(value))
  * path parser since we don't use the extended syntax
  */
 const get = exports.getter({ split: '.' })
+
+/**
+ * return true if the supplied value is a non-empty string, false otherwise
+ *
+ * @type {(value: unknown) => value is string}
+ */
+const isNonEmptyString = value => typeof value === 'string' && value.length > 0
+
+/**
+ * return true if the supplied value is a valid RT date (string), false otherwise
+ *
+ * @type {(value: unknown) => value is string}
+ */
+const isValidRtDate = value => isNonEmptyString(value) && !RT_INVALID_DATE.has(value)
+
+/**
+ * return true if the supplied value is a valid RT name (string), false otherwise
+ *
+ * @type {(value: unknown) => value is string}
+ */
+const isValidRtName = value => isNonEmptyString(value) && !RT_INVALID_NAME.has(value)
 
 /**
  * register a jQuery plugin which extracts and returns JSON-LD data for the
@@ -274,24 +295,24 @@ const MovieMatcher = {
     verify (imdb, $rt) {
         // in theory, we can verify the cast when the page is loaded. in
         // practice, it doesn't work: if the cast is missing from the
-        // API results, it's also missing from the page's metadata
+        // API result, it's also missing from the page's metadata
         //
         // when the cast is missing from the metadata, the directors are
         // often missing from the metadata as well, so we try to scrape
         // them instead
 
-        const metaDirectors = pluck($rt.meta.director, 'name')
-            .flatMap(name => RT_INVALID_NAME.has(name) ? [] : [stripRtName(name)])
-
         const pageDirectors = $rt.find('[data-qa="movie-info-director"]')
             .get()
-            .map(el => el.textContent?.trim())
+            .flatMap(el => {
+                const name = el.textContent?.trim()
+                return name ? [name] : []
+            })
 
-        debug(`movie directors: meta: ${metaDirectors.length}, page: ${pageDirectors.length}`)
-
-        /** @type {string[]} */
-        // @ts-ignore
-        const rtDirectors = metaDirectors.length > pageDirectors.length ? metaDirectors : pageDirectors
+        const rtDirectors = extractRtNames($rt, {
+            name: 'movie directors',
+            prop: 'director',
+            page: pageDirectors,
+        })
 
         return verifyShared({
             imdb: imdb.directors,
@@ -433,21 +454,18 @@ const TVMatcher = {
      * @param {RTDoc} $rt
      */
     verify (imdb, $rt) {
-        const metaCast = pluck($rt.meta.actor, 'name')
-            .flatMap(name => RT_INVALID_NAME.has(name) ? [] : [stripRtName(name)])
-
         const pageCast = $rt.find('[data-qa="cast-item-name"] > span[title]')
             .get()
             .flatMap(el => {
-                const name = el.getAttribute('title') || ''
-                return RT_INVALID_NAME.has(name) ? [] : [name]
+                const name = el.getAttribute('title')
+                return isValidRtName(name) ? [name] : []
             })
 
-        debug(`TV cast: meta: ${metaCast.length}, page: ${pageCast.length}`)
-
-        /** @type {string[]} */
-        // @ts-ignore
-        const rtCast = metaCast.length > pageCast.length ? metaCast : pageCast
+        const rtCast = extractRtNames($rt, {
+            name: 'TV cast',
+            prop: 'actor',
+            page: pageCast,
+        })
 
         // compare the RT cast with the partial IMDb cast and the full IMDb cast
         // and select the one which produces the best match
@@ -468,7 +486,8 @@ const Matcher = {
 
 /*
  * a helper class used to load and verify data from RT pages which transparently
- * handles the selection of the most suitable URL (match or fallback)
+ * handles the selection of the most suitable URL, either from the API (match)
+ * or guessed from the title (fallback)
  */
 class RTClient {
     /**
@@ -834,6 +853,61 @@ function checkOverrides (match, imdbId) {
 }
 
 /**
+ * extract a list (array) of names from the RT page (e.g. director(s) or cast
+ * members), either from the metadata (JSON) or the page (HTML)
+ *
+ * @param {RTDoc} $rt
+ * @param {Object} options
+ * @param {string} options.name
+ * @param {string} options.prop
+ * @param {string[]} options.page
+ */
+function extractRtNames ($rt, { name, prop, page: pageNames }) {
+    const metadataNames = pluck($rt.meta[prop], 'name')
+        .flatMap(name => isValidRtName(name) ? [stripRtName(name)] : [])
+
+    // extract the names from the +sameAs+ property (URL) if the name property
+    // is missing, e.g.
+    //
+    //   url:  "https://www.rottentomatoes.com/celebrity/paul_kaye_4"
+    //   name: "paul kaye"
+    //
+    // NOTE: name comparisons (in this context) are not case sensitive
+    // NOTE: the URL isn't perfect, e.g.:
+    //
+    //   name: "Anna Wilson-Jones"
+    //   url:  "https://www.rottentomatoes.com/celebrity/anna_wilsonjones"
+    //
+    const fallbackMetadataNames = pluck($rt.meta[prop], 'sameAs')
+        .flatMap(url => {
+            if (typeof url === 'string') {
+                const match = url.match(/\/(\w+)$/)
+
+                if (match) {
+                    const name = match[1].replace(/_\d+$/, '').replace(/_/g, ' ')
+                    return [name]
+                }
+            }
+
+            return []
+        })
+
+    debug(`${name}: page: ${pageNames.length}, meta.name: ${metadataNames.length}, meta.id: ${fallbackMetadataNames.length}`)
+
+    // select the best data source, i.e. the list with the highest number of
+    // valid names. these are ordered by priority, with pageNames preferred
+    // because the (screen) names are definitive, i.e. there's no need to clean
+    // them up:
+    //
+    //   - page name: "Paul Kaye"
+    //   - meta name: "Paul Kaye (IV)" -> "Paul Kaye"
+    //   - meta uri:  "paul_kaye_4" -> "paul kaye"
+    return [pageNames, metadataNames, fallbackMetadataNames].reduce((a, b) => {
+        return b.length > a.length ? b : a
+    })
+}
+
+/**
  * return the consensus from an RT movie/TV page as a HTML string
  *
  * @param {JQuery<Document>} $rt
@@ -885,7 +959,7 @@ function getIMDbMetadata (imdbId, rtType) {
 }
 
 /**
- * parse the API's response and extract the RT rating and consensus.
+ * query the API, parse its response and extract the RT rating and consensus.
  *
  * if there's no consensus, default to "No consensus yet."
  * if there's no rating, default to -1
@@ -986,7 +1060,6 @@ async function getRTData (imdb, rtType) {
 
     // values that can be modified by the RT client
     /** @type {{ fallbackUnused: boolean, rtPage?: RTDoc, url: string, verify: boolean }} */
-    // @ts-ignore
     const state = {
         fallbackUnused: false,
         rtPage: undefined,
@@ -1052,7 +1125,7 @@ function lastModified (rtMeta, reviewProp, pageProp) {
         }
     }
 
-    if (!updated && pageProp && !RT_INVALID_DATE.has(rtMeta[pageProp])) {
+    if (!updated && pageProp && isValidRtDate(rtMeta[pageProp])) {
         updated = rtMeta[pageProp]
         debug('updated (page modified):', updated)
     }
@@ -1222,7 +1295,7 @@ function stripRtName (name) {
 function titleSimilarity ({ imdb, rt }) {
     const rtTitle = rt.title
         .trim()
-        .replace(/\s+/, ' ') // remove extraneous spaces, e.g. tt2521668
+        .replace(/\s+/g, ' ') // remove extraneous spaces, e.g. tt2521668
         .replace(/\s+\((?:US|UK|(?:(?:19|20)\d\d))\)$/, '')
 
     if (imdb.originalTitle && imdb.title !== imdb.originalTitle) {
@@ -1353,8 +1426,6 @@ async function run () {
         exports.bury(stats.data, path, get(stats.data, path, 0) + 1)
     }
 
-    bump('request')
-
     try {
         const { data, updated: $updated, preloadUrl } = await getRTData(imdb, rtType)
 
@@ -1399,6 +1470,7 @@ async function run () {
             console.error(error)
         }
     } finally {
+        bump('request')
         debug('stats:', stats.data)
         GM_setValue('stats', JSON.stringify(stats))
     }
