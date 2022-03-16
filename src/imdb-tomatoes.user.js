@@ -3,14 +3,14 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.9.0
+// @version       4.10.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
 // @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.10.7/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.10.7/plugin/relativeTime.js
+// @require       https://unpkg.com/dayjs@1.11.0/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.11.0/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/bury@0.1.0/dist/bury.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
@@ -207,7 +207,9 @@ const MovieMatcher = {
                     return []
                 }
 
-                const rtCast = pluck(castItems, 'name').map(stripRtName)
+                const rtCast = pluck(castItems, 'name').flatMap(name => {
+                    return isValidRtName(name) ? [stripRtName(name)] : []
+                })
 
                 let castMatch = -1, verify = true
 
@@ -457,7 +459,7 @@ const TVMatcher = {
         const pageCast = $rt.find('[data-qa="cast-item-name"] > span[title]')
             .get()
             .flatMap(el => {
-                const name = el.getAttribute('title')
+                const name = el.getAttribute('title')?.trim()
                 return isValidRtName(name) ? [name] : []
             })
 
@@ -683,24 +685,16 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
         .rt-consensus-balloon em { font-style: italic; }
     `)
 
-    // 3) remove the review count and its preceding spacer element
-    $rtRating
-        .find('[class^="AggregateRatingButton__TotalRatingAmount-"]')
-        .prev()
-        .addBack()
-        .remove()
+    // 3) replace "IMDb Rating" with "RT Rating"
+    $rtRating.children().first().text('RT RATING')
 
-    // 4) replace "IMDb Rating" with "RT Rating"
-    $rtRating.find('[class^="RatingBarButtonBase__Header-"]')
-        .text('RT RATING')
+    // 4) remove the review count and its preceding spacer element
+    const $score = $rtRating.find('[data-testid="hero-rating-bar__aggregate-rating__score"]')
+    $score.nextAll().remove()
 
     // 5) replace the IMDb rating with the RT score and remove the "/ 10" suffix
     const score = rating === -1 ? 'N/A' : `${rating}%`
-    $rtRating
-        .find('[class^="AggregateRatingButton__RatingScore-"]')
-        .text(score)
-        .next()
-        .remove()
+    $score.children().first().text(score).nextAll().remove()
 
     // 6) rename the testids, e.g.:
     // hero-rating-bar__aggregate-rating -> hero-rating-bar__rt-rating
@@ -1273,7 +1267,7 @@ function similarity (a, b, map = normalize) {
  * @param {string} name
  */
 function stripRtName (name) {
-    return name.replace(/\s+\([IVXLCDM]+\)\s*$/, '')
+    return name.trim().replace(/\s+\([IVXLCDM]+\)\s*$/, '')
 }
 
 /**
