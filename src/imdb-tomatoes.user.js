@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.10.0
+// @version       4.11.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -291,36 +291,50 @@ const MovieMatcher = {
     /**
      * confirm the supplied RT page data matches the IMDb metadata
      *
-     * @param {any} imdb
      * @param {RTDoc} $rt
+     * @param {any} imdb
      */
-    verify (imdb, $rt) {
-        // in theory, we can verify the cast when the page is loaded. in
-        // practice, it doesn't work: if the cast is missing from the
-        // API result, it's also missing from the page's metadata
-        //
-        // when the cast is missing from the metadata, the directors are
-        // often missing from the metadata as well, so we try to scrape
-        // them instead
+    verify ($rt, imdb) {
+        log('verifying movie')
 
-        const pageDirectors = $rt.find('[data-qa="movie-info-director"]')
-            .get()
-            .flatMap(el => {
-                const name = el.textContent?.trim()
-                return name ? [name] : []
+        // we want to match the cast as it's more robust than matching a single
+        // director (typically), but it's not always available for movies:
+        //
+        // - if the cast is missing from the API result, it may be missing from
+        //   the metadata (JSON) as well
+        //
+        // - though a cast may be included in the page (HTML), no distinction is
+        //   made on movie pages between the cast and the crew so it's not usable
+        //   without additional filtering
+        //
+        // so we try matching the cast first, falling back to the director(s) if
+        // that doesn't work
+
+        let verified = verifyCast($rt, imdb, { meta: 'actors' })
+
+        if (!verified) {
+            const pageDirectors = /** @type {JQuery<HTMLAnchorElement>} */
+                ($rt.find('[data-qa="movie-info-director"]'))
+                    .get()
+                    .flatMap(el => {
+                        const name = $(el).text().trim()
+                        return name ? [name] : []
+                    })
+
+            const rtDirectors = extractRtNames($rt, {
+                name: 'movie directors',
+                meta: 'director',
+                page: pageDirectors,
             })
 
-        const rtDirectors = extractRtNames($rt, {
-            name: 'movie directors',
-            prop: 'director',
-            page: pageDirectors,
-        })
+            verified = verifyShared({
+                imdb: imdb.directors,
+                rt: rtDirectors,
+                name: 'directors',
+            })
+        }
 
-        return verifyShared({
-            imdb: imdb.directors,
-            rt: rtDirectors,
-            name: 'directors',
-        })
+        return verified
     },
 }
 
@@ -452,32 +466,22 @@ const TVMatcher = {
     /**
      * confirm the supplied RT page data matches the IMDb metadata
      *
-     * @param {any} imdb
      * @param {RTDoc} $rt
+     * @param {any} imdb
      */
-    verify (imdb, $rt) {
-        const pageCast = $rt.find('[data-qa="cast-item-name"] > span[title]')
+    verify ($rt, imdb) {
+        log('verifying TV show')
+
+        const roles = ['Actor', 'Host', 'Narrator', 'Self']
+        const siblings = roles.map(it => `~ [title="${it}"]:last-child`).join(', ')
+        const pageCast = $rt.find(`[data-qa^="cast-item-"]:first-child:has(${siblings})`)
             .get()
             .flatMap(el => {
-                const name = el.getAttribute('title')?.trim()
-                return isValidRtName(name) ? [name] : []
+                const name = $(el).text().trim()
+                return name ? [name] : []
             })
 
-        const rtCast = extractRtNames($rt, {
-            name: 'TV cast',
-            prop: 'actor',
-            page: pageCast,
-        })
-
-        // compare the RT cast with the partial IMDb cast and the full IMDb cast
-        // and select the one which produces the best match
-        const partialShared = shared(rtCast, imdb.cast)
-        const fullShared = shared(rtCast, imdb.fullCast)
-        const partialDiff = partialShared.got - partialShared.want
-        const fullDiff = fullShared.got - fullShared.want
-        const imdbCast = partialDiff > fullDiff ? imdb.cast : imdb.fullCast
-
-        return verifyShared({ imdb: imdbCast, rt: rtCast })
+        return verifyCast($rt, imdb, { meta: 'actor', page: pageCast })
     }
 }
 
@@ -581,7 +585,7 @@ class RTClient {
      */
     async verify (imdb) {
         const { match, matcher, preload, state } = this
-        let verified = matcher.verify(imdb, state.rtPage)
+        let verified = matcher.verify(state.rtPage, imdb)
 
         if (!verified) {
             if (match.force) {
@@ -596,13 +600,14 @@ class RTClient {
                 if (res) {
                     log(`fallback response: ${res.status} ${res.statusText}`)
                     state.rtPage = this._parseResponse(res, preload.url)
-                    verified = matcher.verify(imdb, state.rtPage)
+                    verified = matcher.verify(state.rtPage, imdb)
                 } else {
                     log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
                 }
             }
         }
 
+        log('verified:', verified)
         return verified
     }
 }
@@ -853,12 +858,16 @@ function checkOverrides (match, imdbId) {
  * @param {RTDoc} $rt
  * @param {Object} options
  * @param {string} options.name
- * @param {string} options.prop
- * @param {string[]} options.page
+ * @param {string} options.meta
+ * @param {string[]=} options.page
  */
-function extractRtNames ($rt, { name, prop, page: pageNames }) {
-    const metadataNames = pluck($rt.meta[prop], 'name')
-        .flatMap(name => isValidRtName(name) ? [stripRtName(name)] : [])
+function extractRtNames ($rt, { name, meta: prop, page: pageNames = [] }) {
+    // XXX as of March 2022, it looks like the name property is blank ("NA") or
+    // not included in the metadata
+
+    const metadataNames = pluck($rt.meta[prop], 'name').flatMap(name => {
+        return isValidRtName(name) ? [stripRtName(name)] : []
+    })
 
     // extract the names from the +sameAs+ property (URL) if the name property
     // is missing, e.g.
@@ -866,25 +875,30 @@ function extractRtNames ($rt, { name, prop, page: pageNames }) {
     //   url:  "https://www.rottentomatoes.com/celebrity/paul_kaye_4"
     //   name: "paul kaye"
     //
-    // NOTE: name comparisons (in this context) are not case sensitive
+    // name comparisons are not case sensitive
+    //
+    // NOTE: the name can be hyphenated, e.g.:
+    //
+    //   name: "Emma Stone"
+    //   url:  https://www.rottentomatoes.com/celebrity/emma-stone
+    //
     // NOTE: the URL isn't perfect, e.g.:
     //
     //   name: "Anna Wilson-Jones"
     //   url:  "https://www.rottentomatoes.com/celebrity/anna_wilsonjones"
     //
-    const fallbackMetadataNames = pluck($rt.meta[prop], 'sameAs')
-        .flatMap(url => {
-            if (typeof url === 'string') {
-                const match = url.match(/\/(\w+)$/)
+    const fallbackMetadataNames = pluck($rt.meta[prop], 'sameAs').flatMap(url => {
+        if (typeof url === 'string') {
+            const match = url.match(/\/([^/]+)$/)
 
-                if (match) {
-                    const name = match[1].replace(/_\d+$/, '').replace(/_/g, ' ')
-                    return [name]
-                }
+            if (match) {
+                const name = match[1].replace(/[_-]\d+$/, '').replace(/[_-]/g, ' ')
+                return [name]
             }
+        }
 
-            return []
-        })
+        return []
+    })
 
     debug(`${name}: page: ${pageNames.length}, meta.name: ${metadataNames.length}, meta.id: ${fallbackMetadataNames.length}`)
 
@@ -1267,7 +1281,7 @@ function similarity (a, b, map = normalize) {
  * @param {string} name
  */
 function stripRtName (name) {
-    return name.trim().replace(/\s+\([IVXLCDM]+\)\s*$/, '')
+    return name.trim().replace(/\s+\([IVXLCDM]+\)$/, '')
 }
 
 /**
@@ -1311,23 +1325,52 @@ function titleSimilarity ({ imdb, rt }) {
 }
 
 /**
+ * confirm the RT cast matches the IMDb cast
+ *
+ * @param {RTDoc} $rt
+ * @param {{ cast: string[]; fullCast: string[]; }} imdb
+ * @param {Object} options
+ * @param {string} options.meta
+ * @param {string[]=} options.page
+ */
+function verifyCast ($rt, imdb, { meta, page = [] }) {
+    const rtCast = extractRtNames($rt, { name: 'cast', meta, page })
+
+    /** @type {string[]} */
+    let imdbCast
+
+    if (rtCast.length) {
+        // compare the RT cast with the main IMDb cast and the full IMDb cast
+        // and select the one which produces the best match
+        const mainShared = shared(rtCast, imdb.cast)
+        const fullShared = shared(rtCast, imdb.fullCast)
+        const mainRatio = mainShared.got / mainShared.max
+        const fullRatio = fullShared.got / fullShared.max
+
+        imdbCast = fullRatio > mainRatio ? imdb.fullCast : imdb.cast
+    } else {
+        imdbCast = imdb.cast
+    }
+
+    return verifyShared({ imdb: imdbCast, rt: rtCast, name: 'cast' })
+}
+
+/**
  * return true if the supplied arrays are similar (sufficiently overlap), false
  * otherwise
  *
  * @param {Object} options
  * @param {string[]} options.imdb
- * @param {string=} options.name
+ * @param {string} options.name
  * @param {string[]} options.rt
  */
-function verifyShared ({ imdb, rt, name = 'cast' }) {
+function verifyShared ({ imdb, rt, name }) {
     debug(`verifying ${name}`)
     debug(`imdb ${name}:`, imdb)
     debug(`rt ${name}:`, rt)
     const $shared = shared(rt, imdb)
     debug(`shared ${name}:`, $shared)
-    const verified = $shared.got >= $shared.want
-    log('verified:', verified)
-    return verified
+    return $shared.got >= $shared.want
 }
 
 /******************************************************************************/
