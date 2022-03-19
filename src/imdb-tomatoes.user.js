@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.12.0
+// @version       4.13.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -16,7 +16,7 @@
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@2.0.1/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/FqZtiWmN
+// @resource      overrides https://pastebin.com/raw/KMty4uqH
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -41,7 +41,8 @@
 /* begin */ {
 
 const API_LIMIT             = 100
-const DATA_VERSION          = 1.1
+const DATA_VERSION          = 1.2
+const DEBUG                 = false
 const INACTIVE_MONTHS       = 3
 const MAX_YEAR_DIFF         = 3
 const NO_CONSENSUS          = 'No consensus yet.'
@@ -50,7 +51,6 @@ const ONE_DAY               = 1000 * 60 * 60 * 24
 const ONE_WEEK              = ONE_DAY * 7
 const RT_BASE               = 'https://www.rottentomatoes.com'
 const RT_INVALID_DATE       = new Set(['TODO_MISSING'])
-const RT_INVALID_NAME       = new Set(['NA'])
 const SCRIPT_NAME           = GM_info.script.name
 const TITLE_MATCH_THRESHOLD = 0.6
 
@@ -129,25 +129,13 @@ const clone = value => JSON.parse(JSON.stringify(value))
 const get = exports.getter({ split: '.' })
 
 /**
- * return true if the supplied value is a non-empty string, false otherwise
- *
- * @type {(value: unknown) => value is string}
- */
-const isNonEmptyString = value => typeof value === 'string' && value.length > 0
-
-/**
  * return true if the supplied value is a valid RT date (string), false otherwise
  *
  * @type {(value: unknown) => value is string}
  */
-const isValidRtDate = value => isNonEmptyString(value) && !RT_INVALID_DATE.has(value)
-
-/**
- * return true if the supplied value is a valid RT name (string), false otherwise
- *
- * @type {(value: unknown) => value is string}
- */
-const isValidRtName = value => isNonEmptyString(value) && !RT_INVALID_NAME.has(value)
+const isValidRtDate = value => {
+    return typeof value === 'string' && !!value && !RT_INVALID_DATE.has(value)
+}
 
 /**
  * register a jQuery plugin which extracts and returns JSON-LD data for the
@@ -176,6 +164,18 @@ $.fn.jsonLd = function jsonLd (id) {
 }
 
 const MovieMatcher = {
+    /**
+     * return the consensus from a movie page as a HTML string
+     *
+     * @param {RTDoc} $rt
+     * @return {[string]}
+     */
+    getConsensus ($rt) {
+        const $consensus = $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
+            .first()
+        return [$consensus.html()]
+    },
+
     /**
      * return the timestamp (ISO-8601 string) of the last time an RT movie page
      * was updated, e.g. the date of the most-recently published review
@@ -208,7 +208,7 @@ const MovieMatcher = {
                 }
 
                 const rtCast = pluck(castItems, 'name').flatMap(name => {
-                    return isValidRtName(name) ? [stripRtName(name)] : []
+                    return name ? [stripRtName(name)] : []
                 })
 
                 let castMatch = -1, verify = true
@@ -293,83 +293,41 @@ const MovieMatcher = {
      *
      * @param {RTDoc} $rt
      * @param {any} imdb
+     * @returns {boolean}
      */
     verify ($rt, imdb) {
         log('verifying movie')
 
-        // we want to match the cast as it's more robust than matching a single
-        // director (typically), but it's not always available for movies:
-        //
-        // - if the cast is missing from the API result, it may be missing from
-        //   the metadata (JSON) as well
-        //
-        // - though a cast may be included in the page (HTML), no consistent
-        //   distinction is made on movie pages between the cast and the crew so
-        //   it's not reliable
-        //
-        // so we try matching the cast first (based on the cast data in the JSON),
-        // falling back to the director(s) if that doesn't succeed
+        // match the director(s)
+        const rtDirectors = $rt.find('a[data-qa="movie-info-director"]')
+            .map((_, el) => $(el).text().trim())
+            .get()
 
-        /** @type {Map<string, string>} */
-        const names = new Map()
-
-        // build the { href -> display-name } mapping for cast members
-        // NOTE the hrefs currently have leading and trailing spaces (!)
-        /** @type {JQuery<HTMLAnchorElement>} */ ; // XXX semicolon needed for the next line
-        ($rt.find('a[data-qa="cast-crew-item-link"][href*="/celebrity/"]')).each((_, el) => {
-            const $el = $(el)
-            const name = $el.text().trim()
-
-            if (name) {
-                const href = /** @type {string} */ ($el.attr('href')).trim()
-                names.set(href, name)
-            }
+        return verifyShared({
+            name: 'directors',
+            imdb: imdb.directors,
+            rt: rtDirectors,
         })
-
-        let verified = verifyCast($rt, imdb, { meta: 'actors', names })
-
-        if (!verified) {
-            /** @type {Map<string, string>} */
-            const names = new Map()
-
-            const pageDirectors = /** @type {JQuery<HTMLAnchorElement>} */
-                ($rt.find('[data-qa="movie-info-director"]'))
-                    .get()
-                    .flatMap(el => {
-                        const $el = $(el)
-                        const name = $el.text().trim()
-                        const href = $el.attr('href')?.trim()
-
-                        if (name) {
-                            if (href) {
-                                names.set(href, name)
-                            }
-
-                            return [name]
-                        }
-
-                        return []
-                    })
-
-            const rtDirectors = extractRtNames($rt, {
-                name: 'movie directors',
-                meta: 'director',
-                page: pageDirectors,
-                names,
-            })
-
-            verified = verifyShared({
-                imdb: imdb.directors,
-                rt: rtDirectors,
-                name: 'directors',
-            })
-        }
-
-        return verified
     },
 }
 
 const TVMatcher = {
+    /**
+     * return the consensus (HTML string) and rating (number) from a TV page
+     *
+     * @param {RTDoc} $rt
+     * @param {number} showRating
+     * @return {[string | undefined , number]}
+     */
+    getConsensus ($rt, showRating) {
+        const $consensus = $rt.find('season-list-item[consensus]:not([consensus=""])').last()
+        const consensus = $consensus.attr('consensus')
+        const seasonRating = parseInt($consensus.attr('tomatometerscore') ?? '')
+        const rating = consensus ? seasonRating ?? showRating : showRating
+
+        return [consensus, rating]
+    },
+
     /**
      * return the timestamp (ISO-8601 string) of the last time an RT TV show
      * page was updated, e.g. the date of the most-recently published review
@@ -377,8 +335,10 @@ const TVMatcher = {
      * @param {RTDoc} $rt
      * @return {string | undefined}
      */
-    lastModified ({ meta }) {
-        return lastModified(meta, 'datePublished')
+    lastModified ({ meta: _meta }) {
+        // XXX there's no way to determine this from the main page of a TV show
+        // return lastModified(meta, 'datePublished')
+        return undefined
     },
 
     /**
@@ -397,7 +357,7 @@ const TVMatcher = {
                     return []
                 }
 
-                let suffix, $url
+                let suffix, path
 
                 const match = url.match(/^(\/tv\/[^/]+)(?:\/(.+))?$/)
 
@@ -406,8 +366,8 @@ const TVMatcher = {
                         return []
                     }
 
+                    path = match[1] // strip the season
                     suffix = match[2]
-                    $url = suffix ? url : `${url}/s01`
                 } else {
                     warn("can't parse RT URL:", url)
                     return []
@@ -440,7 +400,7 @@ const TVMatcher = {
 
                 const result = {
                     title,
-                    url: $url,
+                    url: path,
                     rating: rt.meterScore,
                     popularity: (rt.meterScore == null ? 0 : 1),
                     startYear,
@@ -486,12 +446,12 @@ const TVMatcher = {
      * return the likely RT path for an IMDb TV show title, e.g.:
      *
      *   title: "Sesame Street"
-     *   path:  "/tv/sesame_street/s01"
+     *   path:  "/tv/sesame_street"
      *
      * @param {string} title
      */
     rtPath (title) {
-        return `/tv/${rtName(title)}/s01`
+        return `/tv/${rtName(title)}`
     },
 
     /**
@@ -499,53 +459,50 @@ const TVMatcher = {
      *
      * @param {RTDoc} $rt
      * @param {any} imdb
+     * @returns {boolean | string}
      */
     verify ($rt, imdb) {
         log('verifying TV show')
 
-        /** @type {Map<string, string>} */
-        const names = new Map()
+        // match the cast or, if empty (e.g. Black Mirror), the creator(s)
+        const rtCast = $rt.find('a[data-qa="cast-member"]')
+            .map((_, el) => $(el).text().trim())
+            .get()
 
-        // extract two sets of data in one pass:
-        //
-        //  - the { href -> display-name } mapping used to translate URLs in the
-        //    metadata (JSON) to their corresponding names
-        //  - (some) actor names
-        //
-        // the latter are determined by checking if a cast/crew member has an
-        // associated "character" annotation, e.g. on Breaking Bad, the "Bryan
-        // Cranston" link has an associated (following) element for the
-        // character containing "Walter White". this doesn't work for, e.g.,
-        // reality TV or news shows, but is better than nothing if the metadata
-        // is missing
-        //
-        // cast/crew names are located in cast-item-name elements in the first
-        // row (6 items) and cast-item-link elements for the rest, e.g.:
-        //
-        //   :is(a[data-qa="cast-item-name"], a[data-qa="cast-item-link"])
-        //     :has(> span[title]:first-child:last-child)
-        //
-        const pageNames = /** @type {JQuery<HTMLAnchorElement>} */
-            ($rt.find('a[data-qa^="cast-item-"][href*="/celebrity/"]:has([title])'))
+        let verified = verifyShared({
+            name: 'cast',
+            imdb: imdb.fullCast,
+            rt: rtCast,
+        })
+
+        if (!verified && rtCast.length === 0) {
+            const rtCreators = $rt.find('a[data-qa="creator"]')
+                .map((_, el) => $(el).text().trim())
                 .get()
-                .flatMap(el => {
-                    const $el = $(el)
-                    const name = $el.text().trim()
 
-                    if (name) {
-                        const href = /** @type {string} */ ($el.attr('href')).trim()
+            verified = verifyShared({
+                name: 'creators',
+                imdb: imdb.creators,
+                rt: rtCreators,
+            })
+        }
 
-                        names.set(href, name)
+        // change the target URL from "/tv/name" to "/tv/name/s01" if there's
+        // only one season
+        if (verified) {
+            /** @type {{ url: string }[] | undefined} */
+            const seasons = $rt.meta.containsSeason
 
-                        if ($el.next('[data-qa="cast-item-character"]').length) {
-                            return [name]
-                        }
-                    }
+            if (seasons?.length === 1) {
+                const url = get(seasons, [-1, 'url'])
 
-                    return []
-                })
+                if (url) {
+                    return url
+                }
+            }
+        }
 
-        return verifyCast($rt, imdb, { meta: 'actor', names, page: pageNames })
+        return verified
     }
 }
 
@@ -563,9 +520,9 @@ class RTClient {
     /**
      * @param {Object} options
      * @param {any} options.match
-     * @param {any} options.matcher
+     * @param {Matcher[keyof Matcher]} options.matcher
      * @param {any} options.preload
-     * @param {any} options.state
+     * @param {RTState} options.state
      */
     constructor ({ match, matcher, preload, state }) {
         this.match = match
@@ -649,7 +606,9 @@ class RTClient {
      */
     async verify (imdb) {
         const { match, matcher, preload, state } = this
-        let verified = matcher.verify(state.rtPage, imdb)
+        const $rt = /** @type {RTDoc} */ (state.rtPage)
+
+        let verified = matcher.verify($rt, imdb)
 
         if (!verified) {
             if (match.force) {
@@ -664,14 +623,20 @@ class RTClient {
                 if (res) {
                     log(`fallback response: ${res.status} ${res.statusText}`)
                     state.rtPage = this._parseResponse(res, preload.url)
-                    verified = matcher.verify(state.rtPage, imdb)
+                    verified = matcher.verify($rt, imdb)
                 } else {
                     log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
                 }
             }
         }
 
+        if (typeof verified === 'string') {
+            state.url = verified
+            verified = true
+        }
+
         log('verified:', verified)
+
         return verified
     }
 }
@@ -916,105 +881,6 @@ function checkOverrides (match, imdbId) {
 }
 
 /**
- * extract a list (array) of names from the RT page (e.g. director(s) or cast
- * members), either from the metadata (JSON) or the page (HTML)
- *
- * @param {RTDoc} $rt
- * @param {Object} options
- * @param {string} options.name
- * @param {Map<string, string>=} options.names
- * @param {string} options.meta
- * @param {string[]=} options.page
- */
-function extractRtNames ($rt, { name, names = new Map(), meta: prop, page: pageNames = [] }) {
-    // XXX as of March 2022, it looks like the name property is blank ("NA") or
-    // not included in the metadata
-
-    const metadataNames = pluck($rt.meta[prop], 'name').flatMap(name => {
-        return isValidRtName(name) ? [stripRtName(name)] : []
-    })
-
-    // extract the names from the +sameAs+ property (URL) if the name property
-    // is missing, e.g.
-    //
-    //   url:  https://www.rottentomatoes.com/celebrity/paul_kaye_4
-    //   name: "paul kaye"
-    //
-    // name comparisons are not case sensitive
-    //
-    // there is usually (but not always) a one-to-one correspondence between the
-    // actors listed in the JSON and the cast listed in the "Cast & Crew" section
-    // in the HTML, and between the movie directors in the JSON and in the
-    // "Movie Info" section in the HTML, so the caller can pass in a
-    // { href -> display-name } map which we use to resolve the name. otherwise
-    // we derive it from the URL.
-    //
-    // Note:
-    //
-    // the name can be hyphenated, e.g.:
-    //
-    //   url:  https://www.rottentomatoes.com/celebrity/emma-stone
-    //   name: "Emma Stone"
-    //
-    // the name can be preceded by a number:
-    //
-    //   url:  https://www.rottentomatoes.com/celebrity/1000795-blanche_baker
-    //   name: "Blanche Baker"
-    //
-    // the URL isn't perfect, e.g.:
-    //
-    //   name: "Anna Wilson-Jones"
-    //   url:  https://www.rottentomatoes.com/celebrity/anna_wilsonjones
-    //
-    //   name: "Jennifer Lawrence"
-    //   url:  https://www.rottentomatoes.com/celebrity/jeniffer_lawrence
-    //
-    const fallbackMetadataNames = pluck($rt.meta[prop], 'sameAs').flatMap(url => {
-        if (typeof url === 'string') {
-            const match = url.match(/\/([^/]+)$/)
-
-            if (match) {
-                const id = match[1]
-                const key = `/celebrity/${id}`
-                const name = names.get(key) || id
-                    .replace(/^[^a-z]+/i, '')
-                    .replace(/[^a-z]+$/i, '')
-                    .replace(/[\W_]/g, ' ')
-
-                return [name]
-            }
-        }
-
-        return []
-    })
-
-    debug(`${name}: page: ${pageNames.length}, meta.name: ${metadataNames.length}, meta.id: ${fallbackMetadataNames.length}`)
-
-    // select the best data source, i.e. the list with the highest number of
-    // valid names. these are ordered by priority, with pageNames preferred
-    // because the (screen) names are definitive, i.e. there's no need to clean
-    // them up:
-    //
-    //   - page name: "Paul Kaye"
-    //   - meta name: "Paul Kaye (IV)" -> "Paul Kaye"
-    //   - meta uri:  "paul_kaye_4"    -> "paul kaye"
-    return [pageNames, metadataNames, fallbackMetadataNames].reduce((a, b) => {
-        return b.length > a.length ? b : a
-    })
-}
-
-/**
- * return the consensus from an RT movie/TV page as a HTML string
- *
- * @param {JQuery<Document>} $rt
- */
-function getConsensus ($rt) {
-    return $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
-        .first()
-        .html()
-}
-
-/**
  * extract IMDb metadata from the GraphQL data embedded in the page
  *
  * @param {string} imdbId
@@ -1046,8 +912,10 @@ function getIMDbMetadata (imdbId, rtType) {
         meta.startYear = year
         meta.endYear = get(extra, 'releaseYear.endYear') || 0
         meta.seasons = get(main, 'episodes.seasons.length') || 0
+        meta.creators = get(main, 'creators.*.credits.*.name.nameText.text', [])
     } else if (rtType === 'movie') {
         meta.directors = get(main, 'directors.*.credits.*.name.nameText.text', [])
+        meta.writers = get(main, 'writers.*.credits.*.name.nameText.text', [])
         meta.year = year
     }
 
@@ -1091,9 +959,13 @@ async function getRTData (imdb, rtType) {
     //   - found: true
     //   - examples: "Quick", "Quick Change", "Kiss Me Quick", "The Quick and the Dead"
     //   - stats: { "Quick": 39 }
-    //
 
-    const query = JSON.stringify(imdb.title.replace(/"/g, ''))
+    const unquoted = imdb.title
+        .replace(/"/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    const query = JSON.stringify(unquoted)
 
     log(`querying API for ${query}`)
 
@@ -1113,7 +985,7 @@ async function getRTData (imdb, rtType) {
     //   preload URL: https://www.rottentomatoes.com/m/bolt
     //
     //   tvSeries:    "Sesame Street"
-    //   preload URL: https://www.rottentomatoes.com/tv/sesame_street/s01
+    //   preload URL: https://www.rottentomatoes.com/tv/sesame_street
     //
     // this guess produces the correct URL most (~75%) of the time
     //
@@ -1186,7 +1058,8 @@ async function getRTData (imdb, rtType) {
     log('matched:', !match.fallback)
 
     // values that can be modified by the RT client
-    /** @type {{ fallbackUnused: boolean, rtPage?: RTDoc, url: string, verify: boolean }} */
+
+    /** @type {RTState} */
     const state = {
         fallbackUnused: false,
         rtPage: undefined,
@@ -1212,8 +1085,9 @@ async function getRTData (imdb, rtType) {
 
     const $rt = state.rtPage
     const $rating = $rt.meta.aggregateRating
-    const rating = Number(($rating?.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
-    const consensus = getConsensus($rt)?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
+    const metaRating = Number(($rating?.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
+    const [$consensus, rating = metaRating] = matcher.getConsensus($rt, metaRating)
+    const consensus = $consensus?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
     const updated = matcher.lastModified($rt)
 
     return {
@@ -1444,47 +1318,15 @@ function titleSimilarity ({ imdb, rt }) {
 }
 
 /**
- * confirm the RT cast matches the IMDb cast
- *
- * @param {RTDoc} $rt
- * @param {{ cast: string[]; fullCast: string[]; }} imdb
- * @param {Object} options
- * @param {string} options.meta
- * @param {Map<string, string>=} options.names
- * @param {string[]=} options.page
- */
-function verifyCast ($rt, imdb, { names, meta, page = [] }) {
-    const rtCast = extractRtNames($rt, { name: 'cast', names, meta, page })
-
-    /** @type {string[]} */
-    let imdbCast
-
-    if (rtCast.length) {
-        // compare the RT cast with the main IMDb cast and the full IMDb cast
-        // and select the one which produces the best match
-        const mainShared = shared(rtCast, imdb.cast)
-        const fullShared = shared(rtCast, imdb.fullCast)
-        const mainRatio = mainShared.got / mainShared.max
-        const fullRatio = fullShared.got / fullShared.max
-
-        imdbCast = fullRatio > mainRatio ? imdb.fullCast : imdb.cast
-    } else {
-        imdbCast = imdb.cast
-    }
-
-    return verifyShared({ imdb: imdbCast, rt: rtCast, name: 'cast' })
-}
-
-/**
  * return true if the supplied arrays are similar (sufficiently overlap), false
  * otherwise
  *
  * @param {Object} options
- * @param {string[]} options.imdb
  * @param {string} options.name
+ * @param {string[]} options.imdb
  * @param {string[]} options.rt
  */
-function verifyShared ({ imdb, rt, name }) {
+function verifyShared ({ name, imdb, rt }) {
     debug(`verifying ${name}`)
     debug(`imdb ${name}:`, imdb)
     debug(`rt ${name}:`, rt)
@@ -1566,9 +1408,15 @@ async function run () {
      * @param {number} ttl
      */
     const store = (dataOrError, ttl) => {
+        // don't cache results while debugging
+        if (DEBUG) {
+            return
+        }
+
         const expires = now + ttl
         const cached = { version: DATA_VERSION, expires, ...dataOrError }
         const json = JSON.stringify(cached)
+
         GM_setValue(imdbId, json)
     }
 

@@ -43,4 +43,11 @@ declare global {
         name: string;
         year: number;
     };
+
+    type RTState = {
+        fallbackUnused: boolean;
+        rtPage?: RTDoc;
+        url: string;
+        verify: boolean;
+    };
 }
