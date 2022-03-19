@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.11.0
+// @version       4.11.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -303,28 +303,59 @@ const MovieMatcher = {
         // - if the cast is missing from the API result, it may be missing from
         //   the metadata (JSON) as well
         //
-        // - though a cast may be included in the page (HTML), no distinction is
-        //   made on movie pages between the cast and the crew so it's not usable
-        //   without additional filtering
+        // - though a cast may be included in the page (HTML), no consistent
+        //   distinction is made on movie pages between the cast and the crew so
+        //   it's not reliable
         //
-        // so we try matching the cast first, falling back to the director(s) if
-        // that doesn't work
+        // so we try matching the cast first (based on the cast data in the JSON),
+        // falling back to the director(s) if that doesn't succeed
 
-        let verified = verifyCast($rt, imdb, { meta: 'actors' })
+        /** @type {Map<string, string>} */
+        const names = new Map()
+
+        // build the { href -> display-name } mapping for cast members
+        // NOTE the hrefs currently have leading and trailing spaces (!)
+        /** @type {JQuery<HTMLAnchorElement>} */ ; // XXX semicolon needed for the next line
+        ($rt.find('a[data-qa="cast-crew-item-link"][href*="/celebrity/"]')).each((_, el) => {
+            const $el = $(el)
+            const name = $el.text().trim()
+
+            if (name) {
+                const href = /** @type {string} */ ($el.attr('href')).trim()
+                names.set(href, name)
+            }
+        })
+
+        let verified = verifyCast($rt, imdb, { meta: 'actors', names })
 
         if (!verified) {
+            /** @type {Map<string, string>} */
+            const names = new Map()
+
             const pageDirectors = /** @type {JQuery<HTMLAnchorElement>} */
                 ($rt.find('[data-qa="movie-info-director"]'))
                     .get()
                     .flatMap(el => {
-                        const name = $(el).text().trim()
-                        return name ? [name] : []
+                        const $el = $(el)
+                        const name = $el.text().trim()
+                        const href = $el.attr('href')?.trim()
+
+                        if (name) {
+                            if (href) {
+                                names.set(href, name)
+                            }
+
+                            return [name]
+                        }
+
+                        return []
                     })
 
             const rtDirectors = extractRtNames($rt, {
                 name: 'movie directors',
                 meta: 'director',
                 page: pageDirectors,
+                names,
             })
 
             verified = verifyShared({
@@ -472,16 +503,49 @@ const TVMatcher = {
     verify ($rt, imdb) {
         log('verifying TV show')
 
-        const roles = ['Actor', 'Host', 'Narrator', 'Self']
-        const siblings = roles.map(it => `~ [title="${it}"]:last-child`).join(', ')
-        const pageCast = $rt.find(`[data-qa^="cast-item-"]:first-child:has(${siblings})`)
-            .get()
-            .flatMap(el => {
-                const name = $(el).text().trim()
-                return name ? [name] : []
-            })
+        /** @type {Map<string, string>} */
+        const names = new Map()
 
-        return verifyCast($rt, imdb, { meta: 'actor', page: pageCast })
+        // extract two sets of data in one pass:
+        //
+        //  - the { href -> display-name } mapping used to translate URLs in the
+        //    metadata (JSON) to their corresponding names
+        //  - (some) actor names
+        //
+        // the latter are determined by checking if a cast/crew member has an
+        // associated "character" annotation, e.g. on Breaking Bad, the "Bryan
+        // Cranston" link has an associated (following) element for the
+        // character containing "Walter White". this doesn't work for, e.g.,
+        // reality TV or news shows, but is better than nothing if the metadata
+        // is missing
+        //
+        // cast/crew names are located in cast-item-name elements in the first
+        // row (6 items) and cast-item-link elements for the rest, e.g.:
+        //
+        //   :is(a[data-qa="cast-item-name"], a[data-qa="cast-item-link"])
+        //     :has(> span[title]:first-child:last-child)
+        //
+        const pageNames = /** @type {JQuery<HTMLAnchorElement>} */
+            ($rt.find('a[data-qa^="cast-item-"][href*="/celebrity/"]:has([title])'))
+                .get()
+                .flatMap(el => {
+                    const $el = $(el)
+                    const name = $el.text().trim()
+
+                    if (name) {
+                        const href = /** @type {string} */ ($el.attr('href')).trim()
+
+                        names.set(href, name)
+
+                        if ($el.next('[data-qa="cast-item-character"]').length) {
+                            return [name]
+                        }
+                    }
+
+                    return []
+                })
+
+        return verifyCast($rt, imdb, { meta: 'actor', names, page: pageNames })
     }
 }
 
@@ -858,10 +922,11 @@ function checkOverrides (match, imdbId) {
  * @param {RTDoc} $rt
  * @param {Object} options
  * @param {string} options.name
+ * @param {Map<string, string>=} options.names
  * @param {string} options.meta
  * @param {string[]=} options.page
  */
-function extractRtNames ($rt, { name, meta: prop, page: pageNames = [] }) {
+function extractRtNames ($rt, { name, names = new Map(), meta: prop, page: pageNames = [] }) {
     // XXX as of March 2022, it looks like the name property is blank ("NA") or
     // not included in the metadata
 
@@ -872,27 +937,50 @@ function extractRtNames ($rt, { name, meta: prop, page: pageNames = [] }) {
     // extract the names from the +sameAs+ property (URL) if the name property
     // is missing, e.g.
     //
-    //   url:  "https://www.rottentomatoes.com/celebrity/paul_kaye_4"
+    //   url:  https://www.rottentomatoes.com/celebrity/paul_kaye_4
     //   name: "paul kaye"
     //
     // name comparisons are not case sensitive
     //
-    // NOTE: the name can be hyphenated, e.g.:
+    // there is usually (but not always) a one-to-one correspondence between the
+    // actors listed in the JSON and the cast listed in the "Cast & Crew" section
+    // in the HTML, and between the movie directors in the JSON and in the
+    // "Movie Info" section in the HTML, so the caller can pass in a
+    // { href -> display-name } map which we use to resolve the name. otherwise
+    // we derive it from the URL.
     //
-    //   name: "Emma Stone"
+    // Note:
+    //
+    // the name can be hyphenated, e.g.:
+    //
     //   url:  https://www.rottentomatoes.com/celebrity/emma-stone
+    //   name: "Emma Stone"
     //
-    // NOTE: the URL isn't perfect, e.g.:
+    // the name can be preceded by a number:
+    //
+    //   url:  https://www.rottentomatoes.com/celebrity/1000795-blanche_baker
+    //   name: "Blanche Baker"
+    //
+    // the URL isn't perfect, e.g.:
     //
     //   name: "Anna Wilson-Jones"
-    //   url:  "https://www.rottentomatoes.com/celebrity/anna_wilsonjones"
+    //   url:  https://www.rottentomatoes.com/celebrity/anna_wilsonjones
+    //
+    //   name: "Jennifer Lawrence"
+    //   url:  https://www.rottentomatoes.com/celebrity/jeniffer_lawrence
     //
     const fallbackMetadataNames = pluck($rt.meta[prop], 'sameAs').flatMap(url => {
         if (typeof url === 'string') {
             const match = url.match(/\/([^/]+)$/)
 
             if (match) {
-                const name = match[1].replace(/[_-]\d+$/, '').replace(/[_-]/g, ' ')
+                const id = match[1]
+                const key = `/celebrity/${id}`
+                const name = names.get(key) || id
+                    .replace(/^[^a-z]+/i, '')
+                    .replace(/[^a-z]+$/i, '')
+                    .replace(/[\W_]/g, ' ')
+
                 return [name]
             }
         }
@@ -909,7 +997,7 @@ function extractRtNames ($rt, { name, meta: prop, page: pageNames = [] }) {
     //
     //   - page name: "Paul Kaye"
     //   - meta name: "Paul Kaye (IV)" -> "Paul Kaye"
-    //   - meta uri:  "paul_kaye_4" -> "paul kaye"
+    //   - meta uri:  "paul_kaye_4"    -> "paul kaye"
     return [pageNames, metadataNames, fallbackMetadataNames].reduce((a, b) => {
         return b.length > a.length ? b : a
     })
@@ -1331,10 +1419,11 @@ function titleSimilarity ({ imdb, rt }) {
  * @param {{ cast: string[]; fullCast: string[]; }} imdb
  * @param {Object} options
  * @param {string} options.meta
+ * @param {Map<string, string>=} options.names
  * @param {string[]=} options.page
  */
-function verifyCast ($rt, imdb, { meta, page = [] }) {
-    const rtCast = extractRtNames($rt, { name: 'cast', meta, page })
+function verifyCast ($rt, imdb, { names, meta, page = [] }) {
+    const rtCast = extractRtNames($rt, { name: 'cast', names, meta, page })
 
     /** @type {string[]} */
     let imdbCast
