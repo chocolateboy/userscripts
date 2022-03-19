@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.11.1
+// @version       4.12.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -1064,11 +1064,42 @@ function getIMDbMetadata (imdbId, rtType) {
  * @param {keyof Matcher} rtType
  */
 async function getRTData (imdb, rtType) {
-    log(`querying API for ${JSON.stringify(imdb.title)}`)
+    // quoting the title behaves similarly to Google search, returning matches
+    // which contain the exact title (and some minor variants), rather than
+    // titles which are loosely similar, e.g. searching for "Quick" (tt9211804)
+    // yields:
+    //
+    // unquoted:
+    //
+    //   - matches: 186
+    //   - results: 79
+    //   - found: false
+    //   - examples: "Quick", "Quicksilver", "Quicksand", "Highlander 2: The Quickening"
+    //   - stats: {
+    //        "Quickie": 50,
+    //        "Quick": 19,
+    //        "Quicksand": 4,
+    //        "Quicksilver": 3,
+    //        "Quickening": 2,
+    //        "Quicker": 1,
+    //     }
+    //
+    // quoted:
+    //
+    //   - matches: 91
+    //   - results: 39
+    //   - found: true
+    //   - examples: "Quick", "Quick Change", "Kiss Me Quick", "The Quick and the Dead"
+    //   - stats: { "Quick": 39 }
+    //
+
+    const query = JSON.stringify(imdb.title.replace(/"/g, ''))
+
+    log(`querying API for ${query}`)
 
     /** @type {AsyncGetOptions} */
     const apiRequest = {
-        params: { t: rtType, q: imdb.title, limit: API_LIMIT },
+        params: { t: rtType, q: query, limit: API_LIMIT },
         request: { responseType: 'json' },
         title: 'API',
     }
