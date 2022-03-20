@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.13.0
+// @version       4.14.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -16,7 +16,7 @@
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@2.0.1/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/KMty4uqH
+// @resource      overrides https://pastebin.com/raw/vh0Xc558
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -293,7 +293,7 @@ const MovieMatcher = {
      *
      * @param {RTDoc} $rt
      * @param {any} imdb
-     * @returns {boolean}
+     * @return {boolean}
      */
     verify ($rt, imdb) {
         log('verifying movie')
@@ -317,7 +317,7 @@ const TVMatcher = {
      *
      * @param {RTDoc} $rt
      * @param {number} showRating
-     * @return {[string | undefined , number]}
+     * @return {[string | undefined, number]}
      */
     getConsensus ($rt, showRating) {
         const $consensus = $rt.find('season-list-item[consensus]:not([consensus=""])').last()
@@ -459,12 +459,18 @@ const TVMatcher = {
      *
      * @param {RTDoc} $rt
      * @param {any} imdb
-     * @returns {boolean | string}
+     * @return {boolean | string}
      */
     verify ($rt, imdb) {
         log('verifying TV show')
 
-        // match the cast or, if empty (e.g. Black Mirror), the creator(s)
+        // match the cast or, if empty (e.g. Black Mirror), the creator(s). if
+        // neither are available, match the RT executive producers against the
+        // IMDb creators.
+        //
+        // perform all the matches (for now), even when the RT data is missing,
+        // so we can see why the match is failing
+
         const rtCast = $rt.find('a[data-qa="cast-member"]')
             .map((_, el) => $(el).text().trim())
             .get()
@@ -485,6 +491,18 @@ const TVMatcher = {
                 imdb: imdb.creators,
                 rt: rtCreators,
             })
+
+            if (!verified && rtCreators.length === 0) {
+                const rtProducers = $rt.find('a[data-qa="series-details-producer"]')
+                    .map((_, el) => $(el).text().trim())
+                    .get()
+
+                verified = verifyShared({
+                    name: 'producers',
+                    imdb: imdb.creators,
+                    rt: rtProducers,
+                })
+            }
         }
 
         // change the target URL from "/tv/name" to "/tv/name/s01" if there's
@@ -1104,7 +1122,7 @@ async function getRTData (imdb, rtType) {
  * @param {Record<string, any> & { review: any[] }} rtMeta
  * @param {string} reviewProp
  * @param {string=} pageProp
- * @returns {string | undefined}
+ * @return {string | undefined}
  */
 function lastModified (rtMeta, reviewProp, pageProp) {
     let updated
