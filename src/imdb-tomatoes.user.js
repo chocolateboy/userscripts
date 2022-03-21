@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.14.0
+// @version       4.15.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -16,7 +16,7 @@
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@2.0.1/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/vh0Xc558
+// @resource      overrides https://pastebin.com/raw/feSX3KFj
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -42,6 +42,7 @@
 
 const API_LIMIT             = 100
 const DATA_VERSION          = 1.2
+const DATE_FORMAT           = 'YYYY-MM-DD'
 const DEBUG                 = false
 const INACTIVE_MONTHS       = 3
 const MAX_YEAR_DIFF         = 3
@@ -135,6 +136,21 @@ const get = exports.getter({ split: '.' })
  */
 const isValidRtDate = value => {
     return typeof value === 'string' && !!value && !RT_INVALID_DATE.has(value)
+}
+
+/**
+ * scan an RT document for properties defined in the text of metadata elements
+ * of the specified type
+ *
+ * @param {RTDoc} $rt
+ * @param {string} type
+ * @return {string[]}
+ */
+const rtProps = ($rt, type) => {
+    return $rt.find(`[data-qa="${type}"]`).get().flatMap(el => {
+        const name = $(el).text().trim()
+        return name ? [name] : []
+    })
 }
 
 /**
@@ -299,9 +315,7 @@ const MovieMatcher = {
         log('verifying movie')
 
         // match the director(s)
-        const rtDirectors = $rt.find('a[data-qa="movie-info-director"]')
-            .map((_, el) => $(el).text().trim())
-            .get()
+        const rtDirectors = rtProps($rt, 'movie-info-director')
 
         return verifyShared({
             name: 'directors',
@@ -464,44 +478,84 @@ const TVMatcher = {
     verify ($rt, imdb) {
         log('verifying TV show')
 
-        // match the cast or, if empty (e.g. Black Mirror), the creator(s). if
-        // neither are available, match the RT executive producers against the
-        // IMDb creators.
-        //
-        // perform all the matches (for now), even when the RT data is missing,
-        // so we can see why the match is failing
+        // match the cast or, if empty, the creator(s). if neither are
+        // available, match the RT executive producers against the IMDb
+        // creators, or, failing that, if all other data is unavailable (e.g.
+        // for TV documentaries), match the genres AND release date.
 
-        const rtCast = $rt.find('a[data-qa="cast-member"]')
-            .map((_, el) => $(el).text().trim())
-            .get()
+        let verified = false
 
-        let verified = verifyShared({
-            name: 'cast',
-            imdb: imdb.fullCast,
-            rt: rtCast,
-        })
+        match: {
+            if (imdb.fullCast.length) {
+                const rtCast = rtProps($rt, 'cast-member')
 
-        if (!verified && rtCast.length === 0) {
-            const rtCreators = $rt.find('a[data-qa="creator"]')
-                .map((_, el) => $(el).text().trim())
-                .get()
+                if (rtCast.length) {
+                    verified = verifyShared({
+                        name: 'cast',
+                        imdb: imdb.fullCast,
+                        rt: rtCast,
+                    })
 
-            verified = verifyShared({
-                name: 'creators',
-                imdb: imdb.creators,
-                rt: rtCreators,
-            })
+                    break match
+                }
+            }
 
-            if (!verified && rtCreators.length === 0) {
-                const rtProducers = $rt.find('a[data-qa="series-details-producer"]')
-                    .map((_, el) => $(el).text().trim())
-                    .get()
+            if (imdb.creators.length) {
+                const rtCreators = rtProps($rt, 'creator')
 
-                verified = verifyShared({
-                    name: 'producers',
-                    imdb: imdb.creators,
-                    rt: rtProducers,
+                if (rtCreators.length) {
+                    verified = verifyShared({
+                        name: 'creators',
+                        imdb: imdb.creators,
+                        rt: rtCreators,
+                    })
+
+                    break match
+                }
+
+                const rtProducers = rtProps($rt, 'series-details-producer')
+
+                if (rtProducers.length) {
+                    verified = verifyShared({
+                        name: 'producers',
+                        imdb: imdb.creators,
+                        rt: rtProducers,
+                    })
+
+                    break match
+                }
+            }
+
+            // last resort: match the genre(s) and release date
+            if (imdb.genres.length && imdb.releaseDate) {
+                const rtGenres = rtProps($rt, 'series-details-genre')
+
+                if (!rtGenres.length) {
+                    break match
+                }
+
+                const matchedGenres = verifyShared({
+                    name: 'genres',
+                    imdb: imdb.genres,
+                    rt: rtGenres,
                 })
+
+                if (!matchedGenres) {
+                    break match
+                }
+
+                debug('verifying release date')
+
+                const [rtReleaseDate] = rtProps($rt, 'series-details-premiere-date')
+                    .map(date => dayjs(date).format(DATE_FORMAT))
+
+                if (!rtReleaseDate) {
+                    break match
+                }
+
+                debug('imdb release date:', imdb.releaseDate)
+                debug('rt release date:', rtReleaseDate)
+                verified = rtReleaseDate === imdb.releaseDate
             }
         }
 
@@ -911,19 +965,35 @@ function getIMDbMetadata (imdbId, rtType) {
     const mainCast = get(main, 'principalCast.*.credits.*.name.nameText.text', [])
     const extraCast = get(main, 'cast.edges.*.node.name.nameText.text', [])
     const fullCast = Array.from(new Set([...mainCast, ...extraCast]))
+    const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', '')
+    const genres = get(main, 'genres.genres.*.text', [])
     const year = get(extra, 'releaseYear.year') || 0
-    const type = get(main, 'titleType.id', '')
+    const $releaseDate = get(extra, 'releaseDate')
 
-    /** @type {any} */
+    let releaseDate = null
+
+    if ($releaseDate) {
+        const date = new Date(
+            $releaseDate.year,
+            $releaseDate.month - 1,
+            $releaseDate.day
+        )
+
+        releaseDate = dayjs(date).format(DATE_FORMAT)
+    }
+
+    /** @type {Record<string, any>} */
     const meta = {
         id: imdbId,
-        cast: mainCast,
-        fullCast,
+        type,
         title,
         originalTitle,
-        type,
+        cast: mainCast,
+        fullCast,
+        genres,
+        releaseDate,
     }
 
     if (rtType === 'tvSeries') {
@@ -1468,7 +1538,7 @@ async function run () {
 
             active = delta <= INACTIVE_MONTHS
 
-            log(`last update: ${updated.format('YYYY-MM-DD')} (${ago})`)
+            log(`last update: ${updated.format(DATE_FORMAT)} (${ago})`)
         }
 
         if (active) {
