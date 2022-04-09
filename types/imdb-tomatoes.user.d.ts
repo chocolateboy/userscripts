@@ -46,7 +46,8 @@ declare global {
 
     type RTState = {
         fallbackUnused: boolean;
-        rtPage?: RTDoc;
+        rtPage: RTDoc | null;
+        targetUrl: string | null;
         url: string;
         verify: boolean;
     };

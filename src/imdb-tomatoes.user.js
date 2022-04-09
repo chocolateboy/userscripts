@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.15.0
+// @version       4.15.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -11,8 +11,8 @@
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @require       https://unpkg.com/dayjs@1.11.0/dayjs.min.js
 // @require       https://unpkg.com/dayjs@1.11.0/plugin/relativeTime.js
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/bury@0.1.0/dist/bury.js
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.0/dist/polyfill.iife.min.js
+// @require       https://unpkg.com/dset@3.1.1/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@2.0.1/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
@@ -56,7 +56,7 @@ const SCRIPT_NAME           = GM_info.script.name
 const TITLE_MATCH_THRESHOLD = 0.6
 
 /** @type {Record<string, number>} */
-const METADATA_VERSION = { stats: 1 }
+const METADATA_VERSION = { stats: 2 }
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -88,7 +88,7 @@ const RT_TYPE = /** @type {const} */ ({
 })
 
 const STATS = {
-    request: 0,
+    requests: 0,
     hit: 0,
     miss: 0,
     preload: {
@@ -703,7 +703,7 @@ class RTClient {
         }
 
         if (typeof verified === 'string') {
-            state.url = verified
+            state.targetUrl = verified
             verified = true
         }
 
@@ -1150,9 +1150,10 @@ async function getRTData (imdb, rtType) {
     /** @type {RTState} */
     const state = {
         fallbackUnused: false,
-        rtPage: undefined,
-        url: RT_BASE + match.url,
-        verify: match.verify,
+        rtPage:         null,
+        targetUrl:      null,
+        url:            RT_BASE + match.url,
+        verify:         match.verify,
     }
 
     const rtClient = new RTClient({ match, matcher, preload, state })
@@ -1177,9 +1178,11 @@ async function getRTData (imdb, rtType) {
     const [$consensus, rating = metaRating] = matcher.getConsensus($rt, metaRating)
     const consensus = $consensus?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
     const updated = matcher.lastModified($rt)
+    const targetUrl = state.targetUrl || state.url
 
     return {
-        data: { consensus, rating, url: state.url },
+        data: { consensus, rating, url: targetUrl },
+        matchUrl: state.url,
         preloadUrl: preload.fullUrl,
         updated,
     }
@@ -1516,15 +1519,15 @@ async function run () {
 
     /** @type {(path: string) => void} */
     const bump = path => {
-        exports.bury(stats.data, path, get(stats.data, path, 0) + 1)
+        exports.dset(stats.data, path, get(stats.data, path, 0) + 1)
     }
 
     try {
-        const { data, updated: $updated, preloadUrl } = await getRTData(imdb, rtType)
+        const { data, updated: $updated, matchUrl, preloadUrl } = await getRTData(imdb, rtType)
 
         log('RT data:', data)
         bump('hit')
-        bump(data.url === preloadUrl ? 'preload.hit' : 'preload.miss')
+        bump(matchUrl === preloadUrl ? 'preload.hit' : 'preload.miss')
 
         let active = false
 
@@ -1563,7 +1566,7 @@ async function run () {
             console.error(error)
         }
     } finally {
-        bump('request')
+        bump('requests')
         debug('stats:', stats.data)
         GM_setValue('stats', JSON.stringify(stats))
     }
