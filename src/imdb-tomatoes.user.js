@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.15.1
+// @version       4.15.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -678,8 +678,8 @@ class RTClient {
      */
     async verify (imdb) {
         const { match, matcher, preload, state } = this
-        const $rt = /** @type {RTDoc} */ (state.rtPage)
 
+        let $rt = /** @type {RTDoc} */ (state.rtPage)
         let verified = matcher.verify($rt, imdb)
 
         if (!verified) {
@@ -694,7 +694,7 @@ class RTClient {
 
                 if (res) {
                     log(`fallback response: ${res.status} ${res.statusText}`)
-                    state.rtPage = this._parseResponse(res, preload.url)
+                    $rt = state.rtPage = this._parseResponse(res, preload.url)
                     verified = matcher.verify($rt, imdb)
                 } else {
                     log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
@@ -1157,12 +1157,13 @@ async function getRTData (imdb, rtType) {
     }
 
     const rtClient = new RTClient({ match, matcher, preload, state })
+    const $rt = await rtClient.loadPage()
 
-    state.rtPage = await rtClient.loadPage()
-
-    if (!state.rtPage) {
+    if (!$rt) {
         throw abort()
     }
+
+    state.rtPage = $rt
 
     if (state.verify) {
         const verified = await rtClient.verify(imdb)
@@ -1172,7 +1173,6 @@ async function getRTData (imdb, rtType) {
         }
     }
 
-    const $rt = state.rtPage
     const $rating = $rt.meta.aggregateRating
     const metaRating = Number(($rating?.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
     const [$consensus, rating = metaRating] = matcher.getConsensus($rt, metaRating)
