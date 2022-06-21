@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.15.2
+// @version       4.15.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -962,13 +962,12 @@ function getIMDbMetadata (imdbId, rtType) {
     const data = JSON.parse($('#__NEXT_DATA__').text())
     const main = get(data, 'props.pageProps.mainColumnData')
     const extra = get(data, 'props.pageProps.aboveTheFoldData')
-    const mainCast = get(main, 'principalCast.*.credits.*.name.nameText.text', [])
-    const extraCast = get(main, 'cast.edges.*.node.name.nameText.text', [])
-    const fullCast = Array.from(new Set([...mainCast, ...extraCast]))
+    const mainCast = get(extra, 'castPageTitle.edges.*.node.name.nameText.text', [])
+    const fullCast = get(main, 'cast.edges.*.node.name.nameText.text', [])
     const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', '')
-    const genres = get(main, 'genres.genres.*.text', [])
+    const genres = get(extra, 'genres.genres.*.text', [])
     const year = get(extra, 'releaseYear.year') || 0
     const $releaseDate = get(extra, 'releaseDate')
 
