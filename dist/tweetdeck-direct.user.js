@@ -5,7 +5,7 @@
 // @description   Remove t.co tracking links from TweetDeck
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://tweetdeck.twitter.com/
@@ -251,7 +251,10 @@
   // src/tweetdeck-direct.user.ts
   // @license       GPL
   var INIT = { childList: true, subtree: true };
-  var SELECTOR = "a[href][data-full-url]:not([data-fixed])";
+  var SELECTOR = [
+    "a[href][data-full-url]:not([data-fixed])",
+    '.mdl .med-tray a[href^="https://t.co/"]:not([data-fixed])'
+  ].map((it) => `:scope ${it}`).join(", ");
   var URL_BLACKLIST = /* @__PURE__ */ new Set([
     "/search/typeahead.json",
     "/trends/available.json",
@@ -273,8 +276,19 @@
     const target = document.body;
     const replace = () => {
       for (const link of target.querySelectorAll(SELECTOR)) {
-        link.href = link.dataset.fullUrl;
-        link.dataset.fixed = "true";
+        if (link.dataset.fullUrl) {
+          link.href = link.dataset.fullUrl;
+          link.dataset.fixed = "true";
+        } else {
+          const tweet = link.closest(".mdl").querySelector(":scope .med-tweet");
+          if (tweet) {
+            const tweetLink = tweet.querySelector(":scope time a[href]");
+            if (tweetLink) {
+              link.href = tweetLink.href;
+              link.dataset.fixed = "true";
+            }
+          }
+        }
       }
     };
     replace();

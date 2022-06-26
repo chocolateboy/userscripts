@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from TweetDeck
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://tweetdeck.twitter.com/
@@ -16,7 +16,11 @@ import { Transformer as BaseTransformer } from './twitter-direct/transformer'
 import { Dict }                           from './twitter-direct/util'
 
 const INIT = { childList: true, subtree: true }
-const SELECTOR = 'a[href][data-full-url]:not([data-fixed])'
+
+const SELECTOR = [
+    'a[href][data-full-url]:not([data-fixed])',
+    '.mdl .med-tray a[href^="https://t.co/"]:not([data-fixed])',
+].map(it => `:scope ${it}`).join(', ')
 
 /*
  * a list of document URIs (paths) which are known to not contain t.co URLs and
@@ -53,9 +57,23 @@ const run = () => {
     const replace = () => {
         // we don't modify the tree so there's no need to suspend the
         // MutationObserver
+
         for (const link of target.querySelectorAll<HTMLAnchorElement>(SELECTOR)) {
-            link.href = link.dataset.fullUrl!
-            link.dataset.fixed = 'true'
+            if (link.dataset.fullUrl) {
+                link.href = link.dataset.fullUrl
+                link.dataset.fixed = 'true'
+            } else {
+                const tweet = link.closest('.mdl')!.querySelector(':scope .med-tweet')
+
+                if (tweet) {
+                    const tweetLink = tweet.querySelector<HTMLAnchorElement>(':scope time a[href]')!
+
+                    if (tweetLink) {
+                        link.href = tweetLink.href
+                        link.dataset.fixed = 'true'
+                    }
+                }
+            }
         }
     }
 
