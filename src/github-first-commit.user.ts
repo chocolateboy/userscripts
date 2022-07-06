@@ -3,15 +3,16 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.7.2
+// @version       2.8.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: https://www.gnu.org/copyleft/gpl.html
+// @license       GPL
 // @include       https://github.com/
 // @include       https://github.com/*
-// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.1/dist/cash.min.js
 // @grant         GM_log
-// @inject-into   auto
 // ==/UserScript==
+
+type Commits = Array<{ html_url: string }>;
 
 const COMMIT_BAR = 'div.js-details-container[data-issue-and-pr-hovercards-enabled] > *:last-child ul'
 const FIRST_COMMIT_LABEL = '<span aria-label="First commit"><strong>1st</strong> commit</span>'
@@ -25,11 +26,11 @@ const FIRST_COMMIT_LABEL = '<span aria-label="First commit"><strong>1st</strong>
   * but it requires an authentication token:
   * https://gist.github.com/simonewebdesign/a70f6c89ffd71e6ba4f7dcf7cc74ccf8
   */
-function openFirstCommit (user, repo) {
+function openFirstCommit (user: string, repo: string) {
     return fetch(`https://api.github.com/repos/${user}/${repo}/commits`)
         // the `Link` header has additional URLs for paging.
         // parse the original JSON for the case where no other pages exist
-        .then(res => Promise.all([res.headers.get('link'), res.json()]))
+        .then(res => Promise.all([res.headers.get('link'), res.json() as Promise<Commits>]))
 
         .then(([link, commits]) => {
             if (!link) {
@@ -47,15 +48,14 @@ function openFirstCommit (user, repo) {
             // reverse chronological order, like the git CLI, so the oldest
             // commit is on the last page)
 
-            // @ts-ignore
-            const lastPage = link.match(/^.+?<([^>]+)>;/)[1]
+            const lastPage = link.match(/^.+?<([^>]+)>;/)![1]
 
             // fetch the last page of results
             return fetch(lastPage).then(res => res.json())
         })
 
         // get the last commit and navigate to its target URL
-        .then(commits => {
+        .then((commits: Commits) => {
             if (Array.isArray(commits)) {
                 location.href = commits[commits.length - 1].html_url
             } else {
@@ -125,5 +125,5 @@ function run () {
     $commitBar.append($firstCommit)
 }
 
-$(document).on('pjax:end', run) // run on pjax page loads
-$(run) // run on full page loads
+// run on navigation (including full page loads)
+$(document).on('turbo:load' as any, run)
