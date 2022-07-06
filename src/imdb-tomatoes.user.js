@@ -3,18 +3,18 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.15.3
+// @version       4.16.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
 // @require       https://code.jquery.com/jquery-3.6.0.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.11.0/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.11.0/plugin/relativeTime.js
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.0/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/dset@3.1.1/dist/index.min.js
+// @require       https://unpkg.com/dayjs@1.11.3/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.11.3/plugin/relativeTime.js
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
+// @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
-// @require       https://unpkg.com/get-wild@2.0.1/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
 // @resource      overrides https://pastebin.com/raw/feSX3KFj
 // @grant         GM_addStyle
@@ -51,7 +51,6 @@ const NO_MATCH              = 'no matching results'
 const ONE_DAY               = 1000 * 60 * 60 * 24
 const ONE_WEEK              = ONE_DAY * 7
 const RT_BASE               = 'https://www.rottentomatoes.com'
-const RT_INVALID_DATE       = new Set(['TODO_MISSING'])
 const SCRIPT_NAME           = GM_info.script.name
 const TITLE_MATCH_THRESHOLD = 0.6
 
@@ -130,15 +129,6 @@ const clone = value => JSON.parse(JSON.stringify(value))
 const get = exports.getter({ split: '.' })
 
 /**
- * return true if the supplied value is a valid RT date (string), false otherwise
- *
- * @type {(value: unknown) => value is string}
- */
-const isValidRtDate = value => {
-    return typeof value === 'string' && !!value && !RT_INVALID_DATE.has(value)
-}
-
-/**
  * scan an RT document for properties defined in the text of metadata elements
  * of the specified type
  *
@@ -193,14 +183,18 @@ const MovieMatcher = {
     },
 
     /**
-     * return the timestamp (ISO-8601 string) of the last time an RT movie page
-     * was updated, e.g. the date of the most-recently published review
+     * return the last time a movie page was updated based on its most
+     * recently-published review
      *
      * @param {RTDoc} $rt
-     * @return {string | undefined}
+     * @return {DayJs | undefined}
      */
-    lastModified ({ meta }) {
-        return lastModified(meta, 'dateCreated', 'dateModified')
+    lastModified ($rt) {
+        return $rt
+            .find('critic-review-bubble[createdate]:not([createdate=""])').get()
+            .map(review => dayjs($(review).attr('createdate')))
+            .sort((a, b) => b.unix() - a.unix())
+            .shift()
     },
 
     /**
@@ -343,15 +337,14 @@ const TVMatcher = {
     },
 
     /**
-     * return the timestamp (ISO-8601 string) of the last time an RT TV show
-     * page was updated, e.g. the date of the most-recently published review
+     * return the last time a TV page was updated based on its most
+     * recently-published review
      *
-     * @param {RTDoc} $rt
-     * @return {string | undefined}
+     * @param {RTDoc} _$rt
+     * @return {DayJs | undefined}
      */
-    lastModified ({ meta: _meta }) {
+    lastModified (_$rt) {
         // XXX there's no way to determine this from the main page of a TV show
-        // return lastModified(meta, 'datePublished')
         return undefined
     },
 
@@ -1188,43 +1181,6 @@ async function getRTData (imdb, rtType) {
 }
 
 /**
- * return the last time a movie/TV page was updated based on its JSON-LD
- * metadata
- *
- * @param {Record<string, any> & { review: any[] }} rtMeta
- * @param {string} reviewProp
- * @param {string=} pageProp
- * @return {string | undefined}
- */
-function lastModified (rtMeta, reviewProp, pageProp) {
-    let updated
-
-    if (rtMeta.review?.length) {
-        debug('reviews:', rtMeta.review.length)
-
-        const [latest] = rtMeta.review
-            .flatMap(review => {
-                return review[reviewProp]
-                    ? [{ review, mtime: dayjs(review[reviewProp]).unix() }]
-                    : []
-            })
-            .sort((a, b) => b.mtime - a.mtime)
-
-        if (latest) {
-            updated = latest.review[reviewProp]
-            debug('updated (most recent review):', updated)
-        }
-    }
-
-    if (!updated && pageProp && isValidRtDate(rtMeta[pageProp])) {
-        updated = rtMeta[pageProp]
-        debug('updated (page modified):', updated)
-    }
-
-    return updated
-}
-
-/**
  * normalize names so matches don't fail due to minor differences in casing or
  * punctuation
  *
@@ -1522,7 +1478,7 @@ async function run () {
     }
 
     try {
-        const { data, updated: $updated, matchUrl, preloadUrl } = await getRTData(imdb, rtType)
+        const { data, matchUrl, preloadUrl, updated } = await getRTData(imdb, rtType)
 
         log('RT data:', data)
         bump('hit')
@@ -1530,10 +1486,9 @@ async function run () {
 
         let active = false
 
-        if ($updated) {
+        if (updated) {
             dayjs.extend(dayjs_plugin_relativeTime)
 
-            const updated = dayjs($updated)
             const date = dayjs()
             const ago = date.to(updated)
             const delta = date.diff(updated, 'month', /* float */ true)
