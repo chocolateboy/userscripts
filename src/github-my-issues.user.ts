@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.0
+// @version       1.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -30,14 +30,9 @@ const ISSUES = '[aria-label="Global"] a[href="/issues"]'
 const MY_ISSUES = 'My Issues'
 
 /*
- * meta-tag selector for the `<user>/<repo>` identifier on full pages
+ * meta-tag selector for the `<user>/<repo>` identifier
  */
-const PAGE_REPO = 'octolytics-dimension-repository_nwo'
-
-/*
- * selector for the `/<user>/<repo>` identifier on pjax pages
- */
-const PJAX_REPO = '[data-pjax="#js-repo-pjax-container"]'
+const REPO = 'octolytics-dimension-repository_nwo'
 
 /*
  * meta-tag selector for the name of the logged-in user
@@ -47,7 +42,7 @@ const SELF = 'user-login'
 /*
  * meta-tag selector for the username on a profile page
  */
-const USER = 'profile:username'
+const USER = 'octolytics-dimension-user_login'
 
 /*
  * helper function which extracts a value from a META tag
@@ -81,11 +76,9 @@ function run () {
     let subqueries = [`involves:${self}`, 'sort:updated-desc']
     let prop, path = '/issues'
 
-    if (prop = meta(PAGE_REPO)) { // user/repo
+    if (prop = meta(REPO)) { // user/repo
         path = `/${prop}/issues`
-    } else if (prop = $(PJAX_REPO).attr('href')) { // /user/repo
-        path = `${prop}/issues`
-    } else if (prop = meta(USER, 'property')) { // user
+    } else if (prop = meta(USER)) { // user
         if (prop === self) { // own homepage
             // user:<self> is:open archived:false involves:<self> ...
             subqueries = [`user:${prop}`, 'is:open', 'archived:false', ...subqueries]

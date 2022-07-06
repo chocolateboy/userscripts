@@ -5,7 +5,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.0
+// @version       1.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -22,10 +22,9 @@
   var ID = "my-issues";
   var ISSUES = '[aria-label="Global"] a[href="/issues"]';
   var MY_ISSUES = "My Issues";
-  var PAGE_REPO = "octolytics-dimension-repository_nwo";
-  var PJAX_REPO = '[data-pjax="#js-repo-pjax-container"]';
+  var REPO = "octolytics-dimension-repository_nwo";
   var SELF = "user-login";
-  var USER = "profile:username";
+  var USER = "octolytics-dimension-user_login";
   function meta(name, key = "name") {
     const quotedName = JSON.stringify(name);
     return $(`meta[${key}=${quotedName}]`).attr("content");
@@ -42,11 +41,9 @@
     }
     let subqueries = [`involves:${self}`, "sort:updated-desc"];
     let prop, path = "/issues";
-    if (prop = meta(PAGE_REPO)) {
+    if (prop = meta(REPO)) {
       path = `/${prop}/issues`;
-    } else if (prop = $(PJAX_REPO).attr("href")) {
-      path = `${prop}/issues`;
-    } else if (prop = meta(USER, "property")) {
+    } else if (prop = meta(USER)) {
       if (prop === self) {
         subqueries = [`user:${prop}`, "is:open", "archived:false", ...subqueries];
       } else {
