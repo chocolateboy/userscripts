@@ -3,12 +3,12 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.2.1
+// @version       1.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
-// @license       GPL: http://www.gnu.org/copyleft/gpl.html
+// @license       GPL
 // @include       https://github.com/
 // @include       https://github.com/*
-// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.1/dist/cash.min.js
 // @grant         GM_log
 // ==/UserScript==
 
@@ -52,7 +52,7 @@ const USER = 'profile:username'
 /*
  * helper function which extracts a value from a META tag
  */
-function meta (name, key = 'name') {
+function meta (name: string, key = 'name') {
     const quotedName = JSON.stringify(name)
     return $(`meta[${key}=${quotedName}]`).attr('content')
 }
@@ -104,5 +104,5 @@ function run () {
     $issues.after($link)
 }
 
-$(document).on('pjax:end', run) // run on pjax page loads
-$(run) // run on full page loads
+// run on navigation (including full page loads)
+$(document).on('turbo:load' as any, run)
