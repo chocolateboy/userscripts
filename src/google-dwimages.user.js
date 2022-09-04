@@ -3,14 +3,13 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.6.0
+// @version       2.6.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
 // @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
-// @run-at        document-start
 // @grant         GM_log
 // ==/UserScript==
 
@@ -201,12 +200,8 @@ function onResult () {
     CACHE.delete(index)
 }
 
-function main () {
-    try {
-        init()
-    } catch (e) {
-        console.error('Initialisation error:', e)
-    }
+try {
+    init()
+} catch (e) {
+    console.error('Initialisation error:', e)
 }
-
-window.addEventListener('load', main)
