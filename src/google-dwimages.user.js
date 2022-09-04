@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.6.1
+// @version       2.6.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -39,6 +39,15 @@ const RESULT_INDEX = 4
 const UNPROCESSED_RESULTS = 'div[data-ri][data-ved][jsaction]'
 
 /******************************** helper functions ****************************/
+
+/**
+ * deep clone a JSON-serializable value
+ *
+ * @type {<T>(data: T) => T} clone
+ */
+function clone (data) {
+    return JSON.parse(JSON.stringify(data))
+}
 
 /*
  * return a wrapper for XmlHttpRequest#open which intercepts image-metadata
@@ -79,12 +88,13 @@ function hookXhrOpen (oldOpen, $container) {
     }
 }
 
-/*
+/**
  * extract image metadata from the full metadata tree and add it to the cache
+ *
+ * @param {any} root
  */
 function mergeImageMetadata (root) {
-    const clone = JSON.parse(JSON.stringify(root))
-    const subtree = clone[31]
+    const subtree = clone(root[31])
     const lastIndex = subtree.length - 1
     const nodes = subtree[lastIndex][12][2]
 
@@ -108,16 +118,22 @@ function mergeImageMetadata (root) {
     }
 }
 
-/*
+/**
  * determine whether an XHR request is an image-metadata request
+ *
+ * @param {string} method
+ * @param {string} url
+ * @return {boolean}
  */
 function isImageDataRequest (method, url) {
     return method.toUpperCase() === 'POST' && IMAGE_METADATA_ENDPOINT.test(url)
 }
 
-/*
+/**
  * event handler for image links, page links and result elements which prevents
  * their click/mousedown events being intercepted
+ *
+ * @param {Event} e
  */
 function stopPropagation (e) {
     e.stopPropagation()
