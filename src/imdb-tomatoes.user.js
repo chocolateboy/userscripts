@@ -3,20 +3,20 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.16.0
+// @version       4.16.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
-// @require       https://code.jquery.com/jquery-3.6.0.min.js
+// @require       https://code.jquery.com/jquery-3.6.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.11.3/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.11.3/plugin/relativeTime.js
+// @require       https://unpkg.com/dayjs@1.11.5/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.11.5/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/feSX3KFj
+// @resource      overrides https://pastebin.com/raw/nTw33T55
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -329,11 +329,32 @@ const TVMatcher = {
      */
     getConsensus ($rt, showRating) {
         const $consensus = $rt.find('season-list-item[consensus]:not([consensus=""])').last()
-        const consensus = $consensus.attr('consensus')
-        const seasonRating = parseInt($consensus.attr('tomatometerscore') ?? '')
-        const rating = consensus ? seasonRating ?? showRating : showRating
+        const $rating = $rt.find('season-list-item[tomatometerscore]:not([tomatometerscore=""])').last()
 
-        return [consensus, rating]
+        /** @type {string | undefined} */
+        let consensus
+
+        /** @type {string | undefined} */
+        let score
+
+        if ($consensus.length) {
+            consensus = $consensus.attr('consensus')
+            score = $consensus.attr('tomatometerscore')
+        } else if ($rating.length) {
+            score = $rating.attr('tomatometerscore')
+        }
+
+        let seasonRating = showRating
+
+        if (score) {
+            const rating = parseInt(score)
+
+            if (Number.isSafeInteger(rating)) {
+                seasonRating = rating
+            }
+        }
+
+        return [consensus, seasonRating]
     },
 
     /**
