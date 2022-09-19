@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.16.1
+// @version       4.16.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -344,17 +344,17 @@ const TVMatcher = {
             score = $rating.attr('tomatometerscore')
         }
 
-        let seasonRating = showRating
+        let rating = showRating
 
         if (score) {
-            const rating = parseInt(score)
+            const seasonRating = parseInt(score)
 
-            if (Number.isSafeInteger(rating)) {
-                seasonRating = rating
+            if (Number.isSafeInteger(seasonRating)) {
+                rating = seasonRating
             }
         }
 
-        return [consensus, seasonRating]
+        return [consensus, rating]
     },
 
     /**
