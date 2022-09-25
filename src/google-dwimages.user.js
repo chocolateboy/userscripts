@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.7.1
+// @version       2.7.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -91,6 +91,17 @@ function hookXhrOpen (oldOpen, $container) {
 }
 
 /**
+ * determine whether an XHR request is an image-metadata request
+ *
+ * @param {string} method
+ * @param {string} url
+ * @return {boolean}
+ */
+function isImageDataRequest (method, url) {
+    return method.toUpperCase() === 'POST' && IMAGE_METADATA_ENDPOINT.test(url)
+}
+
+/**
  * extract image metadata from the full metadata tree and add it to the cache
  *
  * @param {any} root
@@ -119,17 +130,6 @@ function mergeImageMetadata (root) {
 
         CACHE.set(index, imageUrl)
     }
-}
-
-/**
- * determine whether an XHR request is an image-metadata request
- *
- * @param {string} method
- * @param {string} url
- * @return {boolean}
- */
-function isImageDataRequest (method, url) {
-    return method.toUpperCase() === 'POST' && IMAGE_METADATA_ENDPOINT.test(url)
 }
 
 /**
