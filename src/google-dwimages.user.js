@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.7.0
+// @version       2.7.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -96,8 +96,8 @@ function hookXhrOpen (oldOpen, $container) {
  * @param {any} root
  */
 function mergeImageMetadata (root) {
-    const $root = clone(root[56])
-    const nodes = exports.get($root, '[1][0][-1][1][0]')
+    const subtree = clone(root[56])
+    const nodes = exports.get(subtree, '[1][0][-1][1][0]')
 
     for (const $node of nodes) {
         const node = exports.get($node, '[0][0].*')
