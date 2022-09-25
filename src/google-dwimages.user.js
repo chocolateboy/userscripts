@@ -3,13 +3,15 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.6.2
+// @version       2.7.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
 // @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
+// @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @grant         GM_log
 // ==/UserScript==
 
@@ -94,11 +96,12 @@ function hookXhrOpen (oldOpen, $container) {
  * @param {any} root
  */
 function mergeImageMetadata (root) {
-    const subtree = clone(root[31])
-    const lastIndex = subtree.length - 1
-    const nodes = subtree[lastIndex][12][2]
+    const $root = clone(root[56])
+    const nodes = exports.get($root, '[1][0][-1][1][0]')
 
-    for (const node of nodes) {
+    for (const $node of nodes) {
+        const node = exports.get($node, '[0][0].*')
+
         // the first child is the node's type (1 for image metadata)
         const type = node[NODE_TYPE]
 
