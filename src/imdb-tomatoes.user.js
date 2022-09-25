@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.16.2
+// @version       4.16.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -224,7 +224,7 @@ const MovieMatcher = {
                 let castMatch = -1, verify = true
 
                 if (rtCast.length) {
-                    const { got, want } = shared(rtCast, imdb.fullCast)
+                    const { got, want } = shared(rtCast, imdb.cast)
 
                     if (got >= want) {
                         verify = false
@@ -500,13 +500,13 @@ const TVMatcher = {
         let verified = false
 
         match: {
-            if (imdb.fullCast.length) {
+            if (imdb.cast.length) {
                 const rtCast = rtProps($rt, 'cast-member')
 
                 if (rtCast.length) {
                     verified = verifyShared({
                         name: 'cast',
-                        imdb: imdb.fullCast,
+                        imdb: imdb.cast,
                         rt: rtCast,
                     })
 
@@ -976,8 +976,8 @@ function getIMDbMetadata (imdbId, rtType) {
     const data = JSON.parse($('#__NEXT_DATA__').text())
     const main = get(data, 'props.pageProps.mainColumnData')
     const extra = get(data, 'props.pageProps.aboveTheFoldData')
+    const cast = get(main, 'cast.edges.*.node.name.nameText.text', [])
     const mainCast = get(extra, 'castPageTitle.edges.*.node.name.nameText.text', [])
-    const fullCast = get(main, 'cast.edges.*.node.name.nameText.text', [])
     const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', '')
@@ -1003,8 +1003,8 @@ function getIMDbMetadata (imdbId, rtType) {
         type,
         title,
         originalTitle,
-        cast: mainCast,
-        fullCast,
+        cast,
+        mainCast,
         genres,
         releaseDate,
     }
@@ -1328,8 +1328,13 @@ function shared (a, b, { min = MINIMUM_SHARED, map: transform = normalize } = {}
  * @param {string} b
  * @return {number}
  */
-function similarity (a, b, map = normalize) {
-    return a === b ? 2 : exports.dice(map(a), map(b))
+function similarity (a, b, transform = normalize) {
+    // XXX work around a bug in fast-dice-coefficient which returns 0
+    // if either string's length is < 2
+    const $a = transform(a)
+    const $b = transform(b)
+
+    return a === b ? 2 : ($a === $b ? 1 : exports.dice($a, $b))
 }
 
 /**
