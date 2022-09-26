@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.7.2
+// @version       2.8.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -107,12 +107,11 @@ function isImageDataRequest (method, url) {
  * @param {any} root
  */
 function mergeImageMetadata (root) {
-    const subtree = clone(root[56])
-    const nodes = exports.get(subtree, '[1][0][-1][1][0]')
+    const nodes = Array.isArray(root[56])
+        ? exports.get(clone(root[56]), '[1][0][-1][1][0].**[0][0][0]')
+        : exports.get(clone(root[31]), '[-1][12][2]')
 
-    for (const $node of nodes) {
-        const node = exports.get($node, '[0][0].*')
-
+    for (const node of nodes) {
         // the first child is the node's type (1 for image metadata)
         const type = node[NODE_TYPE]
 
