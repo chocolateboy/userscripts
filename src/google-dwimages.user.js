@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.8.0
+// @version       2.8.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -107,7 +107,7 @@ function isImageDataRequest (method, url) {
  * @param {any} root
  */
 function mergeImageMetadata (root) {
-    const nodes = Array.isArray(root[56])
+    const nodes = root[56]
         ? exports.get(clone(root[56]), '[1][0][-1][1][0].**[0][0][0]')
         : exports.get(clone(root[31]), '[-1][12][2]')
 
