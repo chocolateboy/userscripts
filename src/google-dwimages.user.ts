@@ -3,20 +3,30 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.8.1
+// @version       2.9.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
-// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.0/dist/cash.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.1/dist/cash.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
-// @grant         GM_log
+// @grant         GM.registerMenuCommand
+// @grant         GM.setClipboard
 // ==/UserScript==
 
+// XXX needed to appease esbuild
+export {}
+
+import type * as GetWild from 'get-wild'
+
+declare const exports: {
+    get: typeof GetWild['get']
+};
+
 // metadata cache which maps an image's 0-based index to its URL
-const CACHE = new Map()
+const CACHE = new Map<number, string>()
 
 // events to intercept (stop propagating) in result elements
 const EVENTS = 'auxclick click focus focusin mousedown touchstart'
@@ -27,6 +37,9 @@ const IMAGE_METADATA = 1
 
 // a pattern which matches the endpoint for image metadata requests
 const IMAGE_METADATA_ENDPOINT = /\/batchexecute\?rpcids=/
+
+// snapshot of the image-metadata tree for diagnostics
+let INITIAL_DATA: any
 
 // the first child of a node (array) contains the node's type (integer)
 const NODE_TYPE = 0
@@ -44,19 +57,17 @@ const UNPROCESSED_RESULTS = 'div[data-ri][data-ved][jsaction]'
 
 /**
  * deep clone a JSON-serializable value
- *
- * @type {<T>(data: T) => T} clone
  */
-function clone (data) {
+function clone <T>(data: T): T {
     return JSON.parse(JSON.stringify(data))
 }
 
-/*
+/**
  * return a wrapper for XmlHttpRequest#open which intercepts image-metadata
  * requests and adds the results to our metadata cache
  */
-function hookXhrOpen (oldOpen, $container) {
-    return /** @this {XMLHttpRequest} */ function open (method, url) {
+function hookXhrOpen (oldOpen: XMLHttpRequest['open'], $container: JQuery): XMLHttpRequest['open'] {
+    return function open (this: XMLHttpRequest, method: string, url: string) {
         // delegate to the original (there's no return value)
         GMCompat.apply(this, oldOpen, arguments)
 
@@ -92,21 +103,15 @@ function hookXhrOpen (oldOpen, $container) {
 
 /**
  * determine whether an XHR request is an image-metadata request
- *
- * @param {string} method
- * @param {string} url
- * @return {boolean}
  */
-function isImageDataRequest (method, url) {
+function isImageDataRequest (method: string, url: string): boolean {
     return method.toUpperCase() === 'POST' && IMAGE_METADATA_ENDPOINT.test(url)
 }
 
 /**
  * extract image metadata from the full metadata tree and add it to the cache
- *
- * @param {any} root
  */
-function mergeImageMetadata (root) {
+function mergeImageMetadata (root: any): void {
     const nodes = root[56]
         ? exports.get(clone(root[56]), '[1][0][-1][1][0].**[0][0][0]')
         : exports.get(clone(root[31]), '[-1][12][2]')
@@ -134,20 +139,18 @@ function mergeImageMetadata (root) {
 /**
  * event handler for image links, page links and result elements which prevents
  * their click/mousedown events being intercepted
- *
- * @param {Event} e
  */
-function stopPropagation (e) {
+function stopPropagation (e: Event): void {
     e.stopPropagation()
 }
 
 /************************************* main ************************************/
 
-/*
+/**
  * extract the data for the first ≈ 100 images embedded in the page and register
  * a listener for the requests for additional data
  */
-function init () {
+function init (): void {
     const $container = $('.islrc')
 
     if (!$container.length) {
@@ -155,12 +158,12 @@ function init () {
     }
 
     // @ts-ignore
-    mergeImageMetadata(GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
+    mergeImageMetadata(INITIAL_DATA = GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
 
     // there's static data for the first ~100 images, but only the first 50 are
     // shown initially. the next 50 are displayed lazily and then the remaining
     // images are fetched in batches of 100. this handles images 50-99
-    const callback = (_mutations, observer) => {
+    const callback = (_mutations: MutationRecord[], observer: MutationObserver) => {
         const $results = $container.children(UNPROCESSED_RESULTS)
 
         for (const result of $results) {
@@ -181,7 +184,7 @@ function init () {
     const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
 
     $initial.each(onResult) // 0-49
-    observer.observe($container.get(0), { childList: true }) // 50-99
+    observer.observe($container.get(0)!, { childList: true }) // 50-99
     xhrProto.open = GMCompat.export(hookXhrOpen(xhrProto.open, $container)) // 100+
 }
 
@@ -191,10 +194,8 @@ function init () {
  *
  * used to process the original batch of results as well as the lazily-loaded
  * updates
- *
- * @this {HTMLDivElement}
  */
-function onResult () {
+function onResult (this: HTMLElement): void {
     // grab the metadata for this result
     const $result = $(this)
     const index = $result.data('ri') // 0-based index of the result
@@ -217,6 +218,10 @@ function onResult () {
     // the URL is no longer needed: release the memory
     CACHE.delete(index)
 }
+
+GM.registerMenuCommand('Copy image metadata to the clipboard', () => {
+    GM.setClipboard(JSON.stringify(INITIAL_DATA))
+})
 
 try {
     init()
