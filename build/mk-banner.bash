@@ -9,7 +9,7 @@ file="$1"
 pattern='/==UserScript==/,/==\/UserScript==/'
 header=`awk "$pattern" "$file"`
 comment="// NOTE This file is generated from $file and should not be edited directly."
-banner="\n$header\n\n$comment"
+banner="$header\n\n$comment"
 
 # trailing newlines are trimmed by command substitution, so they're added in
 # the caller

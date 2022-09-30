@@ -1,33 +1,37 @@
 # userscripts
 
-<!-- toc -->
+<!-- TOC -->
 
-- [Installation](#installation)
+- [INSTALLATION](#installation)
   - [Compatibility](#compatibility)
-- [Sites](#sites)
-  - [Amazon](#amazon)
-  - [GitHub](#github)
-  - [Google](#google)
-  - [Hacker News](#hacker-news)
-  - [IMDb](#imdb)
-  - [Last.fm](#lastfm)
-  - [Reddit](#reddit)
-  - [Rotten Tomatoes](#rotten-tomatoes)
-  - [Twitter](#twitter)
-- [Highlighters](#highlighters)
-- [Pagerizers](#pagerizers)
-- [Misc](#misc)
-- [See Also](#see-also)
+- [SCRIPTS](#scripts)
+  - [Sites](#sites)
+    - [Amazon](#amazon)
+    - [GitHub](#github)
+    - [Google](#google)
+    - [Hacker News](#hacker-news)
+    - [IMDb](#imdb)
+    - [Last.fm](#lastfm)
+    - [Reddit](#reddit)
+    - [Rotten Tomatoes](#rotten-tomatoes)
+    - [Twitter](#twitter)
+  - [Highlighters](#highlighters)
+  - [Pagerizers](#pagerizers)
+  - [Misc](#misc)
+- [DEVELOPMENT](#development)
+  - [Prerequisites](#prerequisites)
+  - [NPM Scripts](#npm-scripts)
+- [SEE ALSO](#see-also)
   - [Addons](#addons)
   - [Libraries](#libraries)
   - [jQuery Plugins](#jquery-plugins)
   - [Sites](#sites-1)
-- [Author](#author)
-- [Copyright and License](#copyright-and-license)
+- [AUTHOR](#author)
+- [COPYRIGHT AND LICENSE](#copyright-and-license)
 
-<!-- tocstop -->
+<!-- TOC END -->
 
-## Installation
+# INSTALLATION
 
 Unless otherwise noted, each link below points to the userscript's homepage on
 [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy).
@@ -38,7 +42,7 @@ aren't ready for release and which may not even compile. In addition, the
 file/directory names here are subject to change, whereas the URLs on GreasyFork
 will always remain stable.
 
-### Compatibility
+## Compatibility
 
 All of these scripts work in and are tested on
 [Violentmonkey](https://violentmonkey.github.io/), which is open source, cross
@@ -52,6 +56,8 @@ can't use it — or don't want to — the following options are available:
 [Greasemonkey 4 API](https://www.greasespot.net/2017/09/greasemonkey-4-for-script-authors.html)
 is not [currently](https://github.com/chocolateboy/userscripts/issues/5)
 supported. Some scripts work, but most haven't been tested. <br />
+
+# SCRIPTS
 
 ## Sites
 
@@ -122,33 +128,52 @@ The following are all direct links, i.e. clicking them installs the script.
 
 - [ISO 8601 Dates](https://greasyfork.org/scripts/23436-iso-8601-dates/ "Homepage") - display US dates in the ISO 8601 YYYY-MM-DD format
 
-## See Also
+# DEVELOPMENT
 
-### Addons
+<details>
+
+## Prerequisites
+
+- awk
+- esbuild
+- make
+
+## NPM Scripts
+
+- build - compile updated userscripts and save them to the `dist` directory
+- build:doc - generate the README's TOC (table of contents)
+- clean - remove the `dist` directory and other build artifacts
+- rebuild - clean the build artifacts and recompile the code
+
+</details>
+
+# SEE ALSO
+
+## Addons
 
 - [Google Direct](https://github.com/chocolateboy/google-direct) - a Firefox addon which removes tracking links from Google Search results
 
-### Libraries
+## Libraries
 
 - [gm-compat](https://github.com/chocolateboy/gm-compat) - portable monkey-patching for userscripts
 - [gm-storage](https://github.com/chocolateboy/gm-storage) - an ES6 Map wrapper for the synchronous userscript storage API
 - [UnCommonJS](https://github.com/chocolateboy/uncommonjs) - a minimum viable shim for `module.exports`
 
-### jQuery Plugins
+## jQuery Plugins
 
 - [jQuery Highlighter](https://github.com/chocolateboy/jquery-highlighter) - highlight new items since the last time a site was visited
 - [jQuery Pagerizer](https://github.com/chocolateboy/jquery-pagerizer) - mark up web pages with next/previous page annotations
 
-### Sites
+## Sites
 
 - [GreasyFork](https://greasyfork.org/en/users/23939-chocolateboy)
 - [USO Mirror](https://userscripts-mirror.org/users/3169/scripts)
 
-## Author
+# AUTHOR
 
 [chocolateboy](mailto:chocolate@cpan.org)
 
-## Copyright and License
+# COPYRIGHT AND LICENSE
 
 Copyright © 2011-2022 by chocolateboy.
 

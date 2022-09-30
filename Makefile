@@ -22,7 +22,11 @@ TARGETS := $(patsubst src/%.ts,dist/%.js,$(SOURCES))
 .PHONY: build
 build: $(TARGETS)
 
-dist/%.js: src/%.ts Makefile $(BANNER)
+.PHONY: build-doc
+build-doc: README.md
+	$(BIN)/toc-md README.md
+
+dist/%.js: src/%.ts $(BANNER)
 	@banner=$$($(BANNER) $<)$$'\n'
 	command="$(ESBUILD) --banner:js=\"\$$banner\" $<"
 	echo $$command
