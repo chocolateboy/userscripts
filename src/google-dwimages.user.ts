@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.0
+// @version       2.9.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -19,11 +19,17 @@
 // XXX needed to appease esbuild
 export {}
 
-import type * as GetWild from 'get-wild'
-
 declare const exports: {
-    get: typeof GetWild['get']
-};
+    get: typeof import('get-wild').get;
+}
+
+declare global {
+    interface Window {
+        AF_initDataChunkQueue: Array<{ data: Metadata }>;
+    }
+}
+
+type Metadata = any[];
 
 // metadata cache which maps an image's 0-based index to its URL
 const CACHE = new Map<number, string>()
@@ -39,7 +45,7 @@ const IMAGE_METADATA = 1
 const IMAGE_METADATA_ENDPOINT = /\/batchexecute\?rpcids=/
 
 // snapshot of the image-metadata tree for diagnostics
-let INITIAL_DATA: any
+let INITIAL_DATA: Metadata
 
 // the first child of a node (array) contains the node's type (integer)
 const NODE_TYPE = 0
@@ -50,7 +56,6 @@ const NODE_TYPE = 0
 const RESULT_INDEX = 4
 
 // selector for image result elements (DIVs) which haven't been processed
-// @ts-ignore https://github.com/microsoft/TypeScript/issues/14279
 const UNPROCESSED_RESULTS = 'div[data-ri][data-ved][jsaction]'
 
 /******************************** helper functions ****************************/
@@ -71,33 +76,13 @@ function hookXhrOpen (oldOpen: XMLHttpRequest['open'], $container: JQuery): XMLH
         // delegate to the original (there's no return value)
         GMCompat.apply(this, oldOpen, arguments)
 
-        if (!isImageDataRequest(method, url)) {
-            return
+        if (isImageDataRequest(method, url)) {
+            // a new XHR instance is created for each metadata request, so we
+            // need to register a new listener
+            this.addEventListener('load', () => {
+                onLoad(this, $container)
+            })
         }
-
-        // a new XHR instance is created for each metadata request, so we need
-        // to register a new listener
-        this.addEventListener('load', () => {
-            let parsed
-
-            try {
-                // @ts-ignore
-                const cooked = this.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)[0] // '"[...]\n"'
-                const raw = JSON.parse(cooked) // '[...]'
-                parsed = JSON.parse(raw) // [...]
-            } catch (e) {
-                console.error("Can't parse response:", e)
-                return
-            }
-
-            try {
-                mergeImageMetadata(parsed)
-                // process the new images
-                $container.children(UNPROCESSED_RESULTS).each(onResult)
-            } catch (e) {
-                console.error("Can't merge new metadata:", e)
-            }
-        })
     }
 }
 
@@ -111,7 +96,7 @@ function isImageDataRequest (method: string, url: string): boolean {
 /**
  * extract image metadata from the full metadata tree and add it to the cache
  */
-function mergeImageMetadata (root: any): void {
+function mergeImageMetadata (root: Metadata): void {
     const nodes = root[56]
         ? exports.get(clone(root[56]), '[1][0][-1][1][0].**[0][0][0]')
         : exports.get(clone(root[31]), '[-1][12][2]')
@@ -137,6 +122,31 @@ function mergeImageMetadata (root: any): void {
 }
 
 /**
+ * load handler for XHR metadata requests. parse the response and add its
+ * results to the metadata cache
+ */
+function onLoad (xhr: XMLHttpRequest, $container: JQuery) {
+    let parsed
+
+    try {
+        const cooked = xhr.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)![0] // '"[...]\n"'
+        const raw = JSON.parse(cooked) // '[...]'
+        parsed = JSON.parse(raw) // [...]
+    } catch (e) {
+        console.error("Can't parse response:", e)
+        return
+    }
+
+    try {
+        mergeImageMetadata(parsed)
+        // process the new images
+        $container.children(UNPROCESSED_RESULTS).each(onResult)
+    } catch (e) {
+        console.error("Can't merge new metadata:", e)
+    }
+}
+
+/**
  * event handler for image links, page links and result elements which prevents
  * their click/mousedown events being intercepted
  */
@@ -157,7 +167,6 @@ function init (): void {
         throw new Error("Can't find results container")
     }
 
-    // @ts-ignore
     mergeImageMetadata(INITIAL_DATA = GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
 
     // there's static data for the first ~100 images, but only the first 50 are

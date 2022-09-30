@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.0
+// @version       2.9.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -36,26 +36,11 @@
   function hookXhrOpen(oldOpen, $container) {
     return function open(method, url) {
       GMCompat.apply(this, oldOpen, arguments);
-      if (!isImageDataRequest(method, url)) {
-        return;
+      if (isImageDataRequest(method, url)) {
+        this.addEventListener("load", () => {
+          onLoad(this, $container);
+        });
       }
-      this.addEventListener("load", () => {
-        let parsed;
-        try {
-          const cooked = this.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)[0];
-          const raw = JSON.parse(cooked);
-          parsed = JSON.parse(raw);
-        } catch (e) {
-          console.error("Can't parse response:", e);
-          return;
-        }
-        try {
-          mergeImageMetadata(parsed);
-          $container.children(UNPROCESSED_RESULTS).each(onResult);
-        } catch (e) {
-          console.error("Can't merge new metadata:", e);
-        }
-      });
     };
   }
   function isImageDataRequest(method, url) {
@@ -71,6 +56,23 @@
       const index = node[RESULT_INDEX];
       const imageUrl = node[1][3][0];
       CACHE.set(index, imageUrl);
+    }
+  }
+  function onLoad(xhr, $container) {
+    let parsed;
+    try {
+      const cooked = xhr.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)[0];
+      const raw = JSON.parse(cooked);
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      console.error("Can't parse response:", e);
+      return;
+    }
+    try {
+      mergeImageMetadata(parsed);
+      $container.children(UNPROCESSED_RESULTS).each(onResult);
+    } catch (e) {
+      console.error("Can't merge new metadata:", e);
     }
   }
   function stopPropagation(e) {
