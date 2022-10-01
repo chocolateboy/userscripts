@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.1
+// @version       2.9.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -35,12 +35,12 @@
   }
   function hookXhrOpen(oldOpen, $container) {
     return function open(method, url) {
-      GMCompat.apply(this, oldOpen, arguments);
       if (isImageDataRequest(method, url)) {
         this.addEventListener("load", () => {
           onLoad(this, $container);
         });
       }
+      GMCompat.apply(this, oldOpen, arguments);
     };
   }
   function isImageDataRequest(method, url) {

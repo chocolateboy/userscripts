@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.1
+// @version       2.9.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
@@ -73,9 +73,6 @@ function clone <T>(data: T): T {
  */
 function hookXhrOpen (oldOpen: XMLHttpRequest['open'], $container: JQuery): XMLHttpRequest['open'] {
     return function open (this: XMLHttpRequest, method: string, url: string) {
-        // delegate to the original (there's no return value)
-        GMCompat.apply(this, oldOpen, arguments)
-
         if (isImageDataRequest(method, url)) {
             // a new XHR instance is created for each metadata request, so we
             // need to register a new listener
@@ -83,6 +80,9 @@ function hookXhrOpen (oldOpen: XMLHttpRequest['open'], $container: JQuery): XMLH
                 onLoad(this, $container)
             })
         }
+
+        // delegate to the original (there's no return value)
+        GMCompat.apply(this, oldOpen, arguments)
     }
 }
 
@@ -126,7 +126,7 @@ function mergeImageMetadata (root: Metadata): void {
  * results to the metadata cache
  */
 function onLoad (xhr: XMLHttpRequest, $container: JQuery) {
-    let parsed
+    let parsed: Metadata
 
     try {
         const cooked = xhr.responseText.match(/"\[[\s\S]+\](?:\\n)?"/)![0] // '"[...]\n"'
@@ -201,7 +201,7 @@ function init (): void {
  * process an image result (DIV), assigning the image URL to its first link and
  * disabling interceptors
  *
- * used to process the original batch of results as well as the lazily-loaded
+ * used to process the initial batch of results as well as the lazily-loaded
  * updates
  */
 function onResult (this: HTMLElement): void {
