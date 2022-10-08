@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.16.3
+// @version       4.17.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -191,7 +191,7 @@ const MovieMatcher = {
      */
     lastModified ($rt) {
         return $rt
-            .find('critic-review-bubble[createdate]:not([createdate=""])').get()
+            .find('[data-qa="critic-review"][createdate]:not([createdate=""])').get()
             .map(review => dayjs($(review).attr('createdate')))
             .sort((a, b) => b.unix() - a.unix())
             .shift()
@@ -1287,7 +1287,8 @@ function rtName (title) {
  * @param {(smallest: Set<string>, largest: Set<string>) => number} [options.min]
  * @param {(value: string) => string} [options.map]
  */
-function shared (a, b, { min = MINIMUM_SHARED, map: transform = normalize } = {}) {
+function shared (a, b, options = {}) {
+    const { min = MINIMUM_SHARED, map: transform = normalize } = options
     const $a = new Set(Array.from(a, transform))
 
     if ($a.size === 0) {
