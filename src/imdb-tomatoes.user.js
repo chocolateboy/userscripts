@@ -825,7 +825,7 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
     // 7) update the link's label and URL
     $rtRating
         .find('a[role="button"]')
-        .attr({ 'aria-label': 'View RT Rating', href: url })
+        .attr({ 'aria-label': 'View RT Rating', href: url, target: _blank })
 
     // 8) attach the tooltip to the widget
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
