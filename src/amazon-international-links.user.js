@@ -3,10 +3,11 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.5.0
+// @version       3.6.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://smile.amazon.tld/*
+// @include       https://www.amazon.com.be/*
 // @include       https://www.amazon.tld/*
 // @require       https://code.jquery.com/jquery-3.6.0.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@43fd0fe4de1166f343883511e53546e87840aeaf/gm_config.js
@@ -34,6 +35,7 @@
  */
 const SITES = {
     'com.au': 'AU', // Australia
+    'com.be': 'BE', // Belgium
     'com.br': 'BR', // Brazil
     'ae':     'AE', // UAE
     'ca':     'CA', // Canada
