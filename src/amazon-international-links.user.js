@@ -3,13 +3,13 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.6.0
+// @version       3.7.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://smile.amazon.tld/*
 // @include       https://www.amazon.com.be/*
 // @include       https://www.amazon.tld/*
-// @require       https://code.jquery.com/jquery-3.6.0.slim.min.js
+// @require       https://code.jquery.com/jquery-3.6.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@43fd0fe4de1166f343883511e53546e87840aeaf/gm_config.js
 // @require       https://cdn.jsdelivr.net/gh/aduth/hijinks@b4fbbd462c98248c585659fcc35a50b00fec147c/hijinks.min.js
 // @grant         GM_registerMenuCommand
@@ -37,7 +37,6 @@ const SITES = {
     'com.au': 'AU', // Australia
     'com.be': 'BE', // Belgium
     'com.br': 'BR', // Brazil
-    'ae':     'AE', // UAE
     'ca':     'CA', // Canada
     'cn':     'CN', // China
     'fr':     'FR', // France
@@ -48,7 +47,9 @@ const SITES = {
     'com.mx': 'MX', // Mexico
     'nl':     'NL', // Netherlands
     'es':     'ES', // Spain
+    'se':     'SE', // Sweden
     'com.tr': 'TR', // Turkey
+    'ae':     'AE', // UAE
     'co.uk':  'UK', // UK
     'com':    'US', // US
 }
@@ -166,8 +167,7 @@ class Linker {
             // populate the `links` array with jQuery wrappers for link elements
             // (i.e. <a>...</a>)
             for (const tld of tlds) {
-                const country = sites[tld]
-                this.addLink(tld, country)
+                this.addLink(tld, sites[tld])
             }
 
             // prepend the cross-site links to the body of the crossSiteLinks
@@ -182,7 +182,8 @@ class Linker {
     initializeConfig () {
         const checkboxes = {}
 
-        for (const tld of Object.keys(SITES)) {
+        // sort by country code
+        for (const tld of Object.keys(SITES).sort((a, b) => SITES[a].localeCompare(SITES[b]))) {
             const country = SITES[tld]
 
             checkboxes[tld] = {
@@ -221,14 +222,18 @@ class Linker {
 
 /*********************** Main ********************************/
 
-const asin = Linker.getASIN()
+const run = () => {
+    const asin = Linker.getASIN()
 
-if (asin) {
-    const showConfig = () => GM_config.open() // display the settings manager
-    const linker = new Linker(asin)
+    if (asin) {
+        const showConfig = () => GM_config.open() // display the settings manager
+        const linker = new Linker(asin)
 
-    linker.initializeConfig()
-    linker.addLinks()
+        linker.initializeConfig()
+        linker.addLinks()
 
-    GM_registerMenuCommand('Configure Amazon International Links', showConfig)
+        GM_registerMenuCommand('Configure Amazon International Links', showConfig)
+    }
 }
+
+run()
