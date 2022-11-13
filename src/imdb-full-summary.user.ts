@@ -3,7 +3,7 @@
 // @description   Automatically show the full plot summary on IMDb
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.imdb.com/title/tt*
@@ -24,14 +24,7 @@ const init: MutationObserverInit = { childList: true }
 const run = () => {
     let summary = ''
 
-    // get the summary without the leading metadata from the GraphQL data (JSON)
-    // embedded in the page, e.g.:
-    //
-    //     html: Viper: Created by Danny Bilson, Paul De Meo. With Joe Nipote,
-    //           Heather Medway, J. Downing, Jeff Kaake. In the near future, an
-    //           organized crime group...
-    //
-    //     json: In the near future, an organized crime group...
+    // get the summary from the GraphQL data (JSON) embedded in the page
     try {
         const { textContent: metadata } = $.getElementById('__NEXT_DATA__')!
         summary = JSON.parse(metadata!).props.pageProps.aboveTheFoldData.plot.plotText.plainText
