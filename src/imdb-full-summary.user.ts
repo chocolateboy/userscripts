@@ -3,7 +3,7 @@
 // @description   Automatically show the full plot summary on IMDb
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.imdb.com/title/tt*
@@ -22,7 +22,22 @@ const $ = document
 const init: MutationObserverInit = { childList: true }
 
 const run = () => {
-    const summary = $.querySelector<HTMLMetaElement>('meta[name="description"][content]:not([content=""])')
+    let summary = ''
+
+    // get the summary without the leading metadata from the GraphQL data (JSON)
+    // embedded in the page, e.g.:
+    //
+    //     html: Viper: Created by Danny Bilson, Paul De Meo. With Joe Nipote,
+    //           Heather Medway, J. Downing, Jeff Kaake. In the near future, an
+    //           organized crime group...
+    //
+    //     json: In the near future, an organized crime group...
+    try {
+        const { textContent: metadata } = $.getElementById('__NEXT_DATA__')!
+        summary = JSON.parse(metadata!).props.pageProps.aboveTheFoldData.plot.plotText.plainText
+    } catch (e: unknown) {
+        console.warn("Can't extract summary from JSON metadata:", e)
+    }
 
     if (!summary) {
         return
@@ -37,7 +52,7 @@ const run = () => {
         // React's attempts to reinstate the original (reconciliation)
         const callback = () => {
             observer.disconnect()
-            target.textContent = summary.content
+            target.textContent = summary
             observer.observe(target, init)
         }
 
@@ -50,5 +65,8 @@ const run = () => {
 // the earliest event after the "static" parts of the page become visible.
 // this occurs when document.readyState transitions from "loading" to
 // "interactive", which should be the first readystatechange event a userscript
-// sees. on my system, this can occur up to 4 seconds before DOMContentLoaded
+// sees. on my system, this can occur up to 4 seconds before DOMContentLoaded.
+//
+// NOTE: this means we can't extract the summary from the (lazy) "storyline"
+// element as it's not available yet.
 $.addEventListener('readystatechange', run, { once: true })
