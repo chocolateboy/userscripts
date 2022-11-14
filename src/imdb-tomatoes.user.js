@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.17.0
+// @version       4.17.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -53,6 +53,7 @@ const ONE_WEEK              = ONE_DAY * 7
 const RT_BASE               = 'https://www.rottentomatoes.com'
 const SCRIPT_NAME           = GM_info.script.name
 const TITLE_MATCH_THRESHOLD = 0.6
+const WIDGET_ID             = 'rt-rating'
 
 /** @type {Record<string, number>} */
 const METADATA_VERSION = { stats: 2 }
@@ -792,7 +793,7 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
     const $rtRating = $imdbRating.clone()
 
     // 1) assign a unique ID
-    $rtRating.attr('id', 'rt-rating')
+    $rtRating.attr('id', WIDGET_ID)
 
     // 2) add a custom stylesheet which:
     //
@@ -832,7 +833,7 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
     $rtRating.balloon(balloonOptions)
 
     // 9) prepend the widget to the ratings bar
-    attachWidget($ratings, $rtRating)
+    attachWidget($ratings.get(0), $rtRating.get(0))
 }
 
 /**
@@ -904,14 +905,10 @@ function asyncGet (url, options = {}) {
  * its removal (which happens no more than once - the ratings bar is frozen
  * (i.e. synchronisation is halted) once the page has loaded)
  *
- * @param {JQuery} $target
- * @param {JQuery} $rtRating
+ * @param {HTMLElement | undefined} target
+ * @param {HTMLElement | undefined} rtRating
  */
-function attachWidget ($target, $rtRating) {
-    const init = { childList: true }
-    const target = $target.get(0)
-    const rtRating = $rtRating.get(0)
-
+function attachWidget (target, rtRating) {
     if (!target) {
         throw new ReferenceError("can't find ratings bar")
     }
@@ -920,11 +917,17 @@ function attachWidget ($target, $rtRating) {
         throw new ReferenceError("can't find RT widget")
     }
 
+    const init = { childList: true }
+
+    const containsRtRating = (/** @type {HTMLElement} */ target) => Array
+        .from(target.children)
+        .some(it => it === rtRating)
+
     // restore the RT widget if it is removed. only called (once) if the widget
     // is added "quickly" (i.e. while the ratings bar is still being finalized),
     // e.g. when the result is cached
     const callback = () => {
-        if (target.lastElementChild !== rtRating) {
+        if (!containsRtRating(target)) {
             observer.disconnect()
             target.appendChild(rtRating)
             observer.observe(target, init)
