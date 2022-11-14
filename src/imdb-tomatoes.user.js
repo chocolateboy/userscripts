@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.17.1
+// @version       4.17.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -16,7 +16,7 @@
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/nTw33T55
+// @resource      overrides https://pastebin.com/raw/jp2Nip5d
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -919,7 +919,7 @@ function attachWidget (target, rtRating) {
 
     const init = { childList: true }
 
-    const containsRtRating = (/** @type {HTMLElement} */ target) => Array
+    const hasRtRating = () => Array
         .from(target.children)
         .some(it => it === rtRating)
 
@@ -927,7 +927,7 @@ function attachWidget (target, rtRating) {
     // is added "quickly" (i.e. while the ratings bar is still being finalized),
     // e.g. when the result is cached
     const callback = () => {
-        if (!containsRtRating(target)) {
+        if (!hasRtRating()) {
             observer.disconnect()
             target.appendChild(rtRating)
             observer.observe(target, init)
