@@ -3,17 +3,17 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.5.0
+// @version       2.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
-// @require       https://code.jquery.com/jquery-3.5.1.slim.min.js
+// @require       https://code.jquery.com/jquery-3.6.1.slim.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
-// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.1.2/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@1.4.1/dist/index.umd.min.js
+// @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
+// @require       https://unpkg.com/get-wild@3.0.0/dist/index.umd.min.js
 // @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
 // @grant         GM_log
 // @run-at        document-start
@@ -22,21 +22,23 @@
 /// <reference types="jquery" />
 /// <reference path="../types/gm-compat.d.ts" />
 
-// isolate from the scope of the @requires to work around a missing feature in
-// TypeScript and a misfeature in a userscript engine.
-//
-// XXX https://github.com/microsoft/TypeScript/issues/14279
-// XXX https://github.com/chocolateboy/uncommonjs#scope
+// XXX needed to appease esbuild
+export {}
 
-/* begin */ {
+type Debug = {
+    event?: string;
+    trend?: string;
+}
 
-/**
- * @typedef {Object} TwitterEvent
- *
- * @prop {{ url?: string }} TwitterEvent.image
- * @prop {string} TwitterEvent.title
- * @prop {{ url: string }} TwitterEvent.url
- */
+type OnEventOptions = {
+    wrapImage?: boolean;
+}
+
+type TwitterEvent = {
+    image: { url?: string };
+    title: string;
+    url: { url: string };
+}
 
 /**
  * a map from event IDs to their URLs. populated via the intercepted trends
@@ -55,7 +57,7 @@ const CACHE = new exports.default(128)
  * to trend and event elements
  */
 // const DEBUG = { event: 'powderblue', trend: 'palegreen' }
-const DEBUG = {}
+const DEBUG: Debug = {}
 
 /*
  * events to disable (stop propagating) on event and trend elements
@@ -63,7 +65,7 @@ const DEBUG = {}
 const DISABLED_EVENTS = 'click touch'
 
 /*
- * path to the JSON document containing event data
+ * URL path of the JSON document containing event data
  */
 const EVENT_DATA = '/i/api/2/guide.json'
 
@@ -94,7 +96,7 @@ const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
 
 // NOTE: we detect the image inside an event/event-hero element and then
 // navigate up to the event to avoid the overhead of using :has()
-const EVENT = 'div[role="link"]:not([data-testid]):not([data-linked])'
+const EVENT = 'div[role="link"]:not([data-testid]):not([data-linked]):not([href])'
 const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([src=""])`
 const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])'
 const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`
@@ -116,7 +118,7 @@ const pluck = exports.getter({ default: [], split: '.' })
 /*
  * remove the onclick interceptors from event elements
  */
-function disableAll (e) {
+function disableAll (e: JQuery.Event) {
     // don't preventDefault: we still want links to work
     e.stopPropagation()
 }
@@ -124,11 +126,8 @@ function disableAll (e) {
 /**
  * remove the onclick interceptors from trend elements, apart from clicks on the
  * caret (which opens a drop-down menu)
- *
- * @this {Element}
- * @param {JQueryEventObject} e
  */
-function disableSome (e) {
+function disableSome (this: HTMLElement, e: JQueryEventObject) {
     const $target = $(e.target)
     const $caret = $target.closest('[data-testid="caret"]', this)
 
@@ -145,8 +144,8 @@ function disableSome (e) {
  * @param {XMLHttpRequest['open']} oldOpen
  * @returns {XMLHttpRequest['open']}
  */
-function hookXHROpen (oldOpen) {
-    return /** @this {XMLHttpRequest} */ function open (_method, url) { // preserve the arity
+function hookXHROpen (oldOpen: XMLHttpRequest['open']) {
+    return function open (this: XMLHttpRequest, _method: string, url: string) { // preserve the arity
         const $url = new URL(url)
 
         if ($url.pathname === EVENT_DATA) {
@@ -164,8 +163,10 @@ function hookXHROpen (oldOpen) {
  * takes an identifier for an event image (its URL) and returns the portion of
  * that identifier which the data and the element have in common
  */
-function keyFor (url) {
-    return new URL(url).pathname.replace(/\.\w+$/, '')
+function keyFor (url: string) {
+    const path = new URL(url).pathname.replace(/\.\w+$/, '')
+    // /semantic_core_img/1234567891234567890/abcDEFh1
+    return path === LIVE_EVENT_KEY ? path : path.split('/')[2]
 }
 
 /*
@@ -173,7 +174,7 @@ function keyFor (url) {
  *
  * used to wrap the trend/event titles
  */
-function linkFor (href) {
+function linkFor (href: string) {
     return $('<a></a>')
         .attr({ href, role: 'link', 'data-focusable': true })
         .css({ color: 'inherit', textDecoration: 'inherit' })
@@ -182,37 +183,34 @@ function linkFor (href) {
 /*
  * process a newly-created trend or event element
  */
-function onElement (el) {
+function onElement (el: HTMLElement) {
     const $el = $(el)
+
+    let $target: JQuery
+    let type: 'event' | 'trend'
 
     // determine the element's type and pass it to the appropriate handler
     if ($el.is(TREND)) {
-        $el.css({
-            cursor: 'auto', // remove the fake pointer
-            backgroundColor: DEBUG?.trend,
-        })
-
+        [$target, type] = [$el, 'trend']
         $el.on(DISABLED_EVENTS, disableSome)
-
-        // tag so we don't select it again
-        $el.attr('data-linked', 'true')
-
         onTrendElement($el)
     } else {
         const $event = $el.closest(EVENT_ANY)
-        const wrapImage = $event.is(EVENT)
+        const wrapImage = $event.is(EVENT);
 
-        $event.css({
-            cursor: 'auto', // remove the fake pointer
-            backgroundColor: DEBUG?.event,
-        })
-
+        [$target, type] = [$event, 'event']
         $event.on(DISABLED_EVENTS, disableAll)
+        onEventElement($event, $el as JQuery<HTMLImageElement>, { wrapImage })
+    }
 
-        // tag so we don't select it again
-        $event.attr('data-linked', 'true')
+    // tag so we don't select it again
+    $target.attr('data-linked', 'true')
 
-        onEventElement($event, $el, { wrapImage })
+    // remove the fake pointer
+    $target.css('cursor', 'auto')
+
+    if (DEBUG[type]) {
+        $target.css('backgroundColor', DEBUG[type]!)
     }
 }
 
@@ -220,18 +218,18 @@ function onElement (el) {
  * linkify an event element: the target URL is (was) extracted from the
  * intercepted JSON
  */
-function onEventElement ($event, $image, options = {}) {
-    const { $target, title } = targetFor($event)
+function onEventElement ($event: JQuery, $image: JQuery<HTMLImageElement>, options: OnEventOptions = {}) {
+    const { target, title } = targetFor($event)
+    const key = keyFor($image.attr('src')!)
 
-    console.debug('event (element):', JSON.stringify(title))
+    console.debug('element (event):', JSON.stringify(title))
 
-    const key = keyFor($image.attr('src'))
     const url = key === LIVE_EVENT_KEY ? CACHE.get(title) : CACHE.get(key)
 
     if (url) {
         const $link = linkFor(url)
 
-        $target.parent().wrap($link)
+        $(target).parent().wrap($link)
 
         if (options.wrapImage) {
             $image.wrap($link)
@@ -245,31 +243,29 @@ function onEventElement ($event, $image, options = {}) {
  * linkify a trend element: the target URL is derived from the title in the
  * element rather than from the JSON
  */
-function onTrendElement ($trend) {
-    const { $target, title } = targetFor($trend)
+function onTrendElement ($trend: JQuery) {
+    const { target, title } = targetFor($trend)
     const param = /\s+/.test(title) ? ('"' + title.replace(/"/g, '') + '"') : title
 
-    // console.debug('trend (element):', JSON.stringify(param))
+    console.debug('element (trend):', param)
 
     const query = encodeURIComponent(param)
     const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`
 
-    $target.wrap(linkFor(url))
+    $(target).wrap(linkFor(url))
 }
 
 /*
  * process the events data (JSON): extract ID/URL pairs for the event elements
  * and store them in a cache
  */
-function processEventData (json) {
+function processEventData (json: string) {
     const data = JSON.parse(json)
 
-    /** @type {Array<TwitterEvent>} */
-    const events = pluck(data, EVENT_PATH)
+    const events: TwitterEvent[] = pluck(data, EVENT_PATH)
 
     // always returns an array even though there's at most 1
-    /** @type {Array<TwitterEvent>} */
-    const eventHero = pluck(data, EVENT_HERO_PATH)
+    const eventHero: TwitterEvent[] = pluck(data, EVENT_HERO_PATH)
 
     const $events = eventHero.concat(events)
     const nEvents = $events.length
@@ -277,10 +273,6 @@ function processEventData (json) {
     if (!nEvents) {
         return
     }
-
-    const plural = nEvents === 1 ? 'event' : 'events'
-
-    console.debug(`caching data for ${nEvents} ${plural}`)
 
     for (const event of $events) {
         const { title, url: { url } } = event
@@ -294,7 +286,7 @@ function processEventData (json) {
 
         const key = keyFor(imageURL)
 
-        console.debug('event (data):', JSON.stringify(title))
+        console.debug('data (event):', JSON.stringify(title))
 
         if (key === LIVE_EVENT_KEY) {
             CACHE.set(title, url)
@@ -305,14 +297,23 @@ function processEventData (json) {
 }
 
 /*
- * given a trend or event element, return its target element — i.e. the SPAN
- * containing the element's title — along with its title text
+ * given a trend or event element, return its target element (the SPAN
+ * containing the element's title) along with its title text
  */
-function targetFor ($el) {
-    const $target = $el.find('div[dir="ltr"]').first().find('> span')
-    const title = $target.text().trim()
+function targetFor ($el: JQuery) {
+    // the target element is the last bold SPAN (live events have a preceding
+    // bold span containing the word "LIVE" in the header)
+    const targets = $el.find('div[dir="ltr"] > span').filter((_, el) => {
+        // the class for this is currently r-b88u0q (700) or r-1vr29t4 for
+        // hero images (800)
+        const fontWeight = $(el).parent().css('fontWeight') || 0
+        return fontWeight >= 700
+    })
 
-    return { $target, title }
+    const target = targets.get().pop()!
+    const title = $(target).text().trim()
+
+    return { target, title }
 }
 
 /******************************************************************************/
@@ -329,7 +330,7 @@ function run () {
         return
     }
 
-    const callback = (_mutations, observer) => {
+    const callback = (_mutations: MutationRecord[], observer: MutationObserver) => {
         observer.disconnect()
 
         for (const el of $(SELECTOR)) {
@@ -354,5 +355,3 @@ xhrProto.open = GMCompat.export(hookXHROpen(xhrProto.open))
 // (document-start), but run after the page has loaded (DOMContentLoaded). this
 // ensures the latter
 $(run)
-
-/* end */ }
