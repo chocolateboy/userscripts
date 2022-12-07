@@ -2,8 +2,14 @@ import DayJs from 'dayjs'
 import DayJsRelativeTime from 'dayjs/plugin/relativeTime'
 
 type RTResult = {
-    url: string;
-    meterScore: number;
+    title: string;
+    vanity: string;
+    castCrew: { cast: string[] };
+    cast: Array<{ name: string }>;
+    releaseYear: string;
+    rottenTomatoes?: { criticsScore?: number };
+    pageViews_popularity?: number;
+    updateDate: string;
 };
 
 declare global {
@@ -35,16 +41,12 @@ declare global {
     };
 
     type RTTVResult = RTResult & {
-        endYear: number;
-        startYear: number;
-        title: string;
+        seasons: number[];
+        seriesFinale?: string;
+        seriesPremiere?: string;
     };
 
-    type RTMovieResult = RTResult & {
-        castItems: string[];
-        name: string;
-        year: number;
-    };
+    type RTMovieResult = RTResult;
 
     type RTState = {
         fallbackUnused: boolean;

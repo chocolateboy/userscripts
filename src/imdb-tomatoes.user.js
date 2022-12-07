@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.17.2
+// @version       5.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -15,8 +15,8 @@
 // @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
-// @resource      api https://pastebin.com/raw/hcN4ysZD
-// @resource      overrides https://pastebin.com/raw/jp2Nip5d
+// @resource      api https://pastebin.com/raw/NXHeK6nf
+// @resource      overrides https://pastebin.com/raw/9WHD6zrb
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -25,6 +25,7 @@
 // @grant         GM_registerMenuCommand
 // @grant         GM_setValue
 // @grant         GM_xmlhttpRequest
+// @connect       algolia.net
 // @connect       www.rottentomatoes.com
 // @run-at        document-start
 // @noframes
@@ -40,20 +41,19 @@
 
 /* begin */ {
 
-const API_LIMIT             = 100
-const DATA_VERSION          = 1.2
-const DATE_FORMAT           = 'YYYY-MM-DD'
-const DEBUG                 = false
-const INACTIVE_MONTHS       = 3
-const MAX_YEAR_DIFF         = 3
-const NO_CONSENSUS          = 'No consensus yet.'
-const NO_MATCH              = 'no matching results'
-const ONE_DAY               = 1000 * 60 * 60 * 24
-const ONE_WEEK              = ONE_DAY * 7
-const RT_BASE               = 'https://www.rottentomatoes.com'
-const SCRIPT_NAME           = GM_info.script.name
-const TITLE_MATCH_THRESHOLD = 0.6
-const WIDGET_ID             = 'rt-rating'
+const API_LIMIT       = 100
+const DATA_VERSION    = 1.2
+const DATE_FORMAT     = 'YYYY-MM-DD'
+const DEBUG           = false
+const INACTIVE_MONTHS = 3
+const MAX_YEAR_DIFF   = 3
+const NO_CONSENSUS    = 'No consensus yet.'
+const NO_MATCH        = 'no matching results'
+const ONE_DAY         = 1000 * 60 * 60 * 24
+const ONE_WEEK        = ONE_DAY * 7
+const RT_BASE         = 'https://www.rottentomatoes.com'
+const SCRIPT_NAME     = GM_info.script.name
+const WIDGET_ID       = 'rt-rating'
 
 /** @type {Record<string, number>} */
 const METADATA_VERSION = { stats: 2 }
@@ -85,6 +85,11 @@ const CONNECTION_ERROR = {
 const RT_TYPE = /** @type {const} */ ({
     TVSeries: 'tvSeries',
     Movie: 'movie',
+})
+
+const RT_TYPE_ID = /** @type {const} */ ({
+    movie: 1,
+    tvSeries: 2,
 })
 
 const STATS = {
@@ -202,25 +207,22 @@ const MovieMatcher = {
      * return a movie record ({ url: string }) from the API results which
      * matches the supplied IMDb data
      *
-     * @param {{ movies: RTMovieResult[] }} rtResults
+     * @param {RTMovieResult[]} rtResults
      * @param {any} imdb
      */
     match (rtResults, imdb) {
-        const sorted = rtResults.movies
+        const sorted = rtResults
             .flatMap((rt, index) => {
-                const { castItems, name: title, url } = rt
+                const { title, vanity: slug } = rt
 
-                if (!(title && url && castItems)) {
+                if (!(title && slug)) {
+                    warn('invalid result:', rt)
                     return []
                 }
 
-                if (url === '/m/null') {
-                    return []
-                }
-
-                const rtCast = pluck(castItems, 'name').flatMap(name => {
-                    return name ? [stripRtName(name)] : []
-                })
+                const url = `/m/${slug}`
+                const rtCast = pluck(rt.cast, 'name')
+                const rtYear = rt.releaseYear ? Number(rt.releaseYear) : null
 
                 let castMatch = -1, verify = true
 
@@ -235,27 +237,29 @@ const MovieMatcher = {
                     }
                 }
 
-                const yearDiff = (imdb.year && rt.year)
-                    ? { value: Math.abs(imdb.year - rt.year) }
+                const yearDiff = (imdb.year && rtYear)
+                    ? { value: Math.abs(imdb.year - rtYear) }
                     : null
 
                 if (yearDiff && yearDiff.value > MAX_YEAR_DIFF) {
                     return []
                 }
 
-                const titleMatch = titleSimilarity({ imdb, rt: { title } })
+                const titleMatch = titleSimilarity({ imdb, rt })
+                const rtRating = rt.rottenTomatoes?.criticsScore
 
                 const result = {
                     title,
                     url,
-                    rating: rt.meterScore,
-                    popularity: (rt.meterScore == null ? 0 : 1),
+                    year: rtYear,
                     cast: rtCast,
-                    year: rt.year,
-                    index,
                     titleMatch,
                     castMatch,
                     yearDiff,
+                    rating: rtRating,
+                    popularity: rt.pageViews_popularity ?? 0,
+                    updated: rt.updateDate,
+                    index,
                     verify,
                 }
 
@@ -276,10 +280,14 @@ const MovieMatcher = {
                     score.add(a.yearDiff.value - b.yearDiff.value)
                 }
 
+                const popularity = (a.popularity && b.popularity)
+                    ? b.popularity - a.popularity
+                    : 0
+
                 return (b.castMatch - a.castMatch)
                     || (score.b - score.a)
                     || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
-                    || (b.popularity - a.popularity) // last resort
+                    || popularity // last resort
             })
 
         debug('matches:', sorted)
@@ -367,6 +375,7 @@ const TVMatcher = {
      */
     lastModified (_$rt) {
         // XXX there's no way to determine this from the main page of a TV show
+        // and the +updated+ field doesn't correspond to the latest review
         return undefined
     },
 
@@ -374,72 +383,78 @@ const TVMatcher = {
      * return a TV show record ({ url: string }) from the API results which
      * matches the supplied IMDb data
      *
-     * @param {{ tvSeries: RTTVResult[] }} rtResults
+     * @param {RTTVResult[]} rtResults
      * @param {any} imdb
      */
     match (rtResults, imdb) {
-        const sorted = rtResults.tvSeries
+        const sorted = rtResults
             .flatMap((rt, index) => {
-                const { title, startYear, endYear, url } = rt
+                const { title, vanity: slug } = rt
 
-                if (!(title && (startYear || endYear) && url)) {
+                if (!(title && slug)) {
+                    warn('invalid result:', rt)
                     return []
                 }
 
-                let suffix, path
+                const url = `/tv/${slug}`
+                const rtCast = pluck(rt.cast, 'name')
 
-                const match = url.match(/^(\/tv\/[^/]+)(?:\/(.+))?$/)
+                let castMatch = -1, verify = true
 
-                if (match) {
-                    if (match[1] === '/tv/null') {
+                if (rtCast.length) {
+                    const { got, want } = shared(rtCast, imdb.cast)
+
+                    if (got >= want) {
+                        verify = false
+                        castMatch = got
+                    } else {
                         return []
                     }
-
-                    path = match[1] // strip the season
-                    suffix = match[2]
-                } else {
-                    warn("can't parse RT URL:", url)
-                    return []
                 }
 
                 const titleMatch = titleSimilarity({ imdb, rt })
+                const seasons = rt.seasons || []
+                const rtRating = rt.rottenTomatoes?.criticsScore
+                const startYear = rt.releaseYear ? Number(rt.releaseYear) : null
+                const endYear = rt.seriesFinale ? dayjs(rt.seriesFinale).year() : null
 
-                if (titleMatch < TITLE_MATCH_THRESHOLD) {
+                const startYearDiff = (imdb.startYear && startYear)
+                    ? { value: Math.abs(imdb.startYear - startYear) }
+                    : null
+
+                if (startYearDiff && startYearDiff.value > MAX_YEAR_DIFF) {
                     return []
                 }
 
-                /** @type {Record<string, { value: number } | null>} */
-                const dateDiffs = {}
+                const endYearDiff = (imdb.endYear && endYear)
+                    ? { value: Math.abs(imdb.endYear - endYear) }
+                    : null
 
-                for (const dateProp of /** @type {const} */ (['startYear', 'endYear'])) {
-                    if (imdb[dateProp] && rt[dateProp]) {
-                        const diff = Math.abs(imdb[dateProp] - rt[dateProp])
-
-                        if (diff > MAX_YEAR_DIFF) {
-                            return []
-                        } else {
-                            dateDiffs[dateProp] = { value: diff }
-                        }
-                    }
+                if (endYearDiff && endYearDiff.value > MAX_YEAR_DIFF) {
+                    return []
                 }
 
-                const seasonsDiff = (suffix === 's01' && imdb.seasons)
-                    ? { value: imdb.seasons - 1 }
+                const seasonsDiff = (imdb.seasons && seasons.length)
+                    ? { value: Math.abs(imdb.seasons - seasons.length) }
                     : null
 
                 const result = {
                     title,
-                    url: path,
-                    rating: rt.meterScore,
-                    popularity: (rt.meterScore == null ? 0 : 1),
+                    url,
                     startYear,
                     endYear,
-                    index,
+                    seasons: seasons.length,
                     titleMatch,
-                    startYearDiff: dateDiffs.startYear,
-                    endYearDiff: dateDiffs.endYear,
+                    castMatch,
+                    startYearDiff,
+                    endYearDiff,
                     seasonsDiff,
-                    verify: true,
+                    rating: rtRating,
+                    popularity: rt.pageViews_popularity ?? 0,
+                    index,
+                    targetUrl: seasons.length === 1 ? `${RT_BASE}${url}/s01` : null,
+                    updated: rt.updateDate,
+                    verify,
                 }
 
                 return [result]
@@ -461,9 +476,13 @@ const TVMatcher = {
                     score.add(a.seasonsDiff.value - b.seasonsDiff.value)
                 }
 
+                const popularity = (a.popularity && b.popularity)
+                    ? b.popularity - a.popularity
+                    : 0
+
                 return (score.b - score.a)
                     || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
-                    || (b.popularity - a.popularity) // last resort
+                    || popularity // last resort
             })
 
         debug('matches:', sorted)
@@ -1036,50 +1055,6 @@ function getIMDbMetadata (imdbId, rtType) {
  * @param {keyof Matcher} rtType
  */
 async function getRTData (imdb, rtType) {
-    // quoting the title behaves similarly to Google search, returning matches
-    // which contain the exact title (and some minor variants), rather than
-    // titles which are loosely similar, e.g. searching for "Quick" (tt9211804)
-    // yields:
-    //
-    // unquoted:
-    //
-    //   - matches: 186
-    //   - results: 79
-    //   - found: false
-    //   - examples: "Quick", "Quicksilver", "Quicksand", "Highlander 2: The Quickening"
-    //   - stats: {
-    //        "Quickie": 50,
-    //        "Quick": 19,
-    //        "Quicksand": 4,
-    //        "Quicksilver": 3,
-    //        "Quickening": 2,
-    //        "Quicker": 1,
-    //     }
-    //
-    // quoted:
-    //
-    //   - matches: 91
-    //   - results: 39
-    //   - found: true
-    //   - examples: "Quick", "Quick Change", "Kiss Me Quick", "The Quick and the Dead"
-    //   - stats: { "Quick": 39 }
-
-    const unquoted = imdb.title
-        .replace(/"/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-
-    const query = JSON.stringify(unquoted)
-
-    log(`querying API for ${query}`)
-
-    /** @type {AsyncGetOptions} */
-    const apiRequest = {
-        params: { t: rtType, q: query, limit: API_LIMIT },
-        request: { responseType: 'json' },
-        title: 'API',
-    }
-
     const matcher = Matcher[rtType]
 
     // we preload the anticipated RT page URL at the same time as the API request.
@@ -1130,7 +1105,43 @@ async function getRTData (imdb, rtType) {
         }
     })()
 
-    const api = GM_getResourceText('api')
+    const typeId = RT_TYPE_ID[rtType]
+    const template = GM_getResourceText('api')
+    const json = template
+        .replace('{{apiLimit}}', String(API_LIMIT))
+        .replace('{{typeId}}', String(typeId))
+
+    const { api, params, data } = JSON.parse(json)
+
+    const unquoted = imdb.title
+        .replace(/"/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    const query = JSON.stringify(unquoted)
+
+    for (const [key, value] of Object.entries(params)) {
+        if (value && typeof value === 'object') {
+            params[key] = JSON.stringify(value)
+        }
+    }
+
+    Object.assign(data.requests[0], {
+        query,
+        params: $.param(params),
+    })
+
+    /** @type {AsyncGetOptions} */
+    const apiRequest = {
+        title: 'API',
+        request: {
+            data: JSON.stringify(data),
+            method: 'POST',
+            responseType: 'json',
+        },
+    }
+
+    log(`querying API for ${query}`)
 
     /** @type {Tampermonkey.Response<any>} */
     let res = await asyncGet(api, apiRequest)
@@ -1140,13 +1151,26 @@ async function getRTData (imdb, rtType) {
     let results
 
     try {
-        results = JSON.parse(res.responseText)
+        results = JSON.parse(res.responseText).results[0].hits
     } catch (e) {
         throw new Error(`can't parse response: ${e}`)
     }
 
-    if (!results) {
+    if (!Array.isArray(results)) {
         throw new Error('invalid JSON type')
+    }
+
+    // reorder the fields so the main fields are visible in the console without
+    // needing to expand each result
+    for (let i = 0; i < results.length; ++i) {
+        const result = results[i]
+
+        results[i] = {
+            title: result.title,
+            releaseYear: result.releaseYear,
+            vanity: result.vanity,
+            ...result
+        }
     }
 
     debug('results:', results)
@@ -1167,7 +1191,7 @@ async function getRTData (imdb, rtType) {
     const state = {
         fallbackUnused: false,
         rtPage:         null,
-        targetUrl:      null,
+        targetUrl:      match.targetUrl,
         url:            RT_BASE + match.url,
         verify:         match.verify,
     }
@@ -1339,18 +1363,6 @@ function similarity (a, b, transform = normalize) {
     const $b = transform(b)
 
     return a === b ? 2 : ($a === $b ? 1 : exports.dice($a, $b))
-}
-
-/**
- * strip trailing sequence numbers in names in RT metadata, e.g.
- *
- *   - "Meng Li (IX)"       -> "Meng Li"
- *   - "Michael Dwyer (X) " -> "Michael Dwyer"
- *
- * @param {string} name
- */
-function stripRtName (name) {
-    return name.trim().replace(/\s+\([IVXLCDM]+\)$/, '')
 }
 
 /**
