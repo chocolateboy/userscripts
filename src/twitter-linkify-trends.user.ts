@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -96,7 +96,7 @@ const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
 
 // NOTE: we detect the image inside an event/event-hero element and then
 // navigate up to the event to avoid the overhead of using :has()
-const EVENT = 'div[role="link"]:not([data-testid]):not([data-linked]):not([href])'
+const EVENT = 'div[role="link"]:not([data-testid]):not([data-linked])'
 const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([src=""])`
 const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])'
 const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`
@@ -164,7 +164,7 @@ function hookXHROpen (oldOpen: XMLHttpRequest['open']) {
  * that identifier which the data and the element have in common
  */
 function keyFor (url: string) {
-    const path = new URL(url).pathname.replace(/\.\w+$/, '')
+    const { pathname: path } = new URL(url)
     // /semantic_core_img/1234567891234567890/abcDEFh1
     return path === LIVE_EVENT_KEY ? path : path.split('/')[2]
 }

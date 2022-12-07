@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -32,7 +32,7 @@
   var EVENT_PATH = "timeline.instructions.*.addEntries.entries.*.content.timelineModule.items.*.item.content.eventSummary";
   var EVENT_HERO_PATH = "timeline.instructions.*.addEntries.entries.*.content.item.content.eventSummary";
   var LIVE_EVENT_KEY = "/lex/placeholder_live_nomargin";
-  var EVENT = 'div[role="link"]:not([data-testid]):not([data-linked]):not([href])';
+  var EVENT = 'div[role="link"]:not([data-testid]):not([data-linked])';
   var EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([src=""])`;
   var EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])';
   var EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`;
@@ -60,7 +60,7 @@
     };
   }
   function keyFor(url) {
-    const path = new URL(url).pathname.replace(/\.\w+$/, "");
+    const { pathname: path } = new URL(url);
     return path === LIVE_EVENT_KEY ? path : path.split("/")[2];
   }
   function linkFor(href) {
