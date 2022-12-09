@@ -4,12 +4,11 @@ import DayJsRelativeTime from 'dayjs/plugin/relativeTime'
 type RTResult = {
     title: string;
     vanity: string;
-    castCrew: { cast: string[] };
-    cast: Array<{ name: string }>;
     releaseYear: string;
+    updateDate: string;
+    cast?: Array<{ name: string }>;
     rottenTomatoes?: { criticsScore?: number };
     pageViews_popularity?: number;
-    updateDate: string;
 };
 
 declare global {

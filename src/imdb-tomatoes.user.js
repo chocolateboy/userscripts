@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.0.0
+// @version       5.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -15,8 +15,8 @@
 // @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
-// @resource      api https://pastebin.com/raw/NXHeK6nf
-// @resource      overrides https://pastebin.com/raw/9WHD6zrb
+// @resource      api https://pastebin.com/raw/absEYaJ8
+// @resource      overrides https://pastebin.com/raw/kCQZJNai
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -444,6 +444,7 @@ const TVMatcher = {
                     startYear,
                     endYear,
                     seasons: seasons.length,
+                    cast: rtCast,
                     titleMatch,
                     castMatch,
                     startYearDiff,
@@ -480,7 +481,8 @@ const TVMatcher = {
                     ? b.popularity - a.popularity
                     : 0
 
-                return (score.b - score.a)
+                return (b.castMatch - a.castMatch)
+                    || (score.b - score.a)
                     || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
                     || popularity // last resort
             })
@@ -1111,7 +1113,7 @@ async function getRTData (imdb, rtType) {
         .replace('{{apiLimit}}', String(API_LIMIT))
         .replace('{{typeId}}', String(typeId))
 
-    const { api, params, data } = JSON.parse(json)
+    const { api, params, search, data } = JSON.parse(json)
 
     const unquoted = imdb.title
         .replace(/"/g, ' ')
@@ -1120,31 +1122,32 @@ async function getRTData (imdb, rtType) {
 
     const query = JSON.stringify(unquoted)
 
-    for (const [key, value] of Object.entries(params)) {
+    for (const [key, value] of Object.entries(search)) {
         if (value && typeof value === 'object') {
-            params[key] = JSON.stringify(value)
+            search[key] = JSON.stringify(value)
         }
     }
 
     Object.assign(data.requests[0], {
         query,
-        params: $.param(params),
+        params: $.param(search),
     })
 
     /** @type {AsyncGetOptions} */
-    const apiRequest = {
+    const request = {
         title: 'API',
+        params,
         request: {
-            data: JSON.stringify(data),
             method: 'POST',
             responseType: 'json',
+            data: JSON.stringify(data),
         },
     }
 
     log(`querying API for ${query}`)
 
     /** @type {Tampermonkey.Response<any>} */
-    let res = await asyncGet(api, apiRequest)
+    const res = await asyncGet(api, request)
 
     log(`API response: ${res.status} ${res.statusText}`)
 
