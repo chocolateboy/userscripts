@@ -56,7 +56,7 @@ const SCRIPT_NAME     = GM_info.script.name
 const WIDGET_ID       = 'rt-rating'
 
 /** @type {Record<string, number>} */
-const METADATA_VERSION = { stats: 2 }
+const METADATA_VERSION = { stats: 3 }
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -1551,7 +1551,6 @@ async function run () {
         addWidget($ratings, $imdbRating, data)
     } catch (error) {
         bump('miss')
-        bump('preload.miss')
 
         const message = error.message || String(error) // stringify
 
