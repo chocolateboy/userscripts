@@ -1,11 +1,9 @@
-"use strict";
-
 // ==UserScript==
 // @name          Twitter Direct
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.2.0
+// @version       2.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -18,6 +16,7 @@
 
 // NOTE This file is generated from src/twitter-direct.user.ts and should not be edited directly.
 
+"use strict";
 (() => {
   // src/twitter-direct/util.ts
   var checkUrl = function() {
@@ -29,6 +28,14 @@
     const toString = {}.toString;
     return (value) => toString.call(value) === "[object Object]";
   }();
+  var typeOf = (value) => value === null ? "null" : typeof value;
+  var isType = (type) => {
+    return (value) => {
+      return typeOf(value) === type;
+    };
+  };
+  var isString = isType("string");
+  var isNumber = isType("number");
   var isTrackedUrl = function() {
     const urlPattern = /^https?:\/\/t\.co\/\w+$/;
     return (value) => urlPattern.test(value);
@@ -76,7 +83,12 @@
   ]);
   var STATS = {};
   var TWITTER_API = /^(?:(?:api|mobile)\.)?twitter\.com$/;
-  var URL_KEYS = /* @__PURE__ */ new Set(["url", "string_value"]);
+  var isSummary = (value) => {
+    return isPlainObject(value) && isString(value.text) && Array.isArray(value.entities);
+  };
+  var isEntity = (value) => {
+    return isPlainObject(value) && isNumber(value.fromIndex) && isNumber(value.toIndex) && isPlainObject(value.ref) && isString(value.ref.url);
+  };
   var Transformer = class {
     urlBlacklist;
     static register(options) {
@@ -135,7 +147,7 @@
     transform(data, path) {
       const seen = /* @__PURE__ */ new Map();
       const unresolved = /* @__PURE__ */ new Map();
-      const state = { count: 0, seen, unresolved };
+      const state = { path, count: 0, seen, unresolved };
       if (Array.isArray(data) || "id_str" in data) {
         this.traverse(state, data);
       } else {
@@ -180,6 +192,21 @@
       }
       return filtered;
     }
+    transformSummary(state, summary) {
+      const { entities, text } = summary;
+      for (const entity of entities) {
+        if (!isEntity(entity)) {
+          console.warn("invalid entity:", entity);
+          break;
+        }
+        const { url } = entity.ref;
+        if (isTrackedUrl(url)) {
+          const expandedUrl = text.slice(entity.fromIndex, entity.toIndex);
+          state.seen.set(url, expandedUrl);
+        }
+      }
+      return summary;
+    }
     transformURL(state, context, key, value) {
       const { seen, unresolved } = state;
       const writable = this.isWritable(context);
@@ -204,6 +231,7 @@
           targets.push({ target: context, key });
         }
       }
+      return value;
     }
     hookXHRSend(oldSend) {
       const self = this;
@@ -237,14 +265,24 @@
       if (PRUNE_KEYS.has(key)) {
         return 0;
       }
-      if (key === "binding_values") {
-        return this.transformBindingValues(value);
-      }
-      if (key === "legacy" && isPlainObject(value)) {
-        return this.transformLegacyObject(value);
-      }
-      if (URL_KEYS.has(key) && isTrackedUrl(value)) {
-        this.transformURL(state, context, key, value);
+      switch (key) {
+        case "binding_values":
+          return this.transformBindingValues(value);
+        case "legacy":
+          if (isPlainObject(value)) {
+            return this.transformLegacyObject(value);
+          }
+          break;
+        case "string_value":
+        case "url":
+          if (isTrackedUrl(value)) {
+            return this.transformURL(state, context, key, value);
+          }
+          break;
+        case "summary":
+          if (isSummary(value)) {
+            return this.transformSummary(state, value);
+          }
       }
       return value;
     }

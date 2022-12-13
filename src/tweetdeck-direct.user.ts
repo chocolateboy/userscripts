@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from TweetDeck
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.1
+// @version       2.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://tweetdeck.twitter.com/

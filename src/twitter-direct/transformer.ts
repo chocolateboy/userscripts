@@ -13,20 +13,38 @@ import {
     isTrackedUrl,
     Dict,
     Json,
-    JsonObject
+    JsonObject,
+    isNumber,
+    isString
 } from './util'
 
+type Entity = {
+    fromIndex: number;
+    toIndex: number;
+    ref: {
+        type: string;
+        url: string;
+        urlType: string;
+    }
+}
+
+type Options = {
+    urlBlacklist?: Set<string>;
+}
+
 type State = {
+    path: string;
     count: number;
     seen: Map<string, string>;
     unresolved: Map<string, Target[]>;
 }
 
-type Target = { target: Dict, key: string };
-
-type Options = {
-    urlBlacklist?: Set<string>;
+type Summary = {
+    text: string;
+    entities: Entity[];
 }
+
+type Target = { target: Dict, key: string };
 
 /*
  * a pattern which matches the content-type header of responses we scan for
@@ -114,10 +132,19 @@ const STATS: Record<string, number> = {}
  */
 const TWITTER_API = /^(?:(?:api|mobile)\.)?twitter\.com$/
 
-/*
- * object keys whose corresponding values may be t.co URLs
- */
-const URL_KEYS = new Set(['url', 'string_value'])
+const isSummary = (value: unknown): value is Summary => {
+    return isPlainObject(value)
+        && isString(value.text)
+        && Array.isArray(value.entities)
+}
+
+const isEntity = (value: unknown): value is Entity => {
+    return isPlainObject(value)
+        && isNumber(value.fromIndex)
+        && isNumber(value.toIndex)
+        && isPlainObject(value.ref)
+        && isString(value.ref.url)
+}
 
 export class Transformer {
     private urlBlacklist: Set<string>;
@@ -126,7 +153,7 @@ export class Transformer {
      * replace the default XHR#send with our custom version, which scans responses
      * for tweets and expands their URLs
      */
-    public static register (options: Options) {
+    public static register (options: Options): Transformer {
         const transformer = new this(options)
         const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
         const send = transformer.hookXHRSend(xhrProto.send)
@@ -145,7 +172,7 @@ export class Transformer {
      * response if it's a) JSON and b) contains URL data; otherwise, we leave it
      * unchanged
      */
-    private onResponse (xhr: XMLHttpRequest, uri: string) {
+    private onResponse (xhr: XMLHttpRequest, uri: string): void {
         const contentType = xhr.getResponseHeader('Content-Type')
 
         if (!contentType || !CONTENT_TYPE.test(contentType)) {
@@ -225,10 +252,10 @@ export class Transformer {
      *
      * returns the number of substituted URLs
      */
-    private transform (data: JsonObject, path: string) {
+    private transform (data: JsonObject, path: string): number {
         const seen: State['seen'] = new Map()
         const unresolved: State['unresolved'] = new Map()
-        const state = { count: 0, seen, unresolved }
+        const state = { path, count: 0, seen, unresolved }
 
         // [1] top-level tweet or user data (e.g. /favorites/create.json)
         if (Array.isArray(data) || ('id_str' in data) /* [1] */) {
@@ -280,7 +307,7 @@ export class Transformer {
      * reduce the keys under context.legacy (typically around 30) to the
      * handful we care about
      */
-    private transformLegacyObject (value: Dict) {
+    private transformLegacyObject (value: Dict): Dict {
         // XXX don't expand legacy.url: leaving it unexpanded results in media
         // URLs (e.g. YouTube URLs) appearing as clickable links in the tweet
         // (which we want)
@@ -300,10 +327,36 @@ export class Transformer {
     }
 
     /*
+     * extract expanded URLS from a summary object
+     *
+     * the expanded URLs are just extracted here; they're expanded when the
+     * +url+ property within the summary is visited
+     */
+    private transformSummary (state: State, summary: Summary): Summary {
+        const { entities, text } = summary
+
+        for (const entity of entities) {
+            if (!isEntity(entity)) {
+                console.warn('invalid entity:', entity)
+                break
+            }
+
+            const { url } = entity.ref
+
+            if (isTrackedUrl(url)) {
+                const expandedUrl = text.slice(entity.fromIndex, entity.toIndex)
+                state.seen.set(url, expandedUrl)
+            }
+        }
+
+        return summary
+    }
+
+    /*
      * expand t.co URL nodes in place, either obj.url or obj.string_value in
      * binding_values arrays/objects
      */
-    private transformURL (state: State, context: Dict, key: string, value: string) {
+    private transformURL (state: State, context: Dict, key: string, value: string): string {
         const { seen, unresolved } = state
         const writable = this.isWritable(context)
 
@@ -332,6 +385,8 @@ export class Transformer {
                 targets.push({ target: context, key })
             }
         }
+
+        return value
     }
 
     /*
@@ -339,7 +394,7 @@ export class Transformer {
      * in our custom response handler. once done, we delegate to the original
      * handler (this.onreadystatechange)
      */
-    protected hookXHRSend (oldSend: XMLHttpRequest['send']) {
+    protected hookXHRSend (oldSend: XMLHttpRequest['send']): XMLHttpRequest['send'] {
         const self = this
 
         return function send (this: XMLHttpRequest, body = null) {
@@ -365,7 +420,7 @@ export class Transformer {
      * used by TweetDeck Direct to preserve t.co URLs which are expanded in the
      * UI (via a data-full-url attribute on the link)
      */
-    protected isWritable (_context: JsonObject) {
+    protected isWritable (_context: JsonObject): boolean {
         return true
     }
 
@@ -390,27 +445,40 @@ export class Transformer {
      * visitor callback which replaces a t.co +url+ property in an object with
      * its expanded version
      */
-    protected visit (state: State, context: Dict, key: string, value: Json) {
+    protected visit (state: State, context: Dict, key: string, value: Json): Json {
         // exclude subtrees which never contain t.co URLs
         if (PRUNE_KEYS.has(key)) {
             return 0 // a terminal value to stop traversal
         }
 
-        // we only care about the "card_url" property in binding_values
-        // objects/arrays. exclude the other 24 properties
-        if (key === 'binding_values') {
-            return this.transformBindingValues(value)
-        }
+        switch (key) {
+            case 'binding_values':
+                // we only care about the "card_url" property in binding_values
+                // objects/arrays. exclude the other 24 properties
+                return this.transformBindingValues(value)
 
-        // reduce the keys under context.legacy (typically around 30) to the
-        // handful we care about
-        if (key === 'legacy' && isPlainObject(value)) {
-            return this.transformLegacyObject(value)
-        }
+            case 'legacy':
+                // reduce the keys under context.legacy (typically around 30) to the
+                // handful we care about
+                if (isPlainObject(value)) {
+                    return this.transformLegacyObject(value)
+                }
+                break
 
-        // expand t.co URL nodes in place
-        if (URL_KEYS.has(key) && isTrackedUrl(value)) {
-            this.transformURL(state, context, key, value)
+            case 'string_value':
+            case 'url':
+                // expand t.co URL nodes in place
+                if (isTrackedUrl(value)) {
+                    return this.transformURL(state, context, key, value)
+                }
+                break
+
+            case 'summary':
+                // extract expanded URLs from a summary object (used in
+                // Community Notes)
+                if (isSummary(value)) {
+                    return this.transformSummary(state, value)
+                }
         }
 
         return value
