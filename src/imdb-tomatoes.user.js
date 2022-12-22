@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.0.1
+// @version       5.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -602,7 +602,7 @@ const TVMatcher = {
             const seasons = $rt.meta.containsSeason
 
             if (seasons?.length === 1) {
-                const url = get(seasons, [-1, 'url'])
+                const url = get(seasons, [0, 'url'])
 
                 if (url) {
                     return url
@@ -1068,7 +1068,7 @@ async function getRTData (imdb, rtType) {
     //   tvSeries:    "Sesame Street"
     //   preload URL: https://www.rottentomatoes.com/tv/sesame_street
     //
-    // this guess produces the correct URL most (~75%) of the time
+    // this guess produces the correct URL most (~70%) of the time
     //
     // preloading this page serves two purposes:
     //
@@ -1200,7 +1200,8 @@ async function getRTData (imdb, rtType) {
     }
 
     const rtClient = new RTClient({ match, matcher, preload, state })
-    const $rt = await rtClient.loadPage()
+
+    let $rt = await rtClient.loadPage()
 
     if (!$rt) {
         throw abort()
@@ -1214,6 +1215,8 @@ async function getRTData (imdb, rtType) {
         if (!verified) {
             throw abort()
         }
+
+        $rt = state.rtPage
     }
 
     const $rating = $rt.meta.aggregateRating
