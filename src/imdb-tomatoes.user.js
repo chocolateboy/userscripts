@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.0.2
+// @version       5.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -669,12 +669,7 @@ class RTClient {
         // match URL (API result) and fallback (guessed) URL are the same
         if (match.url === preload.url) {
             res = await preload.promise // join the in-flight request
-
-            if (!res) {
-                log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
-                return
-            }
-        } else { // separate match URL and fallback URL
+        } else { // different match URL and fallback URL
             try {
                 res = await asyncGet(state.url) // load the (absolute) match URL
                 state.fallbackUnused = true // only set if the request succeeds
@@ -691,13 +686,13 @@ class RTClient {
                     log(`loading ${requestType} URL:`, state.url)
 
                     res = await preload.promise
-
-                    if (!res) {
-                        log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
-                        return
-                    }
                 }
             }
+        }
+
+        if (!res) {
+            log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
+            return
         }
 
         log(`${requestType} response: ${res.status} ${res.statusText}`)
@@ -819,8 +814,8 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
     // 2) add a custom stylesheet which:
     //
     //   - sets the star (SVG) to the right color
-    //   - restores support for italics in the consensus text
     //   - reorders the appended widget (see attachWidget)
+    //   - restores support for italics in the consensus text
     GM_addStyle(`
         #rt-rating svg { color: ${COLOR[style]}; }
         #rt-rating { order: -1; }
@@ -1068,7 +1063,7 @@ async function getRTData (imdb, rtType) {
     //   tvSeries:    "Sesame Street"
     //   preload URL: https://www.rottentomatoes.com/tv/sesame_street
     //
-    // this guess produces the correct URL most (~70%) of the time
+    // this guess produces the correct URL most (~75%) of the time
     //
     // preloading this page serves two purposes:
     //
