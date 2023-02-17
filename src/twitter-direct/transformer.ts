@@ -327,7 +327,7 @@ export class Transformer {
     }
 
     /*
-     * extract expanded URLS from a summary object
+     * extract expanded URLs from a summary object
      *
      * the expanded URLs are just extracted here; they're expanded when the
      * +url+ property within the summary is visited
