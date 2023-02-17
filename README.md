@@ -175,7 +175,7 @@ The following are all direct links, i.e. clicking them installs the script.
 
 # COPYRIGHT AND LICENSE
 
-Copyright © 2011-2022 by chocolateboy.
+Copyright © 2011-2023 by chocolateboy.
 
 These userscripts are free software; you can redistribute and/or modify them
 under the terms of the [GPL](https://www.gnu.org/copyleft/gpl.html).
