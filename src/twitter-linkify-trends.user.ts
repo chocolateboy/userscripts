@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.1
+// @version       2.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -56,7 +56,7 @@ const CACHE = new exports.default(128)
  * uncomment this to debug the selectors by assigning distinct background colors
  * to trend and event elements
  */
-// const DEBUG = { event: 'powderblue', trend: 'palegreen' }
+// const DEBUG: Debug = { event: 'powderblue', trend: 'palegreen' }
 const DEBUG: Debug = {}
 
 /*
@@ -65,9 +65,9 @@ const DEBUG: Debug = {}
 const DISABLED_EVENTS = 'click touch'
 
 /*
- * URL path of the JSON document containing event data
+ * URL path (suffix) of the JSON document containing event data
  */
-const EVENT_DATA = '/i/api/2/guide.json'
+const EVENT_DATA = '/2/guide.json' // e.g. https://api.twitter.com/2/guide.json
 
 /*
  * path to the array of event records within the JSON document; each record
@@ -96,7 +96,7 @@ const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
 
 // NOTE: we detect the image inside an event/event-hero element and then
 // navigate up to the event to avoid the overhead of using :has()
-const EVENT = 'div[role="link"]:not([data-testid]):not([data-linked])'
+const EVENT = '[data-testid="sidebarColumn"] div[role="link"]:not([data-testid]):not([data-linked])'
 const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([src=""])`
 const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])'
 const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`
@@ -148,7 +148,7 @@ function hookXHROpen (oldOpen: XMLHttpRequest['open']) {
     return function open (this: XMLHttpRequest, _method: string, url: string) { // preserve the arity
         const $url = new URL(url)
 
-        if ($url.pathname === EVENT_DATA) {
+        if ($url.pathname.endsWith(EVENT_DATA)) {
             // register a new listener
             this.addEventListener('load', () => processEventData(this.responseText))
         }
