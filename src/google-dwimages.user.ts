@@ -3,17 +3,18 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.2
+// @version       2.10.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
-// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.1/dist/cash.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.4/dist/cash.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @grant         GM.registerMenuCommand
 // @grant         GM.setClipboard
+// @run-at        document-start
 // ==/UserScript==
 
 // XXX needed to appease esbuild
@@ -35,7 +36,7 @@ type Metadata = any[];
 const CACHE = new Map<number, string>()
 
 // events to intercept (stop propagating) in result elements
-const EVENTS = 'auxclick click focus focusin mousedown touchstart'
+const EVENTS = 'auxclick click contextmenu focus focusin keydown mousedown touchstart'
 
 // the type of image-metadata nodes; other types may be found in the tree, e.g.
 // the type of nodes containing metadata for "Related searches" widgets is 7
@@ -140,7 +141,7 @@ function onLoad (xhr: XMLHttpRequest, $container: JQuery) {
     try {
         mergeImageMetadata(parsed)
         // process the new images
-        $container.children(UNPROCESSED_RESULTS).each(onResult)
+        $container.find(UNPROCESSED_RESULTS).each(onResult)
     } catch (e) {
         console.error("Can't merge new metadata:", e)
     }
@@ -161,11 +162,13 @@ function stopPropagation (e: Event): void {
  * a listener for the requests for additional data
  */
 function init (): void {
-    const $container = $('.islrc')
+    const container = document.querySelector(UNPROCESSED_RESULTS)?.parentElement
 
-    if (!$container.length) {
+    if (!container) {
         throw new Error("Can't find results container")
     }
+
+    const $container = $(container)
 
     mergeImageMetadata(INITIAL_DATA = GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data)
 
@@ -173,7 +176,7 @@ function init (): void {
     // shown initially. the next 50 are displayed lazily and then the remaining
     // images are fetched in batches of 100. this handles images 50-99
     const callback = (_mutations: MutationRecord[], observer: MutationObserver) => {
-        const $results = $container.children(UNPROCESSED_RESULTS)
+        const $results = $container.find(UNPROCESSED_RESULTS)
 
         for (const result of $results) {
             const index = $(result).data('ri') // data() converts it to an integer
@@ -188,12 +191,12 @@ function init (): void {
     }
 
     // process the initial images
-    const $initial = $container.children(UNPROCESSED_RESULTS)
+    const $initial = $container.find(UNPROCESSED_RESULTS)
     const observer = new MutationObserver(callback)
     const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
 
     $initial.each(onResult) // 0-49
-    observer.observe($container.get(0)!, { childList: true }) // 50-99
+    observer.observe(container, { childList: true }) // 50-99
     xhrProto.open = GMCompat.export(hookXhrOpen(xhrProto.open, $container)) // 100+
 }
 
@@ -217,6 +220,7 @@ function onResult (this: HTMLElement): void {
 
     // prevent new interceptors being added to this element and its
     // descendants and pre-empt the existing interceptors
+
     $result.find('[jsaction]').add($result).each(function () {
         $(this).removeAttr('jsaction').on(EVENTS, stopPropagation)
     })
@@ -228,12 +232,16 @@ function onResult (this: HTMLElement): void {
     CACHE.delete(index)
 }
 
+function run () {
+    try {
+        init()
+    } catch (e) {
+        console.error('Initialisation error:', e)
+    }
+}
+
 GM.registerMenuCommand('Copy image metadata to the clipboard', () => {
     GM.setClipboard(JSON.stringify(INITIAL_DATA))
 })
 
-try {
-    init()
-} catch (e) {
-    console.error('Initialisation error:', e)
-}
+document.addEventListener('readystatechange', run, { once: true })

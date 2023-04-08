@@ -3,17 +3,18 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.9.2
+// @version       2.10.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/*tbm=isch*
 // @include       https://encrypted.google.tld/*tbm=isch*
-// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.1/dist/cash.min.js
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.4/dist/cash.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @grant         GM.registerMenuCommand
 // @grant         GM.setClipboard
+// @run-at        document-start
 // ==/UserScript==
 
 // NOTE This file is generated from src/google-dwimages.user.ts and should not be edited directly.
@@ -23,7 +24,7 @@
   // src/google-dwimages.user.ts
   // @license       GPL
   var CACHE = /* @__PURE__ */ new Map();
-  var EVENTS = "auxclick click focus focusin mousedown touchstart";
+  var EVENTS = "auxclick click contextmenu focus focusin keydown mousedown touchstart";
   var IMAGE_METADATA = 1;
   var IMAGE_METADATA_ENDPOINT = /\/batchexecute\?rpcids=/;
   var INITIAL_DATA;
@@ -70,7 +71,7 @@
     }
     try {
       mergeImageMetadata(parsed);
-      $container.children(UNPROCESSED_RESULTS).each(onResult);
+      $container.find(UNPROCESSED_RESULTS).each(onResult);
     } catch (e) {
       console.error("Can't merge new metadata:", e);
     }
@@ -79,13 +80,14 @@
     e.stopPropagation();
   }
   function init() {
-    const $container = $(".islrc");
-    if (!$container.length) {
+    const container = document.querySelector(UNPROCESSED_RESULTS)?.parentElement;
+    if (!container) {
       throw new Error("Can't find results container");
     }
+    const $container = $(container);
     mergeImageMetadata(INITIAL_DATA = GMCompat.unsafeWindow.AF_initDataChunkQueue[1].data);
     const callback = (_mutations, observer2) => {
-      const $results = $container.children(UNPROCESSED_RESULTS);
+      const $results = $container.find(UNPROCESSED_RESULTS);
       for (const result of $results) {
         const index = $(result).data("ri");
         if (CACHE.has(index)) {
@@ -96,11 +98,11 @@
         }
       }
     };
-    const $initial = $container.children(UNPROCESSED_RESULTS);
+    const $initial = $container.find(UNPROCESSED_RESULTS);
     const observer = new MutationObserver(callback);
     const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype;
     $initial.each(onResult);
-    observer.observe($container.get(0), { childList: true });
+    observer.observe(container, { childList: true });
     xhrProto.open = GMCompat.export(hookXhrOpen(xhrProto.open, $container));
   }
   function onResult() {
@@ -117,12 +119,15 @@
     $result.find("a").eq(0).attr("href", imageUrl);
     CACHE.delete(index);
   }
+  function run() {
+    try {
+      init();
+    } catch (e) {
+      console.error("Initialisation error:", e);
+    }
+  }
   GM.registerMenuCommand("Copy image metadata to the clipboard", () => {
     GM.setClipboard(JSON.stringify(INITIAL_DATA));
   });
-  try {
-    init();
-  } catch (e) {
-    console.error("Initialisation error:", e);
-  }
+  document.addEventListener("readystatechange", run, { once: true });
 })();
