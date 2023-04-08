@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.0.3
+// @version       5.0.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -656,12 +656,60 @@ class RTClient {
     }
 
     /**
-     * load the RT URL (match or fallback) and return the corresponding XHR
-     * response
+     * confirm the metadata of the RT page (match or fallback) matches the IMDb
+     * metadata
+     *
+     * @param {RTDoc} rtPage
+     * @param {any} imdb
+     * @param {boolean} fallbackUnused
+     * @return {Promise<{ verified: boolean, rtPage: RTDoc }>}
      */
-    async loadPage () {
+    async _verify (rtPage, imdb, fallbackUnused) {
+        const { match, matcher, preload, state } = this
+
+        let verified = matcher.verify(rtPage, imdb)
+
+        if (!verified) {
+            if (match.force) {
+                log('forced:', true)
+                verified = true
+            } else if (fallbackUnused) {
+                state.url = preload.fullUrl
+                log(`loading fallback URL:`, preload.fullUrl)
+
+                const res = await preload.promise
+
+                if (res) {
+                    log(`fallback response: ${res.status} ${res.statusText}`)
+                    rtPage = this._parseResponse(res, preload.url)
+                    verified = matcher.verify(rtPage, imdb)
+                } else {
+                    log(`error loading ${preload.fullUrl} (${preload.error.status} ${preload.error.statusText})`)
+                }
+            }
+        }
+
+        if (typeof verified === 'string') {
+            state.targetUrl = verified
+            verified = true
+        }
+
+        log('verified:', verified)
+
+        return { verified, rtPage }
+    }
+
+    /**
+     * load the RT URL (match or fallback) and return the resulting RT page
+     *
+     * @param {any} imdb
+     * @return {Promise<RTDoc | void>}
+     */
+    async loadPage (imdb) {
         const { match, preload, state } = this
         let requestType = match.fallback ? 'fallback' : 'match'
+        let verify = match.verify
+        let fallbackUnused = false
         let res
 
         log(`loading ${requestType} URL:`, state.url)
@@ -672,16 +720,16 @@ class RTClient {
         } else { // different match URL and fallback URL
             try {
                 res = await asyncGet(state.url) // load the (absolute) match URL
-                state.fallbackUnused = true // only set if the request succeeds
+                fallbackUnused = true // only set if the request succeeds
             } catch (error) { // bogus URL in API result (or transient server error)
                 log(`error loading ${state.url} (${error.status} ${error.statusText})`)
 
-                if (match.force) { // URL locked in checkOverrides
+                if (match.force) { // URL locked in checkOverrides, so nothing to fall back to
                     return
                 } else { // use (and verify) the fallback URL
                     requestType = 'fallback'
                     state.url = preload.fullUrl
-                    state.verify = true
+                    verify = true
 
                     log(`loading ${requestType} URL:`, state.url)
 
@@ -697,50 +745,23 @@ class RTClient {
 
         log(`${requestType} response: ${res.status} ${res.statusText}`)
 
-        return this._parseResponse(res, state.url)
-    }
+        let rtPage = this._parseResponse(res, state.url)
 
-    /**
-     * confirm the metadata of the RT page (match or fallback) matches the IMDb
-     * metadata
-     *
-     * @param {any} imdb
-     * @return {Promise<boolean>}
-     */
-    async verify (imdb) {
-        const { match, matcher, preload, state } = this
+        if (verify) {
+            const { verified, rtPage: newRtPage } = await this._verify(
+                rtPage,
+                imdb,
+                fallbackUnused
+            )
 
-        let $rt = /** @type {RTDoc} */ (state.rtPage)
-        let verified = matcher.verify($rt, imdb)
-
-        if (!verified) {
-            if (match.force) {
-                log('forced:', true)
-                verified = true
-            } else if (state.fallbackUnused) {
-                state.url = preload.fullUrl
-                log(`loading fallback URL:`, state.url)
-
-                const res = await preload.promise
-
-                if (res) {
-                    log(`fallback response: ${res.status} ${res.statusText}`)
-                    $rt = state.rtPage = this._parseResponse(res, preload.url)
-                    verified = matcher.verify($rt, imdb)
-                } else {
-                    log(`error loading ${state.url} (${preload.error.status} ${preload.error.statusText})`)
-                }
+            if (!verified) {
+                return
             }
+
+            rtPage = newRtPage
         }
 
-        if (typeof verified === 'string') {
-            state.targetUrl = verified
-            verified = true
-        }
-
-        log('verified:', verified)
-
-        return verified
+        return rtPage
     }
 }
 
@@ -1187,31 +1208,16 @@ async function getRTData (imdb, rtType) {
 
     /** @type {RTState} */
     const state = {
-        fallbackUnused: false,
-        rtPage:         null,
-        targetUrl:      match.targetUrl,
-        url:            RT_BASE + match.url,
-        verify:         match.verify,
+        targetUrl: match.targetUrl,
+        url:       RT_BASE + match.url,
     }
 
     const rtClient = new RTClient({ match, matcher, preload, state })
 
-    let $rt = await rtClient.loadPage()
+    let $rt = await rtClient.loadPage(imdb)
 
     if (!$rt) {
         throw abort()
-    }
-
-    state.rtPage = $rt
-
-    if (state.verify) {
-        const verified = await rtClient.verify(imdb)
-
-        if (!verified) {
-            throw abort()
-        }
-
-        $rt = state.rtPage
     }
 
     const $rating = $rt.meta.aggregateRating

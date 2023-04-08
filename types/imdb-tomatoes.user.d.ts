@@ -48,10 +48,7 @@ declare global {
     type RTMovieResult = RTResult;
 
     type RTState = {
-        fallbackUnused: boolean;
-        rtPage: RTDoc | null;
         targetUrl: string | null;
         url: string;
-        verify: boolean;
     };
 }
