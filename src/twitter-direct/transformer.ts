@@ -292,7 +292,7 @@ export class Transformer {
      * reduce the large binding_values array/object to the one property we care
      * about (card_url)
      */
-    private transformBindingValues (value: Json) {
+    private transformBindingValues (value: Json): Json {
         if (Array.isArray(value)) {
             const found = value.find(it => (it as Dict)?.key === 'card_url')
             return found ? [found] : 0
@@ -329,7 +329,7 @@ export class Transformer {
     /*
      * extract expanded URLs from a summary object
      *
-     * the expanded URLs are just extracted here; they're expanded when the
+     * the expanded URLs are only extracted here; they're substituted when the
      * +url+ property within the summary is visited
      */
     private transformSummary (state: State, summary: Summary): Summary {
@@ -356,29 +356,29 @@ export class Transformer {
      * expand t.co URL nodes in place, either obj.url or obj.string_value in
      * binding_values arrays/objects
      */
-    private transformURL (state: State, context: Dict, key: string, value: string): string {
+    private transformURL (state: State, context: Dict, key: string, url: string): string {
         const { seen, unresolved } = state
         const writable = this.isWritable(context)
 
         let expandedUrl
 
-        if ((expandedUrl = seen.get(value))) {
+        if ((expandedUrl = seen.get(url))) {
             if (writable) {
                 context[key] = expandedUrl
                 ++state.count
             }
         } else if ((expandedUrl = checkUrl(context.expanded_url || context.expanded))) {
-            seen.set(value, expandedUrl)
+            seen.set(url, expandedUrl)
 
             if (writable) {
                 context[key] = expandedUrl
                 ++state.count
             }
         } else {
-            let targets = unresolved.get(value)
+            let targets = unresolved.get(url)
 
             if (!targets) {
-                unresolved.set(value, targets = [])
+                unresolved.set(url, targets = [])
             }
 
             if (writable) {
@@ -386,7 +386,7 @@ export class Transformer {
             }
         }
 
-        return value
+        return url
     }
 
     /*
@@ -425,7 +425,7 @@ export class Transformer {
     }
 
     /*
-     * traverse an object, keeping track of the path of each node.
+     * traverse an object by hijacking JSON.stringify's visitor (replacer).
      * dispatches each node to the +visit+ method
      */
     protected traverse (state: State, data: Json): void {
@@ -458,8 +458,8 @@ export class Transformer {
                 return this.transformBindingValues(value)
 
             case 'legacy':
-                // reduce the keys under context.legacy (typically around 30) to the
-                // handful we care about
+                // reduce the keys under context.legacy (typically around 30) to
+                // the handful we care about
                 if (isPlainObject(value)) {
                     return this.transformLegacyObject(value)
                 }

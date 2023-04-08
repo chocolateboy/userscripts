@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from TweetDeck
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.0
+// @version       2.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://tweetdeck.twitter.com/
@@ -24,7 +24,7 @@ const SELECTOR = [
 
 /*
  * a list of document URIs (paths) which are known to not contain t.co URLs and
- * which therefore don't need to be traversed
+ * which therefore don't need to be transformed
  */
 const URL_BLACKLIST = new Set([
     '/search/typeahead.json',

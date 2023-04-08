@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.0
+// @version       2.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -18,7 +18,7 @@ import { Transformer } from './twitter-direct/transformer'
 
 /*
  * a list of document URIs (paths) which are known to not contain t.co URLs and
- * which therefore don't need to be traversed
+ * which therefore don't need to be transformed
  */
 const URL_BLACKLIST = new Set([
     '/hashflags.json',

@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.0
+// @version       2.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -48,6 +48,7 @@
     "globalObjects",
     "inbox_initial_state",
     "modules",
+    // TweetDeck
     "users"
   ];
   var LEGACY_KEYS = [
@@ -91,6 +92,10 @@
   };
   var Transformer = class {
     urlBlacklist;
+    /*
+     * replace the default XHR#send with our custom version, which scans responses
+     * for tweets and expands their URLs
+     */
     static register(options) {
       const transformer = new this(options);
       const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype;
@@ -101,6 +106,11 @@
     constructor(options) {
       this.urlBlacklist = options.urlBlacklist || /* @__PURE__ */ new Set();
     }
+    /*
+     * replacement for Twitter's default handler for XHR requests. we transform the
+     * response if it's a) JSON and b) contains URL data; otherwise, we leave it
+     * unchanged
+     */
     onResponse(xhr, uri) {
       const contentType = xhr.getResponseHeader("Content-Type");
       if (!contentType || !CONTENT_TYPE.test(contentType)) {
@@ -144,6 +154,12 @@
         console.log(STATS);
       }
     }
+    /*
+     * replace t.co URLs with the original URL in all locations in the document
+     * which may contain them
+     *
+     * returns the number of substituted URLs
+     */
     transform(data, path) {
       const seen = /* @__PURE__ */ new Map();
       const unresolved = /* @__PURE__ */ new Map();
@@ -172,6 +188,10 @@
       }
       return state.count;
     }
+    /*
+     * reduce the large binding_values array/object to the one property we care
+     * about (card_url)
+     */
     transformBindingValues(value) {
       if (Array.isArray(value)) {
         const found = value.find((it) => it?.key === "card_url");
@@ -182,6 +202,10 @@
         return 0;
       }
     }
+    /*
+     * reduce the keys under context.legacy (typically around 30) to the
+     * handful we care about
+     */
     transformLegacyObject(value) {
       const filtered = {};
       for (let i = 0; i < LEGACY_KEYS.length; ++i) {
@@ -192,6 +216,12 @@
       }
       return filtered;
     }
+    /*
+     * extract expanded URLs from a summary object
+     *
+     * the expanded URLs are only extracted here; they're substituted when the
+     * +url+ property within the summary is visited
+     */
     transformSummary(state, summary) {
       const { entities, text } = summary;
       for (const entity of entities) {
@@ -207,32 +237,41 @@
       }
       return summary;
     }
-    transformURL(state, context, key, value) {
+    /*
+     * expand t.co URL nodes in place, either obj.url or obj.string_value in
+     * binding_values arrays/objects
+     */
+    transformURL(state, context, key, url) {
       const { seen, unresolved } = state;
       const writable = this.isWritable(context);
       let expandedUrl;
-      if (expandedUrl = seen.get(value)) {
+      if (expandedUrl = seen.get(url)) {
         if (writable) {
           context[key] = expandedUrl;
           ++state.count;
         }
       } else if (expandedUrl = checkUrl(context.expanded_url || context.expanded)) {
-        seen.set(value, expandedUrl);
+        seen.set(url, expandedUrl);
         if (writable) {
           context[key] = expandedUrl;
           ++state.count;
         }
       } else {
-        let targets = unresolved.get(value);
+        let targets = unresolved.get(url);
         if (!targets) {
-          unresolved.set(value, targets = []);
+          unresolved.set(url, targets = []);
         }
         if (writable) {
           targets.push({ target: context, key });
         }
       }
-      return value;
+      return url;
     }
+    /*
+     * replace the built-in XHR#send method with a custom version which swaps
+     * in our custom response handler. once done, we delegate to the original
+     * handler (this.onreadystatechange)
+     */
     hookXHRSend(oldSend) {
       const self = this;
       return function send(body = null) {
@@ -248,9 +287,19 @@
         oldSend.call(this, body);
       };
     }
+    /*
+     * a hook which a subclass can use to veto an expansion.
+     *
+     * used by TweetDeck Direct to preserve t.co URLs which are expanded in the
+     * UI (via a data-full-url attribute on the link)
+     */
     isWritable(_context) {
       return true;
     }
+    /*
+     * traverse an object by hijacking JSON.stringify's visitor (replacer).
+     * dispatches each node to the +visit+ method
+     */
     traverse(state, data) {
       if (!isObject(data)) {
         return;
@@ -261,6 +310,10 @@
       };
       JSON.stringify(data, replacer);
     }
+    /*
+     * visitor callback which replaces a t.co +url+ property in an object with
+     * its expanded version
+     */
     visit(state, context, key, value) {
       if (PRUNE_KEYS.has(key)) {
         return 0;
