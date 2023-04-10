@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.0.4
+// @version       5.0.5
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -677,7 +677,7 @@ class RTClient {
                 state.url = preload.fullUrl
                 log(`loading fallback URL:`, preload.fullUrl)
 
-                const res = await preload.promise
+                const res = await preload.request
 
                 if (res) {
                     log(`fallback response: ${res.status} ${res.statusText}`)
@@ -716,7 +716,7 @@ class RTClient {
 
         // match URL (API result) and fallback (guessed) URL are the same
         if (match.url === preload.url) {
-            res = await preload.promise // join the in-flight request
+            res = await preload.request // join the in-flight request
         } else { // different match URL and fallback URL
             try {
                 res = await asyncGet(state.url) // load the (absolute) match URL
@@ -733,7 +733,7 @@ class RTClient {
 
                     log(`loading ${requestType} URL:`, state.url)
 
-                    res = await preload.promise
+                    res = await preload.request
                 }
             }
         }
@@ -1105,7 +1105,7 @@ async function getRTData (imdb, rtType) {
         debug('preloading fallback URL:', url)
 
         /** @type {Promise<Tampermonkey.Response<any>>} */
-        const promise = asyncGet(url)
+        const request = asyncGet(url)
             .then(res => {
                 debug(`preload response: ${res.status} ${res.statusText}`)
                 return res
@@ -1118,7 +1118,7 @@ async function getRTData (imdb, rtType) {
         return {
             error: null,
             fullUrl: url,
-            promise,
+            request,
             url: path,
         }
     })()
@@ -1205,7 +1205,6 @@ async function getRTData (imdb, rtType) {
     log('matched:', !match.fallback)
 
     // values that can be modified by the RT client
-
     /** @type {RTState} */
     const state = {
         targetUrl: match.targetUrl,
@@ -1213,8 +1212,7 @@ async function getRTData (imdb, rtType) {
     }
 
     const rtClient = new RTClient({ match, matcher, preload, state })
-
-    let $rt = await rtClient.loadPage(imdb)
+    const $rt = await rtClient.loadPage(imdb)
 
     if (!$rt) {
         throw abort()
@@ -1438,13 +1436,7 @@ async function run () {
     // purgeCached(-1) // disable the cache
     purgeCached(now)
 
-    const imdbId = $(`meta[property="imdb:pageConst"]`).attr('content')
-
-    if (!imdbId) {
-        // XXX shouldn't get here
-        console.error("can't find IMDb ID:", location.href)
-        return
-    }
+    const imdbId = location.pathname.split('/')[2]
 
     log('id:', imdbId)
 
