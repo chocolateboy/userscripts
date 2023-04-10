@@ -259,11 +259,11 @@ export class Transformer {
 
         // [1] top-level tweet or user data (e.g. /favorites/create.json)
         if (Array.isArray(data) || ('id_str' in data) /* [1] */) {
-            this.traverse(state, data)
+            this.traverse(data, state)
         } else {
             for (const key of DOCUMENT_ROOTS) {
                 if (key in data) {
-                    this.traverse(state, data[key])
+                    this.traverse(data[key], state)
                 }
             }
         }
@@ -332,7 +332,7 @@ export class Transformer {
      * the expanded URLs are only extracted here; they're substituted when the
      * +url+ property within the summary is visited
      */
-    private transformSummary (state: State, summary: Summary): Summary {
+    private transformSummary (summary: Summary, state: State): Summary {
         const { entities, text } = summary
 
         for (const entity of entities) {
@@ -356,7 +356,7 @@ export class Transformer {
      * expand t.co URL nodes in place, either obj.url or obj.string_value in
      * binding_values arrays/objects
      */
-    private transformURL (state: State, context: Dict, key: string, url: string): string {
+    private transformURL (context: Dict, key: string, url: string, state: State): string {
         const { seen, unresolved } = state
         const writable = this.isWritable(context)
 
@@ -428,14 +428,14 @@ export class Transformer {
      * traverse an object by hijacking JSON.stringify's visitor (replacer).
      * dispatches each node to the +visit+ method
      */
-    protected traverse (state: State, data: Json): void {
+    protected traverse (data: Json, state: State): void {
         if (!isObject(data)) {
             return
         }
 
         const self = this
         const replacer = function (this: JsonObject, key: string, value: Json) {
-            return Array.isArray(this) ? value : self.visit(state, this, key, value)
+            return Array.isArray(this) ? value : self.visit(this, key, value, state)
         }
 
         JSON.stringify(data, replacer)
@@ -445,7 +445,7 @@ export class Transformer {
      * visitor callback which replaces a t.co +url+ property in an object with
      * its expanded version
      */
-    protected visit (state: State, context: Dict, key: string, value: Json): Json {
+    protected visit (context: Dict, key: string, value: Json, state: State): Json {
         // exclude subtrees which never contain t.co URLs
         if (PRUNE_KEYS.has(key)) {
             return 0 // a terminal value to stop traversal
@@ -469,7 +469,7 @@ export class Transformer {
             case 'url':
                 // expand t.co URL nodes in place
                 if (isTrackedUrl(value)) {
-                    return this.transformURL(state, context, key, value)
+                    return this.transformURL(context, key, value, state)
                 }
                 break
 
@@ -477,7 +477,7 @@ export class Transformer {
                 // extract expanded URLs from a summary object (used in
                 // Community Notes)
                 if (isSummary(value)) {
-                    return this.transformSummary(state, value)
+                    return this.transformSummary(value, state)
                 }
         }
 
