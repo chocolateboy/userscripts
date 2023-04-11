@@ -28,6 +28,8 @@ declare global {
         request?: Partial<Tampermonkey.Request>;
     };
 
+    type LinkTarget = '_self' | '_blank';
+
     type RTDoc = JQuery<Document> & {
         meta: any;
         document: Document;

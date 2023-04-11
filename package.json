@@ -33,6 +33,7 @@
         "flru": "^1.0.2",
         "get-wild": "^3.0.2",
         "gm-storage": "^2.0.3",
+        "little-emitter": "^0.3.5",
         "npm-run-all": "^4.1.5",
         "shx": "^0.3.4",
         "toc-md-alt": "^0.4.6",

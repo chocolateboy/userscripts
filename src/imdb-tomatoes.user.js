@@ -3,18 +3,19 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.0.5
+// @version       5.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
 // @require       https://code.jquery.com/jquery-3.6.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.11.5/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.11.5/plugin/relativeTime.js
+// @require       https://unpkg.com/dayjs@1.11.7/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.11.7/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
+// @require       https://unpkg.com/little-emitter@0.3.5/dist/emitter.js
 // @resource      api https://pastebin.com/raw/absEYaJ8
 // @resource      overrides https://pastebin.com/raw/kCQZJNai
 // @grant         GM_addStyle
@@ -25,6 +26,7 @@
 // @grant         GM_registerMenuCommand
 // @grant         GM_setValue
 // @grant         GM_xmlhttpRequest
+// @grant         GM_unregisterMenuCommand
 // @connect       algolia.net
 // @connect       www.rottentomatoes.com
 // @run-at        document-start
@@ -52,11 +54,12 @@ const NO_MATCH        = 'no matching results'
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
 const RT_BASE         = 'https://www.rottentomatoes.com'
-const SCRIPT_NAME     = GM_info.script.name
 const WIDGET_ID       = 'rt-rating'
 
+const STATS_KEY  = 'stats'
+const TARGET_KEY = 'target'
 /** @type {Record<string, number>} */
-const METADATA_VERSION = { stats: 3 }
+const METADATA_VERSION = { [STATS_KEY]: 3, [TARGET_KEY]: 1 }
 
 const BALLOON_OPTIONS = {
     classname: 'rt-consensus-balloon',
@@ -81,6 +84,11 @@ const CONNECTION_ERROR = {
     status: 420,
     statusText: 'Connection Error',
 }
+
+const NEW_WINDOW = JSON.stringify({
+    data: '_blank',
+    version: METADATA_VERSION[TARGET_KEY],
+})
 
 const RT_TYPE = /** @type {const} */ ({
     TVSeries: 'tvSeries',
@@ -133,6 +141,22 @@ const clone = value => JSON.parse(JSON.stringify(value))
  * path parser since we don't use the extended syntax
  */
 const get = exports.getter({ split: '.' })
+
+/**
+ * retrieve the target for RT links from GM storage, either "_self" (default)
+ * or "_blank" (new window)
+ *
+ * @type {() => LinkTarget}
+ */
+const getRTLinkTarget = () => JSON.parse(GM_getValue(TARGET_KEY, 'null'))?.data || '_self'
+
+/**
+ * an Event Emitter instance used to publish changes to the target for RT links
+ * ("_blank" or "_self")
+ *
+ * @type {import("little-emitter")}
+ */
+const EMITTER = new exports.Emitter()
 
 /**
  * scan an RT document for properties defined in the text of metadata elements
@@ -675,7 +699,7 @@ class RTClient {
                 verified = true
             } else if (fallbackUnused) {
                 state.url = preload.fullUrl
-                log(`loading fallback URL:`, preload.fullUrl)
+                log('loading fallback URL:', preload.fullUrl)
 
                 const res = await preload.request
 
@@ -861,9 +885,9 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
     })
 
     // 7) update the link's label and URL
-    $rtRating
-        .find('a[role="button"]')
-        .attr({ 'aria-label': 'View RT Rating', href: url })
+    const $link = $rtRating.find('a[role="button"]')
+    $link.attr({ 'aria-label': 'View RT Rating', href: url, target: getRTLinkTarget() })
+    EMITTER.on(TARGET_KEY, (/** @type {LinkTarget} */ target) => $link.prop('target', target))
 
     // 8) attach the tooltip to the widget
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
@@ -1287,6 +1311,41 @@ function purgeCached (date) {
 }
 
 /**
+ * register a menu command which toggles the RT link target between the current
+ * tab/window and a new tab/window
+ */
+function registerLinkTargetMenuCommand () {
+    const toggle = /** @type {const} */ ({ _self: '_blank', _blank: '_self' })
+
+    /** @type {(target: LinkTarget) => string} */
+    const name = target => `Open links in ${target === '_self' ? 'the current' : 'a new'} window`
+
+    /** @type {ReturnType<typeof GM_registerMenuCommand> | null} */
+    let id = null
+
+    let target = getRTLinkTarget()
+
+    const onClick = () => {
+        if (id) {
+            target = toggle[target]
+
+            if (target === '_self') {
+                GM_deleteValue(TARGET_KEY)
+            } else {
+                GM_setValue(TARGET_KEY, NEW_WINDOW)
+            }
+
+            GM_unregisterMenuCommand(id)
+            EMITTER.emit(TARGET_KEY, target)
+        }
+
+        id = GM_registerMenuCommand(name(toggle[target]), onClick)
+    }
+
+    onClick()
+}
+
+/**
  * convert an IMDb title into the most likely basename (final part of the URL)
  * for that title on Rotten Tomatoes, e.g.:
  *
@@ -1508,7 +1567,7 @@ async function run () {
     }
 
     /** @type {{ version: number, data: typeof STATS }} */
-    const stats = JSON.parse(GM_getValue('stats', 'null')) || {
+    const stats = JSON.parse(GM_getValue(STATS_KEY, 'null')) || {
         version: METADATA_VERSION.stats,
         data: clone(STATS),
     }
@@ -1562,21 +1621,23 @@ async function run () {
     } finally {
         bump('requests')
         debug('stats:', stats.data)
-        GM_setValue('stats', JSON.stringify(stats))
+        GM_setValue(STATS_KEY, JSON.stringify(stats))
     }
 }
 
 // register these first so data can be cleared even if there's an error
-GM_registerMenuCommand(`${SCRIPT_NAME}: clear cache`, () => {
+GM_registerMenuCommand('Clear cache', () => {
     purgeCached(-1)
 })
 
-GM_registerMenuCommand(`${SCRIPT_NAME}: clear stats`, () => {
+GM_registerMenuCommand('Clear stats', () => {
     if (confirm('Clear stats?')) {
         log('clearing stats')
-        GM_deleteValue('stats')
+        GM_deleteValue(STATS_KEY)
     }
 })
+
+registerLinkTargetMenuCommand()
 
 // DOMContentLoaded typically fires several seconds after the IMDb ratings
 // widget is displayed, which leads to an unacceptable delay if the result is
