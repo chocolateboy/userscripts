@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.1.0
+// @version       5.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -54,10 +54,10 @@ const NO_MATCH        = 'no matching results'
 const ONE_DAY         = 1000 * 60 * 60 * 24
 const ONE_WEEK        = ONE_DAY * 7
 const RT_BASE         = 'https://www.rottentomatoes.com'
-const WIDGET_ID       = 'rt-rating'
+const STATS_KEY       = 'stats'
+const TARGET_KEY      = 'target'
+const WIDGET_CLASS    = 'rt-rating'
 
-const STATS_KEY  = 'stats'
-const TARGET_KEY = 'target'
 /** @type {Record<string, number>} */
 const METADATA_VERSION = { [STATS_KEY]: 3, [TARGET_KEY]: 1 }
 
@@ -829,16 +829,17 @@ function abort (message = NO_MATCH) {
 }
 
 /**
- * add a Rotten Tomatoes widget to the ratings bar
+ * add Rotten Tomatoes widgets to the desktop/mobile ratings bars
  *
- * @param {JQuery} $ratings
- * @param {JQuery} $imdbRating
+ * @param {JQuery} $imdbRatings
  * @param {Object} data
  * @param {string} data.url
  * @param {string} data.consensus
  * @param {number} data.rating
  */
-function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
+function addWidgets ($imdbRatings, { consensus, rating, url }) {
+    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
+
     /** @type {"tbd" | "rotten" | "fresh"} */
     let style
 
@@ -850,51 +851,58 @@ function addWidget ($ratings, $imdbRating, { consensus, rating, url }) {
         style = 'fresh'
     }
 
-    // clone the IMDb rating widget
-    const $rtRating = $imdbRating.clone()
-
-    // 1) assign a unique ID
-    $rtRating.attr('id', WIDGET_ID)
-
-    // 2) add a custom stylesheet which:
+    // add a custom stylesheet which:
     //
     //   - sets the star (SVG) to the right color
     //   - reorders the appended widget (see attachWidget)
     //   - restores support for italics in the consensus text
     GM_addStyle(`
-        #rt-rating svg { color: ${COLOR[style]}; }
-        #rt-rating { order: -1; }
+        .rt-rating svg { color: ${COLOR[style]}; }
+        .rt-rating { order: -1; }
         .rt-consensus-balloon em { font-style: italic; }
     `)
 
-    // 3) replace "IMDb Rating" with "RT Rating"
-    $rtRating.children().first().text('RT RATING')
+    // the markup for the small (e.g. mobile) and large (e.g. desktop) IMDb
+    // ratings widgets is exactly the same - they only differ in the way they're
+    // (externally) styled
+    for (const imdbRating of $imdbRatings) {
+        const $imdbRating = $(imdbRating)
+        const $ratings = $imdbRating.parent()
 
-    // 4) remove the review count and its preceding spacer element
-    const $score = $rtRating.find('[data-testid="hero-rating-bar__aggregate-rating__score"]')
-    $score.nextAll().remove()
+        // clone the IMDb rating widget
+        const $rtRating = $imdbRating.clone()
 
-    // 5) replace the IMDb rating with the RT score and remove the "/ 10" suffix
-    const score = rating === -1 ? 'N/A' : `${rating}%`
-    $score.children().first().text(score).nextAll().remove()
+        // 1) assign a unique class
+        $rtRating.addClass(WIDGET_CLASS)
 
-    // 6) rename the testids, e.g.:
-    // hero-rating-bar__aggregate-rating -> hero-rating-bar__rt-rating
-    $rtRating.find('[data-testid]').addBack().each(function () {
-        $(this).attr('data-testid', (_, id) => id.replace('aggregate', 'rt'))
-    })
+        // 2) replace "IMDb Rating" with "RT Rating"
+        $rtRating.children().first().text('RT RATING')
 
-    // 7) update the link's label and URL
-    const $link = $rtRating.find('a[role="button"]')
-    $link.attr({ 'aria-label': 'View RT Rating', href: url, target: getRTLinkTarget() })
-    EMITTER.on(TARGET_KEY, (/** @type {LinkTarget} */ target) => $link.prop('target', target))
+        // 3) remove the review count and its preceding spacer element
+        const $score = $rtRating.find('[data-testid="hero-rating-bar__aggregate-rating__score"]')
+        $score.nextAll().remove()
 
-    // 8) attach the tooltip to the widget
-    const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
-    $rtRating.balloon(balloonOptions)
+        // 4) replace the IMDb rating with the RT score and remove the "/ 10" suffix
+        const score = rating === -1 ? 'N/A' : `${rating}%`
+        $score.children().first().text(score).nextAll().remove()
 
-    // 9) prepend the widget to the ratings bar
-    attachWidget($ratings.get(0), $rtRating.get(0))
+        // 5) rename the testids, e.g.:
+        // hero-rating-bar__aggregate-rating -> hero-rating-bar__rt-rating
+        $rtRating.find('[data-testid]').addBack().each(function () {
+            $(this).attr('data-testid', (_, id) => id.replace('aggregate', 'rt'))
+        })
+
+        // 6) update the link's label and URL
+        const $link = $rtRating.find('a[role="button"]')
+        $link.attr({ 'aria-label': 'View RT Rating', href: url, target: getRTLinkTarget() })
+        EMITTER.on(TARGET_KEY, (/** @type {LinkTarget} */ target) => $link.prop('target', target))
+
+        // 7) attach the tooltip to the widget
+        $rtRating.balloon(balloonOptions)
+
+        // 8) prepend the widget to the ratings bar
+        attachWidget($ratings.get(0), $rtRating.get(0))
+    }
 }
 
 /**
@@ -1499,16 +1507,14 @@ async function run () {
 
     log('id:', imdbId)
 
-    // we clone the IMDb widget, so make sure it exists before navigating up to
-    // its container
-    const $imdbRating = $('[data-testid="hero-rating-bar__aggregate-rating"]').first()
+    // we clone the IMDb widgets, so make sure they exist before determining
+    // their content
+    const $imdbRatings = $('[data-testid="hero-rating-bar__aggregate-rating"]')
 
-    if (!$imdbRating.length) {
+    if (!$imdbRatings.length) {
         info(`can't find IMDb rating for ${imdbId}`)
         return
     }
-
-    const $ratings = $imdbRating.parent()
 
     // get the cached result for this page
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
@@ -1520,7 +1526,7 @@ async function run () {
             log(`cached error (expires: ${expires}):`, cached.error)
         } else {
             log(`cached result (expires: ${expires}):`, cached.data)
-            addWidget($ratings, $imdbRating, cached.data)
+            addWidgets($imdbRatings, cached.data)
         }
 
         return
@@ -1606,7 +1612,7 @@ async function run () {
             store({ data }, ONE_WEEK)
         }
 
-        addWidget($ratings, $imdbRating, data)
+        addWidgets($imdbRatings, data)
     } catch (error) {
         bump('miss')
 
