@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.2.2
+// @version       5.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -833,13 +833,13 @@ function abort (message = NO_MATCH) {
 /**
  * add Rotten Tomatoes widgets to the desktop/mobile ratings bars
  *
- * @param {JQuery} $imdbRatings
+ * @param {NodeListOf<HTMLElement>} imdbRatings
  * @param {Object} data
  * @param {string} data.url
  * @param {string} data.consensus
  * @param {number} data.rating
  */
-function addWidgets ($imdbRatings, { consensus, rating, url }) {
+function addWidgets (imdbRatings, { consensus, rating, url }) {
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
     const score = rating === -1 ? 'N/A' : `${rating}%`
     const rtLinkTarget = getRTLinkTarget()
@@ -869,7 +869,7 @@ function addWidgets ($imdbRatings, { consensus, rating, url }) {
     // the markup for the small (e.g. mobile) and large (e.g. desktop) IMDb
     // ratings widgets is exactly the same - they only differ in the way they're
     // (externally) styled
-    for (const imdbRating of $imdbRatings) {
+    for (const imdbRating of imdbRatings) {
         const $imdbRating = $(imdbRating)
         const $ratings = $imdbRating.parent()
 
@@ -1045,8 +1045,12 @@ function checkOverrides (match, imdbId) {
  * @param {string} imdbId
  * @param {string} rtType
  */
-function getIMDbMetadata (imdbId, rtType) {
-    const data = JSON.parse($('#__NEXT_DATA__').text())
+async function getIMDbMetadata (imdbId, rtType) {
+    const json = await poll(() => {
+        return document.getElementById('__NEXT_DATA__')?.textContent?.trim()
+    })
+
+    const data = JSON.parse(json)
     const main = get(data, 'props.pageProps.mainColumnData')
     const extra = get(data, 'props.pageProps.aboveTheFoldData')
     const cast = get(main, 'cast.edges.*.node.name.nameText.text', [])
@@ -1292,6 +1296,45 @@ function pluck (array, path) {
     return (array || []).map(it => get(it, path))
 }
 
+/*
+ * poll for a result, resolving it if found, or rejecting if the search times
+ * out
+ */
+const poll = (function () {
+    let retry = true
+
+    // don't keep polling if we still haven't found anything after the page has
+    // finished loading
+    //
+    // XXX Uncaught TypeError: can't delete property '"jQuery123456789"': proxy deleteProperty handler returned false
+    // $(window).one('DOMContentLoaded', () => { retry = false })
+
+    window.addEventListener('DOMContentLoaded', () => { retry = false }, { once: true })
+
+    /**
+     * @template T
+     * @param {() => T | null | undefined} fn
+     * @return {Promise<T>}
+     */
+    return function poll (fn) {
+        return new Promise((resolve, reject) => {
+            const check = () => {
+                const result = fn()
+
+                if (result) {
+                    resolve(result)
+                } else if (retry) {
+                    requestAnimationFrame(check)
+                } else {
+                    reject()
+                }
+            }
+
+            requestAnimationFrame(check)
+        })
+    }
+})()
+
 /**
  * purge expired entries from the cache older than the supplied date
  * (milliseconds since the epoch). if the date is -1, purge all entries
@@ -1498,24 +1541,15 @@ function verifyShared ({ name, imdb, rt }) {
 
 /******************************************************************************/
 
-async function run () {
+/**
+ * @param {string} imdbId
+ * @param {NodeListOf<HTMLElement>} imdbRatings
+ */
+async function run (imdbId, imdbRatings) {
     const now = Date.now()
 
     // purgeCached(-1) // disable the cache
     purgeCached(now)
-
-    const imdbId = location.pathname.split('/')[2]
-
-    log('id:', imdbId)
-
-    // we clone the IMDb widgets, so make sure they exist before determining
-    // their content
-    const $imdbRatings = $('[data-testid="hero-rating-bar__aggregate-rating"]')
-
-    if (!$imdbRatings.length) {
-        info(`can't find IMDb rating for ${imdbId}`)
-        return
-    }
 
     // get the cached result for this page
     const cached = JSON.parse(GM_getValue(imdbId, 'null'))
@@ -1527,7 +1561,7 @@ async function run () {
             log(`cached error (expires: ${expires}):`, cached.error)
         } else {
             log(`cached result (expires: ${expires}):`, cached.data)
-            addWidgets($imdbRatings, cached.data)
+            addWidgets(imdbRatings, cached.data)
         }
 
         return
@@ -1544,7 +1578,7 @@ async function run () {
         return
     }
 
-    const imdb = getIMDbMetadata(imdbId, rtType)
+    const imdb = await getIMDbMetadata(imdbId, rtType)
 
     // do a basic sanity check to make sure it's valid
     if (!imdb?.type) {
@@ -1613,7 +1647,7 @@ async function run () {
             store({ data }, ONE_WEEK)
         }
 
-        addWidgets($imdbRatings, data)
+        addWidgets(imdbRatings, data)
     } catch (error) {
         bump('miss')
 
@@ -1644,16 +1678,32 @@ GM_registerMenuCommand('Clear stats', () => {
     }
 })
 
-registerLinkTargetMenuCommand()
-
-// DOMContentLoaded typically fires several seconds after the IMDb ratings
-// widget is displayed, which leads to an unacceptable delay if the result is
-// already cached, so we hook into the earliest event which fires after the
-// widget is loaded.
+// call +run+ as soon as the IMDb widgets are displayed. polling detects them much
+// faster than waiting for document.readyState === "interactive" or DOMContentLoaded:
 //
-// this occurs when document.readyState transitions from "loading" to
-// "interactive", which should be the first readystatechange event a userscript
-// sees. on my system, this can occur up to 4 seconds before DOMContentLoaded
-$(document).one('readystatechange', run)
+//   event:                  timestamp (seconds)
+//   document-start:         0.000
+//   first widget (desktop): 1.780
+//   second widget (mobile): 1.851
+//   interactive:            2.643
+//   DOMContentLoaded:       5.997
+//   complete:               7.340
+{
+    const imdbId = location.pathname.split('/')[2]
+
+    log('id:', imdbId)
+
+    const getTargets = () => {
+        /** @type {NodeListOf<HTMLElement>} */
+        const targets = document.querySelectorAll('[data-testid="hero-rating-bar__aggregate-rating"]')
+        return targets.length > 1 ? targets : null
+    }
+
+    poll(getTargets)
+        .then(targets => run(imdbId, targets))
+        .catch(() => console.warn(`can't find IMDb ratings for ${imdbId}`))
+}
+
+registerLinkTargetMenuCommand()
 
 /* end */ }
