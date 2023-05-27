@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.2.0
+// @version       5.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -839,6 +839,7 @@ function abort (message = NO_MATCH) {
  */
 function addWidgets ($imdbRatings, { consensus, rating, url }) {
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
+    const score = rating === -1 ? 'N/A' : `${rating}%`
 
     /** @type {"tbd" | "rotten" | "fresh"} */
     let style
@@ -883,7 +884,6 @@ function addWidgets ($imdbRatings, { consensus, rating, url }) {
         $score.nextAll().remove()
 
         // 4) replace the IMDb rating with the RT score and remove the "/ 10" suffix
-        const score = rating === -1 ? 'N/A' : `${rating}%`
         $score.children().first().text(score).nextAll().remove()
 
         // 5) rename the testids, e.g.:
@@ -895,12 +895,14 @@ function addWidgets ($imdbRatings, { consensus, rating, url }) {
         // 6) update the link's label and URL
         const $link = $rtRating.find('a[role="button"]')
         $link.attr({ 'aria-label': 'View RT Rating', href: url, target: getRTLinkTarget() })
+
+        // 7) observe changes to the link's target
         EMITTER.on(TARGET_KEY, (/** @type {LinkTarget} */ target) => $link.prop('target', target))
 
-        // 7) attach the tooltip to the widget
+        // 8) attach the tooltip to the widget
         $rtRating.balloon(balloonOptions)
 
-        // 8) prepend the widget to the ratings bar
+        // 9) prepend the widget to the ratings bar
         attachWidget($ratings.get(0), $rtRating.get(0))
     }
 }
