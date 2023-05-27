@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.2.1
+// @version       5.2.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -43,26 +43,28 @@
 
 /* begin */ {
 
-const API_LIMIT       = 100
-const DATA_VERSION    = 1.2
-const DATE_FORMAT     = 'YYYY-MM-DD'
-const DEBUG           = false
-const INACTIVE_MONTHS = 3
-const MAX_YEAR_DIFF   = 3
-const NO_CONSENSUS    = 'No consensus yet.'
-const NO_MATCH        = 'no matching results'
-const ONE_DAY         = 1000 * 60 * 60 * 24
-const ONE_WEEK        = ONE_DAY * 7
-const RT_BASE         = 'https://www.rottentomatoes.com'
-const STATS_KEY       = 'stats'
-const TARGET_KEY      = 'target'
-const WIDGET_CLASS    = 'rt-rating'
+const API_LIMIT        = 100
+const CHANGE_TARGET    = 'target:change'
+const DATA_VERSION     = 1.2
+const DATE_FORMAT      = 'YYYY-MM-DD'
+const DEBUG            = false
+const INACTIVE_MONTHS  = 3
+const MAX_YEAR_DIFF    = 3
+const NO_CONSENSUS     = 'No consensus yet.'
+const NO_MATCH         = 'no matching results'
+const ONE_DAY          = 1000 * 60 * 60 * 24
+const ONE_WEEK         = ONE_DAY * 7
+const RT_BALLOON_CLASS = 'rt-consensus-balloon'
+const RT_BASE          = 'https://www.rottentomatoes.com'
+const RT_WIDGET_CLASS  = 'rt-rating'
+const STATS_KEY        = 'stats'
+const TARGET_KEY       = 'target'
 
 /** @type {Record<string, number>} */
 const METADATA_VERSION = { [STATS_KEY]: 3, [TARGET_KEY]: 1 }
 
 const BALLOON_OPTIONS = {
-    classname: 'rt-consensus-balloon',
+    classname: RT_BALLOON_CLASS,
     css: {
         fontFamily: 'Roboto, Helvetica, Arial, sans-serif',
         fontSize: '16px',
@@ -840,6 +842,7 @@ function abort (message = NO_MATCH) {
 function addWidgets ($imdbRatings, { consensus, rating, url }) {
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
     const score = rating === -1 ? 'N/A' : `${rating}%`
+    const rtLinkTarget = getRTLinkTarget()
 
     /** @type {"tbd" | "rotten" | "fresh"} */
     let style
@@ -858,9 +861,9 @@ function addWidgets ($imdbRatings, { consensus, rating, url }) {
     //   - reorders the appended widget (see attachWidget)
     //   - restores support for italics in the consensus text
     GM_addStyle(`
-        .rt-rating svg { color: ${COLOR[style]}; }
-        .rt-rating { order: -1; }
-        .rt-consensus-balloon em { font-style: italic; }
+        .${RT_WIDGET_CLASS} svg { color: ${COLOR[style]}; }
+        .${RT_WIDGET_CLASS} { order: -1; }
+        .${RT_BALLOON_CLASS} em { font-style: italic; }
     `)
 
     // the markup for the small (e.g. mobile) and large (e.g. desktop) IMDb
@@ -873,8 +876,8 @@ function addWidgets ($imdbRatings, { consensus, rating, url }) {
         // clone the IMDb rating widget
         const $rtRating = $imdbRating.clone()
 
-        // 1) assign a unique class
-        $rtRating.addClass(WIDGET_CLASS)
+        // 1) assign a unique class for styling
+        $rtRating.addClass(RT_WIDGET_CLASS)
 
         // 2) replace "IMDb Rating" with "RT Rating"
         $rtRating.children().first().text('RT RATING')
@@ -888,16 +891,16 @@ function addWidgets ($imdbRatings, { consensus, rating, url }) {
 
         // 5) rename the testids, e.g.:
         // hero-rating-bar__aggregate-rating -> hero-rating-bar__rt-rating
-        $rtRating.find('[data-testid]').addBack().each(function () {
-            $(this).attr('data-testid', (_, id) => id.replace('aggregate', 'rt'))
+        $rtRating.find('[data-testid]').addBack().each((_index, el) => {
+            $(el).attr('data-testid', (_index, id) => id.replace('aggregate', 'rt'))
         })
 
         // 6) update the link's label and URL
         const $link = $rtRating.find('a[role="button"]')
-        $link.attr({ 'aria-label': 'View RT Rating', href: url, target: getRTLinkTarget() })
+        $link.attr({ 'aria-label': 'View RT Rating', href: url, target: rtLinkTarget })
 
         // 7) observe changes to the link's target
-        EMITTER.on(TARGET_KEY, (/** @type {LinkTarget} */ target) => $link.prop('target', target))
+        EMITTER.on(CHANGE_TARGET, (/** @type {LinkTarget} */ target) => $link.prop('target', target))
 
         // 8) attach the tooltip to the widget
         $rtRating.balloon(balloonOptions)
@@ -964,10 +967,10 @@ function asyncGet (url, options = {}) {
  * so the first widget will be updated in place to match the data for the IMDb
  * rating etc. this changes some, but not all nodes within an element, and most
  * attributes added to/changed in a prepended RT widget remain when it's
- * reverted back to an IMDb widget, including its ID attribute (rt-rating),
- * which controls the color of the rating star. as a result, we end up with a
- * restored IMDb widget but with an RT-colored star (and with the RT widget
- * removed since it's not in the ratings-bar model)
+ * reverted back to an IMDb widget, including its class (rt-rating), which
+ * controls the color of the rating star. as a result, we end up with a restored
+ * IMDb widget but with an RT-colored star (and with the RT widget removed since
+ * it's not in the ratings-bar model)
  *
  * if we *append* the RT widget, none of the other widgets will need to be
  * changed/updated if the DOM is re-synced, so we won't end up with a mangled
@@ -990,15 +993,11 @@ function attachWidget (target, rtRating) {
 
     const init = { childList: true }
 
-    const hasRtRating = () => Array
-        .from(target.children)
-        .some(it => it === rtRating)
-
     // restore the RT widget if it is removed. only called (once) if the widget
     // is added "quickly" (i.e. while the ratings bar is still being finalized),
     // e.g. when the result is cached
     const callback = () => {
-        if (!hasRtRating()) {
+        if (rtRating.parentElement !== target) {
             observer.disconnect()
             target.appendChild(rtRating)
             observer.observe(target, init)
@@ -1346,7 +1345,7 @@ function registerLinkTargetMenuCommand () {
             }
 
             GM_unregisterMenuCommand(id)
-            EMITTER.emit(TARGET_KEY, target)
+            EMITTER.emit(CHANGE_TARGET, target)
         }
 
         id = GM_registerMenuCommand(name(toggle[target]), onClick)
