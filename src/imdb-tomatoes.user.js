@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.3.0
+// @version       5.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -833,7 +833,7 @@ function abort (message = NO_MATCH) {
 /**
  * add Rotten Tomatoes widgets to the desktop/mobile ratings bars
  *
- * @param {NodeListOf<HTMLElement>} imdbRatings
+ * @param {Iterable<HTMLElement>} imdbRatings
  * @param {Object} data
  * @param {string} data.url
  * @param {string} data.consensus
@@ -1046,7 +1046,7 @@ function checkOverrides (match, imdbId) {
  * @param {string} rtType
  */
 async function getIMDbMetadata (imdbId, rtType) {
-    const json = await poll(() => {
+    const json = await waitFor(() => {
         return document.getElementById('__NEXT_DATA__')?.textContent?.trim()
     })
 
@@ -1296,45 +1296,6 @@ function pluck (array, path) {
     return (array || []).map(it => get(it, path))
 }
 
-/*
- * poll for a result, resolving it if found, or rejecting if the search times
- * out
- */
-const poll = (function () {
-    let retry = true
-
-    // don't keep polling if we still haven't found anything after the page has
-    // finished loading
-    //
-    // XXX Uncaught TypeError: can't delete property '"jQuery123456789"': proxy deleteProperty handler returned false
-    // $(window).one('DOMContentLoaded', () => { retry = false })
-
-    window.addEventListener('DOMContentLoaded', () => { retry = false }, { once: true })
-
-    /**
-     * @template T
-     * @param {() => T | null | undefined} fn
-     * @return {Promise<T>}
-     */
-    return function poll (fn) {
-        return new Promise((resolve, reject) => {
-            const check = () => {
-                const result = fn()
-
-                if (result) {
-                    resolve(result)
-                } else if (retry) {
-                    requestAnimationFrame(check)
-                } else {
-                    reject()
-                }
-            }
-
-            requestAnimationFrame(check)
-        })
-    }
-})()
-
 /**
  * purge expired entries from the cache older than the supplied date
  * (milliseconds since the epoch). if the date is -1, purge all entries
@@ -1539,6 +1500,65 @@ function verifyShared ({ name, imdb, rt }) {
     return $shared.got >= $shared.want
 }
 
+/*
+ * poll for a truthy value, returning a promise which resolves the value or
+ * which is rejected if the probe times out
+ */
+const { waitFor, TimeoutError } = (function () {
+    class TimeoutError extends Error {}
+
+    // don't keep polling if we still haven't found anything after the page has
+    // finished loading
+    /** @type {(timeout: VoidFunction) => void} */
+    const defaultCallback = timeout => {
+        // XXX Uncaught TypeError: can't delete property '"jQuery123456789"': proxy deleteProperty handler returned false
+        // $(window).one('DOMContentLoaded', () => { retry = false })
+        window.addEventListener('DOMContentLoaded', timeout, { once: true })
+    }
+
+    /**
+     * @template T
+     * @param {(state: PollState) => Maybe<T>} fn
+     * @param {(timeout: VoidFunction) => void} callback
+     * @return {Promise<T>}
+     */
+    const waitFor = (fn, callback = defaultCallback) => {
+        let count = 0
+        let retry = true
+
+        callback(() => { retry = false })
+
+        return new Promise((resolve, reject) => {
+            /** @type {FrameRequestCallback} */
+            const check = time => {
+                ++count
+
+                let result
+
+                try {
+                    result = fn({ tick: count, time })
+                } catch (e) {
+                    return reject(/** @type {Error} */ e)
+                }
+
+                if (result) {
+                    resolve(result)
+                } else if (retry) {
+                    requestAnimationFrame(check)
+                } else {
+                    const ticks = 'tick' + (count === 1 ? '' : 's')
+                    const error = new TimeoutError(`polling timed out after ${count} ${ticks}`)
+                    reject(error)
+                }
+            }
+
+            requestAnimationFrame(check)
+        })
+    }
+
+    return { waitFor, TimeoutError }
+})()
+
 /******************************************************************************/
 
 /**
@@ -1693,15 +1713,21 @@ GM_registerMenuCommand('Clear stats', () => {
 
     log('id:', imdbId)
 
-    const getTargets = () => {
+    const getRatings = () => {
         /** @type {NodeListOf<HTMLElement>} */
-        const targets = document.querySelectorAll('[data-testid="hero-rating-bar__aggregate-rating"]')
-        return targets.length > 1 ? targets : null
+        const ratings = document.querySelectorAll('[data-testid="hero-rating-bar__aggregate-rating"]')
+        return ratings.length > 1 ? ratings : null
     }
 
-    poll(getTargets)
-        .then(targets => run(imdbId, targets))
-        .catch(() => console.warn(`can't find IMDb ratings for ${imdbId}`))
+    waitFor(getRatings)
+        .then(ratings => run(imdbId, ratings))
+        .catch(e => {
+            if (e instanceof TimeoutError) {
+                console.warn(`can't find IMDb ratings for ${imdbId}`)
+            } else {
+                console.error(e)
+            }
+        })
 }
 
 registerLinkTargetMenuCommand()

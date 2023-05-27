@@ -29,6 +29,8 @@ declare global {
     };
 
     type LinkTarget = '_self' | '_blank';
+    type Maybe<T> = T | null | undefined;
+    type PollState = { tick: number, time: number };
 
     type RTDoc = JQuery<Document> & {
         meta: any;
