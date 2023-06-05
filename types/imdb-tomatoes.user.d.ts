@@ -1,16 +1,6 @@
 import DayJs from 'dayjs'
 import DayJsRelativeTime from 'dayjs/plugin/relativeTime'
 
-type RTResult = {
-    title: string;
-    vanity: string;
-    releaseYear: string;
-    updateDate: string;
-    cast?: Array<{ name: string }>;
-    rottenTomatoes?: { criticsScore?: number };
-    pageViews_popularity?: number;
-};
-
 declare global {
     const dayjs: typeof DayJs;
     const dayjs_plugin_relativeTime: typeof DayJsRelativeTime;
@@ -31,6 +21,17 @@ declare global {
     type LinkTarget = '_self' | '_blank';
     type Maybe<T> = T | null | undefined;
     type PollState = { tick: number, time: number };
+
+    type RTResult = {
+        title: string;
+        vanity: string;
+        releaseYear: string;
+        updateDate: string;
+        cast?: Array<{ name: string }>;
+        rottenTomatoes?: { criticsScore?: number };
+        pageViews_popularity?: number;
+        aka?: string[];
+    };
 
     type RTDoc = JQuery<Document> & {
         meta: any;

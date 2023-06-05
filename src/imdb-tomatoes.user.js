@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.3.1
+// @version       5.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -12,6 +12,7 @@
 // @require       https://unpkg.com/dayjs@1.11.7/dayjs.min.js
 // @require       https://unpkg.com/dayjs@1.11.7/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
+// @require       https://unpkg.com/@chocolatey/enumerator@1.1.1/dist/index.umd.min.js
 // @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
@@ -127,6 +128,11 @@ const UNSHARED = Object.freeze({
 const MINIMUM_SHARED = smallest => Math.round(smallest.size / 2)
 
 /*
+ * per-page performance metrics, only displayed when debugging is enabled
+ */
+const PAGE_STATS = { titleComparisons: 0 }
+
+/*
  * log a message to the console
  */
 const { debug, info, log, warn } = console
@@ -143,6 +149,13 @@ const clone = value => JSON.parse(JSON.stringify(value))
  * path parser since we don't use the extended syntax
  */
 const get = exports.getter({ split: '.' })
+
+/**
+ * return the Cartesian product of items from a collection of arrays
+ *
+ * @type {(arrays: string[][]) => [string, string][]}
+ */
+const cartesianProduct = exports.enumerator
 
 /**
  * retrieve the target for RT links from GM storage, either "_self" (default)
@@ -209,21 +222,24 @@ const MovieMatcher = {
      * @return {[string]}
      */
     getConsensus ($rt) {
-        const $consensus = $rt.find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
+        const $consensus = $rt
+            .find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
             .first()
+
         return [$consensus.html()]
     },
 
     /**
-     * return the last time a movie page was updated based on its most
-     * recently-published review
+     * return the last time a movie page was updated based on its most recently
+     * published review
      *
      * @param {RTDoc} $rt
      * @return {DayJs | undefined}
      */
     lastModified ($rt) {
         return $rt
-            .find('[data-qa="critic-review"][createdate]:not([createdate=""])').get()
+            .find('[data-qa="critic-review"][createdate]:not([createdate=""])')
+            .get()
             .map(review => dayjs($(review).attr('createdate')))
             .sort((a, b) => b.unix() - a.unix())
             .shift()
@@ -233,12 +249,16 @@ const MovieMatcher = {
      * return a movie record ({ url: string }) from the API results which
      * matches the supplied IMDb data
      *
-     * @param {RTMovieResult[]} rtResults
      * @param {any} imdb
+     * @param {RTMovieResult[]} rtResults
      */
-    match (rtResults, imdb) {
+    match (imdb, rtResults) {
         const sorted = rtResults
             .flatMap((rt, index) => {
+                // XXX the order of these tests matters: do fast, efficient
+                // checks first to reduce the number of results for the more
+                // expensive checks to process
+
                 const { title, vanity: slug } = rt
 
                 if (!(title && slug)) {
@@ -246,11 +266,18 @@ const MovieMatcher = {
                     return []
                 }
 
-                const url = `/m/${slug}`
-                const rtCast = pluck(rt.cast, 'name')
                 const rtYear = rt.releaseYear ? Number(rt.releaseYear) : null
+                const yearDiff = (imdb.year && rtYear)
+                    ? { value: Math.abs(imdb.year - rtYear) }
+                    : null
+
+                if (yearDiff && yearDiff.value > MAX_YEAR_DIFF) {
+                    return []
+                }
 
                 let castMatch = -1, verify = true
+
+                const rtCast = pluck(rt.cast, 'name')
 
                 if (rtCast.length) {
                     const { got, want } = shared(rtCast, imdb.cast)
@@ -263,16 +290,17 @@ const MovieMatcher = {
                     }
                 }
 
-                const yearDiff = (imdb.year && rtYear)
-                    ? { value: Math.abs(imdb.year - rtYear) }
-                    : null
-
-                if (yearDiff && yearDiff.value > MAX_YEAR_DIFF) {
-                    return []
-                }
-
-                const titleMatch = titleSimilarity({ imdb, rt })
                 const rtRating = rt.rottenTomatoes?.criticsScore
+                const url = `/m/${slug}`
+
+                // XXX the title is in the AKA array, but a) we don't want to
+                // assume that and b) it's not usually first
+                const rtTitles = rt.aka ? [...new Set([title, ...rt.aka])] : [title]
+
+                // XXX only called after the other checks have filtered out
+                // non-matches, so the number of comparions remains small
+                // (usually 1 or 2, and seldom more than 3, even with 100 results)
+                const titleMatch = titleSimilarity({ imdb: imdb.titles, rt: rtTitles })
 
                 const result = {
                     title,
@@ -283,6 +311,7 @@ const MovieMatcher = {
                     castMatch,
                     yearDiff,
                     rating: rtRating,
+                    titles: rtTitles,
                     popularity: rt.pageViews_popularity ?? 0,
                     updated: rt.updateDate,
                     index,
@@ -336,11 +365,11 @@ const MovieMatcher = {
     /**
      * confirm the supplied RT page data matches the IMDb metadata
      *
-     * @param {RTDoc} $rt
      * @param {any} imdb
+     * @param {RTDoc} $rt
      * @return {boolean}
      */
-    verify ($rt, imdb) {
+    verify (imdb, $rt) {
         log('verifying movie')
 
         // match the director(s)
@@ -393,8 +422,8 @@ const TVMatcher = {
     },
 
     /**
-     * return the last time a TV page was updated based on its most
-     * recently-published review
+     * return the last time a TV page was updated based on its most recently
+     * published review
      *
      * @param {RTDoc} _$rt
      * @return {DayJs | undefined}
@@ -409,12 +438,16 @@ const TVMatcher = {
      * return a TV show record ({ url: string }) from the API results which
      * matches the supplied IMDb data
      *
-     * @param {RTTVResult[]} rtResults
      * @param {any} imdb
+     * @param {RTTVResult[]} rtResults
      */
-    match (rtResults, imdb) {
+    match (imdb, rtResults) {
         const sorted = rtResults
             .flatMap((rt, index) => {
+                // XXX the order of these tests matters: do fast, efficient
+                // checks first to reduce the number of results for the more
+                // expensive checks to process
+
                 const { title, vanity: slug } = rt
 
                 if (!(title && slug)) {
@@ -422,10 +455,32 @@ const TVMatcher = {
                     return []
                 }
 
-                const url = `/tv/${slug}`
-                const rtCast = pluck(rt.cast, 'name')
+                const startYear = rt.releaseYear ? Number(rt.releaseYear) : null
+                const startYearDiff = (imdb.startYear && startYear)
+                    ? { value: Math.abs(imdb.startYear - startYear) }
+                    : null
+
+                if (startYearDiff && startYearDiff.value > MAX_YEAR_DIFF) {
+                    return []
+                }
+
+                const endYear = rt.seriesFinale ? dayjs(rt.seriesFinale).year() : null
+                const endYearDiff = (imdb.endYear && endYear)
+                    ? { value: Math.abs(imdb.endYear - endYear) }
+                    : null
+
+                if (endYearDiff && endYearDiff.value > MAX_YEAR_DIFF) {
+                    return []
+                }
+
+                const seasons = rt.seasons || []
+                const seasonsDiff = (imdb.seasons && seasons.length)
+                    ? { value: Math.abs(imdb.seasons - seasons.length) }
+                    : null
 
                 let castMatch = -1, verify = true
+
+                const rtCast = pluck(rt.cast, 'name')
 
                 if (rtCast.length) {
                     const { got, want } = shared(rtCast, imdb.cast)
@@ -438,31 +493,17 @@ const TVMatcher = {
                     }
                 }
 
-                const titleMatch = titleSimilarity({ imdb, rt })
-                const seasons = rt.seasons || []
                 const rtRating = rt.rottenTomatoes?.criticsScore
-                const startYear = rt.releaseYear ? Number(rt.releaseYear) : null
-                const endYear = rt.seriesFinale ? dayjs(rt.seriesFinale).year() : null
+                const url = `/tv/${slug}`
 
-                const startYearDiff = (imdb.startYear && startYear)
-                    ? { value: Math.abs(imdb.startYear - startYear) }
-                    : null
+                // XXX the title is in the AKA array, but a) we don't want to
+                // assume that and b) it's not usually first
+                const rtTitles = rt.aka ? [...new Set([title, ...rt.aka])] : [title]
 
-                if (startYearDiff && startYearDiff.value > MAX_YEAR_DIFF) {
-                    return []
-                }
-
-                const endYearDiff = (imdb.endYear && endYear)
-                    ? { value: Math.abs(imdb.endYear - endYear) }
-                    : null
-
-                if (endYearDiff && endYearDiff.value > MAX_YEAR_DIFF) {
-                    return []
-                }
-
-                const seasonsDiff = (imdb.seasons && seasons.length)
-                    ? { value: Math.abs(imdb.seasons - seasons.length) }
-                    : null
+                // XXX only called after the other checks have filtered out
+                // non-matches, so the number of comparions remains small
+                // (usually 1 or 2, and seldom more than 3, even with 100 results)
+                const titleMatch = titleSimilarity({ imdb: imdb.titles, rt: rtTitles })
 
                 const result = {
                     title,
@@ -477,6 +518,7 @@ const TVMatcher = {
                     endYearDiff,
                     seasonsDiff,
                     rating: rtRating,
+                    titles: rtTitles,
                     popularity: rt.pageViews_popularity ?? 0,
                     index,
                     targetUrl: seasons.length === 1 ? `${RT_BASE}${url}/s01` : null,
@@ -531,13 +573,13 @@ const TVMatcher = {
     },
 
     /**
-     * confirm the supplied RT page data matches the IMDb metadata
+     * confirm the supplied RT page data matches the IMDb data
      *
-     * @param {RTDoc} $rt
      * @param {any} imdb
+     * @param {RTDoc} $rt
      * @return {boolean | string}
      */
-    verify ($rt, imdb) {
+    verify (imdb, $rt) {
         log('verifying TV show')
 
         // match the cast or, if empty, the creator(s). if neither are
@@ -683,17 +725,17 @@ class RTClient {
 
     /**
      * confirm the metadata of the RT page (match or fallback) matches the IMDb
-     * metadata
+     * data
      *
-     * @param {RTDoc} rtPage
      * @param {any} imdb
+     * @param {RTDoc} rtPage
      * @param {boolean} fallbackUnused
      * @return {Promise<{ verified: boolean, rtPage: RTDoc }>}
      */
-    async _verify (rtPage, imdb, fallbackUnused) {
+    async _verify (imdb, rtPage, fallbackUnused) {
         const { match, matcher, preload, state } = this
 
-        let verified = matcher.verify(rtPage, imdb)
+        let verified = matcher.verify(imdb, rtPage)
 
         if (!verified) {
             if (match.force) {
@@ -708,7 +750,7 @@ class RTClient {
                 if (res) {
                     log(`fallback response: ${res.status} ${res.statusText}`)
                     rtPage = this._parseResponse(res, preload.url)
-                    verified = matcher.verify(rtPage, imdb)
+                    verified = matcher.verify(imdb, rtPage)
                 } else {
                     log(`error loading ${preload.fullUrl} (${preload.error.status} ${preload.error.statusText})`)
                 }
@@ -740,7 +782,7 @@ class RTClient {
 
         log(`loading ${requestType} URL:`, state.url)
 
-        // match URL (API result) and fallback (guessed) URL are the same
+        // match URL (API result) and fallback URL (guessed) are the same
         if (match.url === preload.url) {
             res = await preload.request // join the in-flight request
         } else { // different match URL and fallback URL
@@ -775,8 +817,8 @@ class RTClient {
 
         if (verify) {
             const { verified, rtPage: newRtPage } = await this._verify(
-                rtPage,
                 imdb,
+                rtPage,
                 fallbackUnused
             )
 
@@ -955,7 +997,7 @@ function asyncGet (url, options = {}) {
 }
 
 /**
- * attach the RT ratings widget to the ratings bar
+ * attach an RT ratings widget to a ratings bar
  *
  * although the widget appears to be prepended to the bar, we need to append it
  * (and reorder it via CSS) to work around React reconciliation (updating the
@@ -1057,7 +1099,8 @@ async function getIMDbMetadata (imdbId, rtType) {
     const mainCast = get(extra, 'castPageTitle.edges.*.node.name.nameText.text', [])
     const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
-    const originalTitle = get(main, 'originalTitleText.text', '')
+    const originalTitle = get(main, 'originalTitleText.text', title)
+    const titles = title === originalTitle ? [title] : [title, originalTitle]
     const genres = get(extra, 'genres.genres.*.text', [])
     const year = get(extra, 'releaseYear.year') || 0
     const $releaseDate = get(extra, 'releaseDate')
@@ -1080,6 +1123,7 @@ async function getIMDbMetadata (imdbId, rtType) {
         type,
         title,
         originalTitle,
+        titles,
         cast,
         mainCast,
         genres,
@@ -1213,7 +1257,7 @@ async function getRTData (imdb, rtType) {
     }
 
     if (!Array.isArray(results)) {
-        throw new Error('invalid JSON type')
+        throw new Error('invalid response type')
     }
 
     // reorder the fields so the main fields are visible in the console without
@@ -1231,7 +1275,7 @@ async function getRTData (imdb, rtType) {
 
     debug('results:', results)
 
-    const matched = matcher.match(results, imdb)
+    const matched = matcher.match(imdb, results)
     const match = checkOverrides(matched, imdb.id) || {
         url: preload.url,
         verify: true,
@@ -1308,16 +1352,22 @@ function purgeCached (date) {
         const value = JSON.parse(json)
         const metadataVersion = METADATA_VERSION[key]
 
+        let $delete = false
+
         if (metadataVersion) { // persistent (until the next METADATA_VERSION[key] change)
             if (value.version !== metadataVersion) {
+                $delete = true
                 log(`purging invalid metadata (obsolete version: ${value.version}): ${key}`)
-                GM_deleteValue(key)
             }
         } else if (value.version !== DATA_VERSION) {
+            $delete = true
             log(`purging invalid data (obsolete version: ${value.version}): ${key}`)
-            GM_deleteValue(key)
         } else if (date === -1 || (typeof value.expires !== 'number') || date > value.expires) {
+            $delete = true
             log(`purging expired value: ${key}`)
+        }
+
+        if ($delete) {
             GM_deleteValue(key)
         }
     }
@@ -1436,50 +1486,46 @@ function shared (a, b, options = {}) {
 function similarity (a, b, transform = normalize) {
     // XXX work around a bug in fast-dice-coefficient which returns 0
     // if either string's length is < 2
-    const $a = transform(a)
-    const $b = transform(b)
 
-    return a === b ? 2 : ($a === $b ? 1 : exports.dice($a, $b))
+    if (a === b) {
+        return 2
+    } else {
+        const $a = transform(a)
+        const $b = transform(b)
+
+        return ($a === $b ? 1 : exports.dice($a, $b))
+    }
 }
 
 /**
  * measure the similarity of an IMDb title and an RT title returned by the API
  *
- * RT titles for foreign-language films/shows sometimes contain the original
- * title at the end in brackets, so we take that into account
+ * return the best match between the IMDb titles (display and original) and RT
+ * titles (display and AKAs)
  *
- * NOTE we only use this if the original IMDb title differs from the main
- * IMDb title
- *
- *   similarity("The Swarm", "The Swarm (La Nuée)")                    // 0.66
- *   titleSimilarity({ imdb: "The Swarm", rt: "The Swarm (La Nuée)" }) // 2
+ *   similarity({ imdb: "La haine", rt: "Hate" })                      // 0.2
+ *   titleSimilarity({ imdb: ["La haine"], rt: ["Hate", "La Haine"] }) // 1
  *
  * @param {Object} options
- * @param {{ title: string, originalTitle: string }} options.imdb
- * @param {{ title: string }} options.rt
+ * @param {string[]} options.imdb
+ * @param {string[]} options.rt
  */
-function titleSimilarity ({ imdb, rt }) {
-    const rtTitle = rt.title
-        .trim()
-        .replace(/\s+/g, ' ') // remove extraneous spaces, e.g. tt2521668
-        .replace(/\s+\((?:US|UK|(?:(?:19|20)\d\d))\)$/, '')
+function titleSimilarity ({ imdb: imdbTitles, rt: rtTitles }) {
+    let max = 0
 
-    if (imdb.originalTitle && imdb.title !== imdb.originalTitle) {
-        const match = rtTitle.match(/^(.+?)\s+\(([^)]+)\)$/)
+    for (const [imdb, rt] of cartesianProduct([imdbTitles, rtTitles])) {
+        ++PAGE_STATS.titleComparisons
 
-        if (match) {
-            const s1 = similarity(imdb.title, match[1])
-            const s2 = similarity(imdb.title, match[2])
-            const s3 = similarity(imdb.title, rtTitle)
-            return Math.max(s1, s2, s3)
-        } else {
-            const s1 = similarity(imdb.title, rtTitle)
-            const s2 = similarity(imdb.originalTitle, rtTitle)
-            return Math.max(s1, s2)
+        const s = similarity(imdb, rt)
+
+        if (s === 2) {
+            return s
+        } else if (s > max) {
+            max = s
         }
     }
 
-    return similarity(imdb.title, rtTitle)
+    return max
 }
 
 /**
@@ -1511,8 +1557,10 @@ const { waitFor, TimeoutError } = (function () {
     // finished loading
     /** @type {(timeout: VoidFunction) => void} */
     const defaultCallback = timeout => {
-        // XXX Uncaught TypeError: can't delete property '"jQuery123456789"': proxy deleteProperty handler returned false
-        // $(window).one('DOMContentLoaded', () => { retry = false })
+        // XXX Uncaught TypeError: can't delete property '"jQuery123456789"':
+        // proxy deleteProperty handler returned false
+        //
+        // $(window).one('DOMContentLoaded', timeout)
         window.addEventListener('DOMContentLoaded', timeout, { once: true })
     }
 
@@ -1563,7 +1611,7 @@ const { waitFor, TimeoutError } = (function () {
 
 /**
  * @param {string} imdbId
- * @param {NodeListOf<HTMLElement>} imdbRatings
+ * @param {Iterable<HTMLElement>} imdbRatings
  */
 async function run (imdbId, imdbRatings) {
     const now = Date.now()
@@ -1682,6 +1730,11 @@ async function run (imdbId, imdbRatings) {
     } finally {
         bump('requests')
         debug('stats:', stats.data)
+
+        if (DEBUG) {
+            debug('page stats:', PAGE_STATS)
+        }
+
         GM_setValue(STATS_KEY, JSON.stringify(stats))
     }
 }
@@ -1698,8 +1751,9 @@ GM_registerMenuCommand('Clear stats', () => {
     }
 })
 
-// call +run+ as soon as the IMDb widgets are displayed. polling detects them much
-// faster than waiting for document.readyState === "interactive" or DOMContentLoaded:
+// call +run+ as soon as the IMDb widgets are displayed. polling detects them
+// much earlier than waiting for document.readyState === "interactive" or
+// DOMContentLoaded:
 //
 //   event:                  timestamp (seconds)
 //   document-start:         0.000
@@ -1723,7 +1777,7 @@ GM_registerMenuCommand('Clear stats', () => {
         .then(ratings => run(imdbId, ratings))
         .catch(e => {
             if (e instanceof TimeoutError) {
-                console.warn(`can't find IMDb ratings for ${imdbId}`)
+                warn(`can't find IMDb ratings for ${imdbId}`)
             } else {
                 console.error(e)
             }
