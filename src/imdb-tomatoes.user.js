@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.4.0
+// @version       5.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -591,7 +591,7 @@ const TVMatcher = {
 
         match: {
             if (imdb.cast.length) {
-                const rtCast = rtProps($rt, 'cast-member')
+                const rtCast = rtProps($rt, 'cast-item-name')
 
                 if (rtCast.length) {
                     verified = verifyShared({
