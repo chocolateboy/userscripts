@@ -3,26 +3,27 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       1.3.1
+// @version       2.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
 // @include       https://github.com/*
-// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.1/dist/cash.min.js
-// @grant         GM_log
+// @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.5/dist/cash.min.js
+// @grant         GM_addStyle
+// @run-at        document-start
 // ==/UserScript==
 
 /*
  * value of the ID attribute for the "My Issues" link. used to identify an
  * existing link so it can be removed on pjax page loads
  */
-const ID = 'my-issues'
+const ID = 'my-issues-tab'
 
 /*
- * selector for the "Issues" link which we clone the "My Issues" link from and
- * append to
+ * selector for the "Issues" link. we navigate up from this to its parent
+ * tab, which we clone the "My Issues" tab from and append to.
  */
-const ISSUES = '[aria-label="Global"] a[href="/issues"]'
+const ISSUES_LINK = 'a#issues-tab'
 
 /*
  * text for the "My Issues" link
@@ -40,7 +41,7 @@ const REPO = 'octolytics-dimension-repository_nwo'
 const SELF = 'user-login'
 
 /*
- * meta-tag selector for the username on a profile page
+ * meta-tag selector for the owner of a repo
  */
 const USER = 'octolytics-dimension-user_login'
 
@@ -59,43 +60,72 @@ function run () {
     // if we're here via a pjax load, there may be an existing "My Issues" link
     // from a previous page load. we can't reuse it as the event handlers may no
     // longer work, so we just replace it
-    $(`#${ID}`).remove()
+    $(`#${ID}`).closest('li').remove()
 
-    const self = meta(SELF)
+    const [self, user, repo] = [meta(SELF), meta(USER), meta(REPO)]
 
-    if (!self) {
+    if (!(self && user && repo)) {
         return
     }
 
-    const $issues = $(ISSUES)
+    const $issuesLink = $(ISSUES_LINK)
+    const $issues = $issuesLink.closest('li')
 
     if ($issues.length !== 1) {
         return
     }
 
-    let subqueries = [`involves:${self}`, 'sort:updated-desc']
-    let prop, path = '/issues'
+    const myIssues = `involves:${self}`
+    const subqueries = [myIssues, 'sort:updated-desc']
 
-    if (prop = meta(REPO)) { // user/repo
-        path = `/${prop}/issues`
-    } else if (prop = meta(USER)) { // user
-        if (prop === self) { // own homepage
-            // user:<self> is:open archived:false involves:<self> ...
-            subqueries = [`user:${prop}`, 'is:open', 'archived:false', ...subqueries]
-        } else { // other user's homepage
-            // user:<user> involves:<self> ...
-            subqueries = [`user:${prop}`, ...subqueries]
-        }
+    if (user === self) { // own repo
+        // is:open archived:false involves:<self> ...
+        subqueries.unshift('is:open', 'archived:false')
     }
 
     const query = subqueries.join('+')
+    const path = `/${repo}/issues`
     const href = `${path}?q=${escape(query)}`
-    const $link = $issues.clone()
-        .attr({ href, 'data-hotkey': 'g I', id: ID })
-        .text(MY_ISSUES)
+    const $myIssues = $issues.clone()
+    const $link = $myIssues
+        .find(`:scope ${ISSUES_LINK}`)
+        .removeClass('selected')
+        .removeClass('deselected')
+        .attr({
+            id: ID,
+            role: 'tab',
+            href,
+            'aria-current': null,
+            'data-hotkey': 'g I',
+            'data-selected-links': null,
+        })
 
-    $issues.after($link)
+    $link.find(':scope [data-content="Issues"]').text(MY_ISSUES)
+    $link.find(':scope [id="issues-repo-tab-count"]').remove()
+
+    let q: string | null = null
+
+    if (location.pathname === path) {
+        const params = new URLSearchParams(location.search)
+        q = params.get('q')
+    }
+
+    if (q && q.trim().split(/\s+/).includes(myIssues)) {
+        $link.attr('aria-selected', 'true')
+        $issuesLink.addClass('deselected')
+    } else {
+        $link.attr('aria-selected', 'false')
+        $issuesLink.removeClass('deselected')
+    }
+
+    $issues.after($myIssues)
 }
 
+GM_addStyle(`
+    .deselected::after {
+        background: transparent !important;
+    }
+`)
+
 // run on navigation (including full page loads)
-$(document).on('turbo:load' as any, run)
+$(document).on('turbo:load', run)
