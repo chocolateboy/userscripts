@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -22,22 +22,23 @@
   var ID = "my-issues-tab";
   var ISSUES_LINK = "a#issues-tab";
   var MY_ISSUES = "My Issues";
+  var MY_ISSUES_LINK = `li a#${ID}`;
   var REPO = "octolytics-dimension-repository_nwo";
   var SELF = "user-login";
   var USER = "octolytics-dimension-user_login";
-  function meta(name, key = "name") {
+  var meta = (name, key = "name") => {
     const quotedName = JSON.stringify(name);
     return $(`meta[${key}=${quotedName}]`).attr("content");
-  }
-  function run() {
-    $(`#${ID}`).closest("li").remove();
-    const [self, user, repo] = [meta(SELF), meta(USER), meta(REPO)];
-    if (!(self && user && repo)) {
-      return;
-    }
-    const $issuesLink = $(ISSUES_LINK);
+  };
+  var run = () => {
+    $(MY_ISSUES_LINK).closest("li").remove();
+    const $issuesLink = $(`li ${ISSUES_LINK}`);
     const $issues = $issuesLink.closest("li");
     if ($issues.length !== 1) {
+      return;
+    }
+    const [self, user, repo] = [meta(SELF), meta(USER), meta(REPO)];
+    if (!(self && user && repo)) {
       return;
     }
     const myIssues = `involves:${self}`;
@@ -72,7 +73,7 @@
       $issuesLink.removeClass("deselected");
     }
     $issues.after($myIssues);
-  }
+  };
   GM_addStyle(`
     .deselected::after {
         background: transparent !important;

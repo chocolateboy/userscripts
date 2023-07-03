@@ -68,7 +68,7 @@ supported. Some scripts work, but most haven't been tested. <br />
 ### GitHub
 
 - [GitHub First Commit](https://greasyfork.org/en/scripts/38557-github-first-commit "Homepage") - add a link to a GitHub repo's first commit
-- [GitHub My Issues](https://greasyfork.org/en/scripts/411765-github-my-issues "Homepage") - add a contextual link to issues you've contributed to on GitHub
+- [GitHub My Issues](https://greasyfork.org/en/scripts/411765-github-my-issues "Homepage") - add a link to issues you've contributed to in a GitHub repo
 
 ### Google
 

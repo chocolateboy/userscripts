@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -14,8 +14,7 @@
 // ==/UserScript==
 
 /*
- * value of the ID attribute for the "My Issues" link. used to identify an
- * existing link so it can be removed on pjax page loads
+ * the ID of the "My Issues" link.
  */
 const ID = 'my-issues-tab'
 
@@ -26,9 +25,15 @@ const ID = 'my-issues-tab'
 const ISSUES_LINK = 'a#issues-tab'
 
 /*
- * text for the "My Issues" link
+ * text of the "My Issues" link
  */
 const MY_ISSUES = 'My Issues'
+
+/*
+ * selector for the added "My Issues" link. used to identify an existing link so
+ * it can be removed on pjax page loads
+ */
+const MY_ISSUES_LINK = `li a#${ID}`
 
 /*
  * meta-tag selector for the `<user>/<repo>` identifier
@@ -48,7 +53,7 @@ const USER = 'octolytics-dimension-user_login'
 /*
  * helper function which extracts a value from a META tag
  */
-function meta (name: string, key = 'name') {
+const meta = (name: string, key = 'name') => {
     const quotedName = JSON.stringify(name)
     return $(`meta[${key}=${quotedName}]`).attr('content')
 }
@@ -56,22 +61,22 @@ function meta (name: string, key = 'name') {
 /*
  * add the "My Issues" link
  */
-function run () {
+const run = () => {
     // if we're here via a pjax load, there may be an existing "My Issues" link
-    // from a previous page load. we can't reuse it as the event handlers may no
-    // longer work, so we just replace it
-    $(`#${ID}`).closest('li').remove()
+    // from a previous page load. we can't reuse it as it may no longer be
+    // required or in a valid state, so we just replace it
+    $(MY_ISSUES_LINK).closest('li').remove()
+
+    const $issuesLink = $(`li ${ISSUES_LINK}`)
+    const $issues = $issuesLink.closest('li')
+
+    if ($issues.length !== 1) {
+        return
+    }
 
     const [self, user, repo] = [meta(SELF), meta(USER), meta(REPO)]
 
     if (!(self && user && repo)) {
-        return
-    }
-
-    const $issuesLink = $(ISSUES_LINK)
-    const $issues = $issuesLink.closest('li')
-
-    if ($issues.length !== 1) {
         return
     }
 
