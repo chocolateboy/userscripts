@@ -3,9 +3,9 @@
 @description   Distinguish between images and links on Twitter
 @author        chocolateboy
 @copyright     chocolateboy
-@version       0.0.1
+@version       0.0.2
 @namespace     https://github.com/chocolateboy/userscripts
-@license       GPL: http://www.gnu.org/copyleft/gpl.html
+@license       GPL
 ==/UserStyle== */
 
 @-moz-document url-prefix("https://twitter.com/"), url-prefix("https://mobile.twitter.com/") {
