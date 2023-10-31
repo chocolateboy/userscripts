@@ -3,17 +3,17 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.0
+// @version       2.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
-// @require       https://code.jquery.com/jquery-3.6.1.slim.min.js
+// @require       https://code.jquery.com/jquery-3.7.1.slim.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@3.0.0/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
 // @grant         GM_log
 // @run-at        document-start
@@ -28,6 +28,7 @@ export {}
 type Debug = {
     event?: string;
     trend?: string;
+    video?: string;
 }
 
 type OnEventOptions = {
@@ -101,8 +102,9 @@ const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([
 const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])'
 const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`
 const TREND = 'div[role="link"][data-testid="trend"]:not([data-linked])'
+const VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])'
 const EVENT_ANY = [EVENT, EVENT_HERO].join(', ')
-const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(', ')
+const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND, VIDEO].join(', ')
 
 /**
  * a custom version of get-wild's `get` function which automatically removes
@@ -187,13 +189,17 @@ function onElement (el: HTMLElement) {
     const $el = $(el)
 
     let $target: JQuery
-    let type: 'event' | 'trend'
+    let type: 'event' | 'trend' | 'video'
 
     // determine the element's type and pass it to the appropriate handler
     if ($el.is(TREND)) {
         [$target, type] = [$el, 'trend']
         $el.on(DISABLED_EVENTS, disableSome)
         onTrendElement($el)
+    } else if ($el.is(VIDEO)) {
+        [$target, type] = [$el, 'video']
+        $el.on(DISABLED_EVENTS, disableAll)
+        onVideoElement($el)
     } else {
         const $event = $el.closest(EVENT_ANY)
         const wrapImage = $event.is(EVENT);
@@ -207,7 +213,9 @@ function onElement (el: HTMLElement) {
     $target.attr('data-linked', 'true')
 
     // remove the fake pointer
-    $target.css('cursor', 'auto')
+    if (type !== 'video') {
+        $target.css('cursor', 'auto')
+    }
 
     if (DEBUG[type]) {
         $target.css('backgroundColor', DEBUG[type]!)
@@ -256,12 +264,24 @@ function onTrendElement ($trend: JQuery) {
 }
 
 /*
+ * linkify a video element ("Videos for you"): the target URL is derived from
+ * the ID in the data-testid attribute, e.g.:
+ *
+ *     <div role="link" data-testid="media-tweet-card-12345678">...</div>
+ */
+function onVideoElement ($link: JQuery) {
+    // const id = $link.data('testid').match(/^media-tweet-card-(\d+)$/)?[1]
+    const id = $link.data('testid').split('-').at(-1)
+    const url = `https://twitter.com/i/web/status/${id}`
+    $link.wrap(linkFor(url))
+}
+
+/*
  * process the events data (JSON): extract ID/URL pairs for the event elements
  * and store them in a cache
  */
 function processEventData (json: string) {
     const data = JSON.parse(json)
-
     const events: TwitterEvent[] = pluck(data, EVENT_PATH)
 
     // always returns an array even though there's at most 1
@@ -306,7 +326,7 @@ function targetFor ($el: JQuery) {
     const targets = $el.find('div[dir="ltr"] > span').filter((_, el) => {
         // the class for this is currently r-b88u0q (700) or r-1vr29t4 for
         // hero images (800)
-        const fontWeight = $(el).parent().css('fontWeight') || 0
+        const fontWeight = Number($(el).parent().css('fontWeight') || 0)
         return fontWeight >= 700
     })
 

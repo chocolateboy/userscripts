@@ -3,17 +3,17 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.0
+// @version       2.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
 // @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
-// @require       https://code.jquery.com/jquery-3.6.1.slim.min.js
+// @require       https://code.jquery.com/jquery-3.7.1.slim.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
-// @require       https://unpkg.com/get-wild@3.0.0/dist/index.umd.min.js
+// @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
 // @grant         GM_log
 // @run-at        document-start
@@ -37,8 +37,9 @@
   var EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])';
   var EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`;
   var TREND = 'div[role="link"][data-testid="trend"]:not([data-linked])';
+  var VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])';
   var EVENT_ANY = [EVENT, EVENT_HERO].join(", ");
-  var SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND].join(", ");
+  var SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND, VIDEO].join(", ");
   var pluck = exports.getter({ default: [], split: "." });
   function disableAll(e) {
     e.stopPropagation();
@@ -74,6 +75,10 @@
       [$target, type] = [$el, "trend"];
       $el.on(DISABLED_EVENTS, disableSome);
       onTrendElement($el);
+    } else if ($el.is(VIDEO)) {
+      [$target, type] = [$el, "video"];
+      $el.on(DISABLED_EVENTS, disableAll);
+      onVideoElement($el);
     } else {
       const $event = $el.closest(EVENT_ANY);
       const wrapImage = $event.is(EVENT);
@@ -82,7 +87,9 @@
       onEventElement($event, $el, { wrapImage });
     }
     $target.attr("data-linked", "true");
-    $target.css("cursor", "auto");
+    if (type !== "video") {
+      $target.css("cursor", "auto");
+    }
     if (DEBUG[type]) {
       $target.css("backgroundColor", DEBUG[type]);
     }
@@ -109,6 +116,11 @@
     const query = encodeURIComponent(param);
     const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`;
     $(target).wrap(linkFor(url));
+  }
+  function onVideoElement($link) {
+    const id = $link.data("testid").split("-").at(-1);
+    const url = `https://twitter.com/i/web/status/${id}`;
+    $link.wrap(linkFor(url));
   }
   function processEventData(json) {
     const data = JSON.parse(json);
@@ -137,7 +149,7 @@
   }
   function targetFor($el) {
     const targets = $el.find('div[dir="ltr"] > span').filter((_, el) => {
-      const fontWeight = $(el).parent().css("fontWeight") || 0;
+      const fontWeight = Number($(el).parent().css("fontWeight") || 0);
       return fontWeight >= 700;
     });
     const target = targets.get().pop();
