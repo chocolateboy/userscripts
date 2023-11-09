@@ -3,7 +3,7 @@
 // @description   Automatically show the full plot summary on IMDb
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.imdb.com/title/tt*
@@ -24,12 +24,12 @@ const init: MutationObserverInit = { childList: true }
 const run = () => {
     let summary = ''
 
-    // get the summary from the GraphQL data (JSON) embedded in the page
+    // get the summary from the props (JSON) embedded in the page
     try {
         const { textContent: metadata } = $.getElementById('__NEXT_DATA__')!
         summary = JSON.parse(metadata!).props.pageProps.aboveTheFoldData.plot.plotText.plainText
     } catch (e: unknown) {
-        console.warn("Can't extract summary from JSON metadata:", e)
+        console.warn("Can't extract summary from JSON metadata:", (e as Error).message)
     }
 
     if (!summary) {
