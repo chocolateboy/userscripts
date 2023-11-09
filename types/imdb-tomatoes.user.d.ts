@@ -9,7 +9,6 @@ declare global {
 
     interface JQuery {
         balloon: (options: any) => this;
-        jsonLd: (id: string) => any;
     }
 
     type AsyncGetOptions = {
@@ -19,8 +18,23 @@ declare global {
     };
 
     type LinkTarget = '_self' | '_blank';
-    type Maybe<T> = T | null | undefined;
-    type PollState = { tick: number, time: number };
+    type Falsey = null | undefined | '' | false | 0;
+    type Maybe<T> = T | Falsey;
+    type IsTruthy<T> = (value: Maybe<T>) => value is T;
+
+    namespace WaitFor {
+        type Callback = (timeout: () => boolean, id: string) => void;
+        type Checker<T> = (state: State) => Maybe<T>;
+        type Id = string | number | bigint;
+        type State = { tick: number, time: number, id: string };
+
+        interface WaitFor {
+            <T>(id: Id, callback: Callback, checker: Checker<T>): Promise<T>;
+            <T>(callback: Callback, checker: Checker<T>): Promise<T>;
+            <T>(id: Id, checker: Checker<T>): Promise<T>;
+            <T>(checker: Checker<T>): Promise<T>;
+        }
+    }
 
     type RTResult = {
         title: string;

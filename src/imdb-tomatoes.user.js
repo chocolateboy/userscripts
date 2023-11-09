@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       5.4.1
+// @version       6.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -13,6 +13,7 @@
 // @require       https://unpkg.com/dayjs@1.11.7/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/@chocolatey/enumerator@1.1.1/dist/index.umd.min.js
+// @require       https://unpkg.com/@chocolatey/when@1.2.0/dist/index.umd.min.js
 // @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
@@ -48,8 +49,10 @@ const API_LIMIT        = 100
 const CHANGE_TARGET    = 'target:change'
 const DATA_VERSION     = 1.2
 const DATE_FORMAT      = 'YYYY-MM-DD'
-const DEBUG            = false
+const DEBUG_KEY        = 'debug'
+const DISABLE_CACHE    = false
 const INACTIVE_MONTHS  = 3
+const LD_JSON          = 'script[type="application/ld+json"]'
 const MAX_YEAR_DIFF    = 3
 const NO_CONSENSUS     = 'No consensus yet.'
 const NO_MATCH         = 'no matching results'
@@ -62,7 +65,11 @@ const STATS_KEY        = 'stats'
 const TARGET_KEY       = 'target'
 
 /** @type {Record<string, number>} */
-const METADATA_VERSION = { [STATS_KEY]: 3, [TARGET_KEY]: 1 }
+const METADATA_VERSION = {
+    [STATS_KEY]: 3,
+    [TARGET_KEY]: 1,
+    [DEBUG_KEY]: 1,
+}
 
 const BALLOON_OPTIONS = {
     classname: RT_BALLOON_CLASS,
@@ -87,6 +94,11 @@ const CONNECTION_ERROR = {
     status: 420,
     statusText: 'Connection Error',
 }
+
+const ENABLE_DEBUGGING = JSON.stringify({
+    data: true,
+    version: METADATA_VERSION[DEBUG_KEY],
+})
 
 const NEW_WINDOW = JSON.stringify({
     data: '_blank',
@@ -120,6 +132,14 @@ const UNSHARED = Object.freeze({
 })
 
 /**
+ * an Event Emitter instance used to publish changes to the target for RT links
+ * ("_blank" or "_self")
+ *
+ * @type {import("little-emitter")}
+ */
+const EMITTER = new exports.Emitter()
+
+/**
  * the minimum number of elements shared between two Sets for them to be
  * deemed similar
  *
@@ -133,22 +153,25 @@ const MINIMUM_SHARED = smallest => Math.round(smallest.size / 2)
 const PAGE_STATS = { titleComparisons: 0 }
 
 /*
- * log a message to the console
+ * enable verbose logging
  */
-const { debug, info, log, warn } = console
-
-/**
- * deep-clone a JSON-serializable value
- *
- * @type {<T>(value: T) => T}
- */
-const clone = value => JSON.parse(JSON.stringify(value))
+let DEBUG = JSON.parse(GM_getValue(DEBUG_KEY, 'false'))?.data || false
 
 /*
- * a custom version of get-wild's `get` function which uses a simpler/faster
- * path parser since we don't use the extended syntax
+ * log a message to the console
  */
-const get = exports.getter({ split: '.' })
+const { debug, log, warn } = console
+
+/** @type {(...args: any[]) => void} */
+const trace = (...args) => {
+    if (DEBUG) {
+        if (args.length === 1 && typeof args[0] === 'function') {
+            args = [].concat(args[0]())
+        }
+
+        debug(...args)
+    }
+}
 
 /**
  * return the Cartesian product of items from a collection of arrays
@@ -158,20 +181,43 @@ const get = exports.getter({ split: '.' })
 const cartesianProduct = exports.enumerator
 
 /**
+ * deep-clone a JSON-serializable value
+ *
+ * @type {<T>(value: T) => T}
+ */
+const clone = value => JSON.parse(JSON.stringify(value))
+
+/**
+ * decode HTML entities, e.g.:
+ *
+ *    from: "Bill &amp; Ted&apos;s Excellent Adventure"
+ *    to:   "Bill & Ted's Excellent Adventure"
+ *
+ * @type {(html: string | undefined) => string}
+ */
+const htmlDecode = (html) => {
+   if (!html) {
+        return ''
+   }
+
+   const el = document.createElement('textarea')
+   el.innerHTML = html
+   return el.value
+}
+
+/*
+ * a custom version of get-wild's `get` function which uses a simpler/faster
+ * path parser since we don't use the extended syntax
+ */
+const get = exports.getter({ split: '.' })
+
+/**
  * retrieve the target for RT links from GM storage, either "_self" (default)
  * or "_blank" (new window)
  *
  * @type {() => LinkTarget}
  */
 const getRTLinkTarget = () => JSON.parse(GM_getValue(TARGET_KEY, 'null'))?.data || '_self'
-
-/**
- * an Event Emitter instance used to publish changes to the target for RT links
- * ("_blank" or "_self")
- *
- * @type {import("little-emitter")}
- */
-const EMITTER = new exports.Emitter()
 
 /**
  * scan an RT document for properties defined in the text of metadata elements
@@ -189,21 +235,24 @@ const rtProps = ($rt, type) => {
 }
 
 /**
- * register a jQuery plugin which extracts and returns JSON-LD data for the
- * loaded document
+ * extract JSON-LD data for the loaded document
  *
  * used to extract metadata on IMDb and Rotten Tomatoes
  *
+ * @param {Document | HTMLScriptElement} el
  * @param {string} id
  */
-$.fn.jsonLd = function jsonLd (id) {
-    const $script = this.find('script[type="application/ld+json"]')
+function jsonLd (el, id) {
+    const script = el instanceof HTMLScriptElement
+        ? el
+        : el.querySelector(LD_JSON)
 
     let data
 
-    if ($script.length) {
+    if (script) {
         try {
-            data = JSON.parse($script.first().text().trim())
+            const json = /** @type {string} */ (script.textContent)
+            data = JSON.parse(json.trim())
         } catch (e) {
             throw new Error(`Can't parse JSON-LD data for ${id}: ${e}`)
         }
@@ -286,6 +335,7 @@ const MovieMatcher = {
                         verify = false
                         castMatch = got
                     } else {
+                        // trace('cast mismatch:', { imdb: imdb.cast, rt, got, want })
                         return []
                     }
                 }
@@ -719,7 +769,7 @@ class RTClient {
         const parser = new DOMParser()
         const dom = parser.parseFromString(res.responseText, 'text/html')
         const $rt = $(dom)
-        const meta = $rt.jsonLd(id)
+        const meta = jsonLd(dom, id)
         return Object.assign($rt, { meta, document: dom })
     }
 
@@ -875,13 +925,20 @@ function abort (message = NO_MATCH) {
 /**
  * add Rotten Tomatoes widgets to the desktop/mobile ratings bars
  *
- * @param {Iterable<HTMLElement>} imdbRatings
  * @param {Object} data
  * @param {string} data.url
  * @param {string} data.consensus
  * @param {number} data.rating
  */
-function addWidgets (imdbRatings, { consensus, rating, url }) {
+async function addWidgets ({ consensus, rating, url }) {
+    trace('adding RT widgets')
+    const imdbRatings = await waitFor('IMDb widgets', () => {
+        /** @type {NodeListOf<HTMLElement>} */
+        const ratings = document.querySelectorAll('[data-testid="hero-rating-bar__aggregate-rating"]')
+        return ratings.length > 1 ? ratings : null
+    })
+    trace('found IMDb widgets')
+
     const balloonOptions = Object.assign({}, BALLOON_OPTIONS, { contents: consensus })
     const score = rating === -1 ? 'N/A' : `${rating}%`
     const rtLinkTarget = getRTLinkTarget()
@@ -950,6 +1007,8 @@ function addWidgets (imdbRatings, { consensus, rating, url }) {
         // 9) prepend the widget to the ratings bar
         attachWidget($ratings.get(0), $rtRating.get(0))
     }
+
+    trace('added RT widgets')
 }
 
 /**
@@ -1082,21 +1141,22 @@ function checkOverrides (match, imdbId) {
 }
 
 /**
- * extract IMDb metadata from the GraphQL data embedded in the page
+ * extract IMDb metadata from the props embedded in the page
  *
  * @param {string} imdbId
  * @param {string} rtType
  */
 async function getIMDbMetadata (imdbId, rtType) {
-    const json = await waitFor(() => {
+    trace('waiting for props')
+    const json = await waitFor('props', () => {
         return document.getElementById('__NEXT_DATA__')?.textContent?.trim()
     })
+    trace('got props:', json.length)
 
     const data = JSON.parse(json)
     const main = get(data, 'props.pageProps.mainColumnData')
     const extra = get(data, 'props.pageProps.aboveTheFoldData')
     const cast = get(main, 'cast.edges.*.node.name.nameText.text', [])
-    const mainCast = get(extra, 'castPageTitle.edges.*.node.name.nameText.text', [])
     const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', title)
@@ -1125,7 +1185,6 @@ async function getIMDbMetadata (imdbId, rtType) {
         originalTitle,
         titles,
         cast,
-        mainCast,
         genres,
         releaseDate,
     }
@@ -1150,10 +1209,11 @@ async function getIMDbMetadata (imdbId, rtType) {
  * if there's no consensus, default to "No consensus yet."
  * if there's no rating, default to -1
  *
- * @param {any} imdb
+ * @param {string} imdbId
+ * @param {string} title
  * @param {keyof Matcher} rtType
  */
-async function getRTData (imdb, rtType) {
+async function getRTData (imdbId, title, rtType) {
     const matcher = Matcher[rtType]
 
     // we preload the anticipated RT page URL at the same time as the API request.
@@ -1180,7 +1240,7 @@ async function getRTData (imdb, rtType) {
     //   c) is wrong (fails the verification check)
     //
     const preload = (function () {
-        const path = matcher.rtPath(imdb.title)
+        const path = matcher.rtPath(title)
         const url = RT_BASE + path
 
         debug('preloading fallback URL:', url)
@@ -1212,7 +1272,7 @@ async function getRTData (imdb, rtType) {
 
     const { api, params, search, data } = JSON.parse(json)
 
-    const unquoted = imdb.title
+    const unquoted = title
         .replace(/"/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
@@ -1275,8 +1335,16 @@ async function getRTData (imdb, rtType) {
 
     debug('results:', results)
 
+    const imdb = await getIMDbMetadata(imdbId, rtType)
+
+    // do a basic sanity check to make sure it's valid
+    if (!imdb?.type) {
+        throw new Error(`can't find metadata for ${imdbId}`)
+    }
+
+    log('metadata:', imdb)
     const matched = matcher.match(imdb, results)
-    const match = checkOverrides(matched, imdb.id) || {
+    const match = checkOverrides(matched, imdbId) || {
         url: preload.url,
         verify: true,
         fallback: true,
@@ -1374,6 +1442,34 @@ function purgeCached (date) {
 }
 
 /**
+ * register a menu command which toggles verbose logging
+ */
+function registerDebugMenuCommand () {
+    /** @type {ReturnType<typeof GM_registerMenuCommand> | null} */
+    let id = null
+
+    const onClick = () => {
+        if (id) {
+            DEBUG = !DEBUG
+
+            if (DEBUG) {
+                GM_setValue(DEBUG_KEY, ENABLE_DEBUGGING)
+            } else {
+                GM_deleteValue(DEBUG_KEY)
+            }
+
+            GM_unregisterMenuCommand(id)
+        }
+
+        const name = `Enable debug logging${DEBUG ? ' ✔' : ''}`
+
+        id = GM_registerMenuCommand(name, onClick)
+    }
+
+    onClick()
+}
+
+/**
  * register a menu command which toggles the RT link target between the current
  * tab/window and a new tab/window
  */
@@ -1381,7 +1477,7 @@ function registerLinkTargetMenuCommand () {
     const toggle = /** @type {const} */ ({ _self: '_blank', _blank: '_self' })
 
     /** @type {(target: LinkTarget) => string} */
-    const name = target => `Open links in ${target === '_self' ? 'the current' : 'a new'} window`
+    const name = target => `Open links in a new window${target === '_self' ? ' ✔' : ''}`
 
     /** @type {ReturnType<typeof GM_registerMenuCommand> | null} */
     let id = null
@@ -1553,28 +1649,45 @@ function verifyShared ({ name, imdb, rt }) {
 const { waitFor, TimeoutError } = (function () {
     class TimeoutError extends Error {}
 
+    // "pin" the window.load event
+    //
+    // we only wait for DOM elements, so if they don't exist by the time the
+    // last DOM lifecycle event fires, then they never will
+    const onLoad = exports.when(/** @type {(done: () => boolean) => void} */ done => {
+        window.addEventListener('load', done, { once: true })
+    })
+
     // don't keep polling if we still haven't found anything after the page has
     // finished loading
-    /** @type {(timeout: VoidFunction) => void} */
-    const defaultCallback = timeout => {
-        // XXX Uncaught TypeError: can't delete property '"jQuery123456789"':
-        // proxy deleteProperty handler returned false
-        //
-        // $(window).one('DOMContentLoaded', timeout)
-        window.addEventListener('DOMContentLoaded', timeout, { once: true })
-    }
+    /** @type {WaitFor.Callback} */
+    const defaultCallback = onLoad
+
+    let ID = 0
 
     /**
-     * @template T
-     * @param {(state: PollState) => Maybe<T>} fn
-     * @param {(timeout: VoidFunction) => void} callback
-     * @return {Promise<T>}
+     * @type {WaitFor.WaitFor}
+     * @param {any[]} args
      */
-    const waitFor = (fn, callback = defaultCallback) => {
-        let count = 0
-        let retry = true
+    const waitFor = (...args) => {
+        /** @type {WaitFor.Checker<unknown>} */
+        const checker = args.pop()
 
-        callback(() => { retry = false })
+        /** @type {WaitFor.Callback} */
+        const callback = (args.length && (typeof args.at(-1) === 'function'))
+            ? args.pop()
+            : defaultCallback
+
+        const id = String(args.length ? args.pop() : ++ID)
+
+        let count = -1
+        let retry = true
+        let found = false
+
+        callback(() => {
+            trace(() => `inside timeout handler for ${id}: ${found ? 'found' : 'not found'}`)
+            retry = false
+            return found
+        }, id)
 
         return new Promise((resolve, reject) => {
             /** @type {FrameRequestCallback} */
@@ -1584,23 +1697,24 @@ const { waitFor, TimeoutError } = (function () {
                 let result
 
                 try {
-                    result = fn({ tick: count, time })
+                    result = checker({ tick: count, time, id })
                 } catch (e) {
                     return reject(/** @type {Error} */ e)
                 }
 
                 if (result) {
-                    resolve(result)
+                    found = true
+                    resolve(/** @type {any} */ (result))
                 } else if (retry) {
                     requestAnimationFrame(check)
                 } else {
                     const ticks = 'tick' + (count === 1 ? '' : 's')
-                    const error = new TimeoutError(`polling timed out after ${count} ${ticks}`)
+                    const error = new TimeoutError(`polling timed out after ${count} ${ticks} (${id})`)
                     reject(error)
                 }
             }
 
-            requestAnimationFrame(check)
+            check(0)
         })
     }
 
@@ -1611,9 +1725,8 @@ const { waitFor, TimeoutError } = (function () {
 
 /**
  * @param {string} imdbId
- * @param {Iterable<HTMLElement>} imdbRatings
  */
-async function run (imdbId, imdbRatings) {
+async function run (imdbId) {
     const now = Date.now()
 
     // purgeCached(-1) // disable the cache
@@ -1627,34 +1740,35 @@ async function run (imdbId, imdbRatings) {
 
         if (cached.error) {
             log(`cached error (expires: ${expires}):`, cached.error)
+            return
         } else {
             log(`cached result (expires: ${expires}):`, cached.data)
-            addWidgets(imdbRatings, cached.data)
+            return addWidgets(cached.data)
         }
-
-        return
     } else {
         log('not cached')
     }
 
-    /** @type {keyof RT_TYPE} */
-    const imdbType = $(document).jsonLd(location.href)?.['@type']
+    trace('waiting for json-ld')
+    const script = await waitFor('json-ld', () => {
+        return /** @type {HTMLScriptElement} */ (document.querySelector(LD_JSON))
+    })
+    trace('got json-ld: ', script.textContent?.length)
+
+    const ld = jsonLd(script, location.href)
+    const imdbType = /** @type {keyof RT_TYPE} */ (ld['@type'])
     const rtType = RT_TYPE[imdbType]
 
     if (!rtType) {
-        info(`invalid type for ${imdbId}: ${imdbType}`)
+        log(`invalid type for ${imdbId}: ${imdbType}`)
         return
     }
 
-    const imdb = await getIMDbMetadata(imdbId, rtType)
-
-    // do a basic sanity check to make sure it's valid
-    if (!imdb?.type) {
-        console.error(`can't find metadata for ${imdbId}`)
-        return
-    }
-
-    log('metadata:', imdb)
+    const name = htmlDecode(ld.name)
+    const alternateName = htmlDecode(ld.alternateName)
+    trace('ld.name:', JSON.stringify(name))
+    trace('ld.alternateName:', JSON.stringify(alternateName))
+    const title = alternateName || name
 
     /**
      * add a { version, expires, data|error } entry to the cache
@@ -1663,8 +1777,7 @@ async function run (imdbId, imdbRatings) {
      * @param {number} ttl
      */
     const store = (dataOrError, ttl) => {
-        // don't cache results while debugging
-        if (DEBUG) {
+        if (DISABLE_CACHE) {
             return
         }
 
@@ -1687,7 +1800,7 @@ async function run (imdbId, imdbRatings) {
     }
 
     try {
-        const { data, matchUrl, preloadUrl, updated } = await getRTData(imdb, rtType)
+        const { data, matchUrl, preloadUrl, updated } = await getRTData(imdbId, title, rtType)
 
         log('RT data:', data)
         bump('hit')
@@ -1715,7 +1828,7 @@ async function run (imdbId, imdbRatings) {
             store({ data }, ONE_WEEK)
         }
 
-        addWidgets(imdbRatings, data)
+        await addWidgets(data)
     } catch (error) {
         bump('miss')
 
@@ -1725,7 +1838,7 @@ async function run (imdbId, imdbRatings) {
         store({ error: message }, ONE_DAY)
 
         if (!error.abort) {
-            console.error(error)
+            throw error
         }
     } finally {
         bump('requests')
@@ -1739,7 +1852,28 @@ async function run (imdbId, imdbRatings) {
     }
 }
 
-// register these first so data can be cleared even if there's an error
+{
+    const start = Date.now()
+    const imdbId = location.pathname.split('/')[2]
+
+    log('id:', imdbId)
+
+    run(imdbId)
+        .then(() => {
+            const time = (Date.now() - start) / 1000
+            debug(`completed in ${time}s`)
+        })
+        .catch(e => {
+            if (e instanceof TimeoutError) {
+                warn(e.message)
+            } else {
+                console.error(e)
+            }
+        })
+}
+
+registerLinkTargetMenuCommand()
+
 GM_registerMenuCommand('Clear cache', () => {
     purgeCached(-1)
 })
@@ -1751,39 +1885,6 @@ GM_registerMenuCommand('Clear stats', () => {
     }
 })
 
-// call +run+ as soon as the IMDb widgets are displayed. polling detects them
-// much earlier than waiting for document.readyState === "interactive" or
-// DOMContentLoaded:
-//
-//   event:                  timestamp (seconds)
-//   document-start:         0.000
-//   first widget (desktop): 1.780
-//   second widget (mobile): 1.851
-//   interactive:            2.643
-//   DOMContentLoaded:       5.997
-//   complete:               7.340
-{
-    const imdbId = location.pathname.split('/')[2]
-
-    log('id:', imdbId)
-
-    const getRatings = () => {
-        /** @type {NodeListOf<HTMLElement>} */
-        const ratings = document.querySelectorAll('[data-testid="hero-rating-bar__aggregate-rating"]')
-        return ratings.length > 1 ? ratings : null
-    }
-
-    waitFor(getRatings)
-        .then(ratings => run(imdbId, ratings))
-        .catch(e => {
-            if (e instanceof TimeoutError) {
-                warn(`can't find IMDb ratings for ${imdbId}`)
-            } else {
-                console.error(e)
-            }
-        })
-}
-
-registerLinkTargetMenuCommand()
+registerDebugMenuCommand()
 
 /* end */ }
