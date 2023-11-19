@@ -97,9 +97,9 @@ supported. Some scripts work, but most haven't been tested. <br />
 
 ### Twitter
 
-- [Twitter Direct](https://greasyfork.org/en/scripts/404632-twitter-direct) - remove t.co tracking links from Twitter
-- [Twitter Linkify Trends](https://greasyfork.org/en/scripts/405103-linkify-twitter-trends) - make Twitter trends links (again)
-- [Twitter Zoom Cursor](https://greasyfork.org/en/scripts/413963-twitter-zoom-cursor) - distinguish between images and links on Twitter (userstyle)
+- [Twitter Direct](https://greasyfork.org/en/scripts/404632-twitter-direct "Homepage") - remove t.co tracking links from Twitter
+- [Twitter Linkify Trends](https://greasyfork.org/en/scripts/405103-linkify-twitter-trends "Homepage") - make Twitter trends links (again)
+- [Twitter Zoom Cursor](https://greasyfork.org/en/scripts/413963-twitter-zoom-cursor "Homepage") - distinguish between images and links on Twitter (userstyle)
 
 ## Highlighters
 
