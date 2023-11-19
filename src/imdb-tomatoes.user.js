@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       6.0.0
+// @version       6.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -138,14 +138,6 @@ const UNSHARED = Object.freeze({
  * @type {import("little-emitter")}
  */
 const EMITTER = new exports.Emitter()
-
-/**
- * the minimum number of elements shared between two Sets for them to be
- * deemed similar
- *
- * @type {<T>(smallest: Set<T>, largest: Set<T>) => number}
- */
-const MINIMUM_SHARED = smallest => Math.round(smallest.size / 2)
 
 /*
  * per-page performance metrics, only displayed when debugging is enabled
@@ -302,6 +294,8 @@ const MovieMatcher = {
      * @param {RTMovieResult[]} rtResults
      */
     match (imdb, rtResults) {
+        const sharedWithImdb = shared(imdb.cast)
+
         const sorted = rtResults
             .flatMap((rt, index) => {
                 // XXX the order of these tests matters: do fast, efficient
@@ -324,18 +318,31 @@ const MovieMatcher = {
                     return []
                 }
 
-                let castMatch = -1, verify = true
+                /** @type {Shared} */
+                let castMatch = UNSHARED
+                let verify = true
 
                 const rtCast = pluck(rt.cast, 'name')
 
                 if (rtCast.length) {
-                    const { got, want } = shared(rtCast, imdb.cast)
+                    const fullShared = sharedWithImdb(rtCast)
 
-                    if (got >= want) {
+                    if (fullShared.got >= fullShared.want) {
                         verify = false
-                        castMatch = got
+                        castMatch = fullShared
+                    } else if (fullShared.got) {
+                        // fall back to matching IMDb's main cast (e.g. 2/3) if
+                        // the full-cast match fails (e.g. 8/18)
+                        const mainShared = shared(imdb.mainCast, rtCast)
+
+                        if (mainShared.got >= mainShared.want) {
+                            verify = false
+                            castMatch = mainShared
+                            castMatch.full = fullShared
+                        } else {
+                            return []
+                        }
                     } else {
-                        // trace('cast mismatch:', { imdb: imdb.cast, rt, got, want })
                         return []
                     }
                 }
@@ -389,7 +396,7 @@ const MovieMatcher = {
                     ? b.popularity - a.popularity
                     : 0
 
-                return (b.castMatch - a.castMatch)
+                return (b.castMatch.got - a.castMatch.got)
                     || (score.b - score.a)
                     || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
                     || popularity // last resort
@@ -492,6 +499,8 @@ const TVMatcher = {
      * @param {RTTVResult[]} rtResults
      */
     match (imdb, rtResults) {
+        const sharedWithImdb = shared(imdb.cast)
+
         const sorted = rtResults
             .flatMap((rt, index) => {
                 // XXX the order of these tests matters: do fast, efficient
@@ -528,16 +537,30 @@ const TVMatcher = {
                     ? { value: Math.abs(imdb.seasons - seasons.length) }
                     : null
 
-                let castMatch = -1, verify = true
+                /** @type {Shared} */
+                let castMatch = UNSHARED
+                let verify = true
 
                 const rtCast = pluck(rt.cast, 'name')
 
                 if (rtCast.length) {
-                    const { got, want } = shared(rtCast, imdb.cast)
+                    const fullShared = sharedWithImdb(rtCast)
 
-                    if (got >= want) {
+                    if (fullShared.got >= fullShared.want) {
                         verify = false
-                        castMatch = got
+                        castMatch = fullShared
+                    } else if (fullShared.got) {
+                        // fall back to matching IMDb's main cast (e.g. 2/3) if
+                        // the full-cast match fails (e.g. 8/18)
+                        const mainShared = shared(imdb.mainCast, rtCast)
+
+                        if (mainShared.got >= mainShared.want) {
+                            verify = false
+                            castMatch = mainShared
+                            castMatch.full = fullShared
+                        } else {
+                            return []
+                        }
                     } else {
                         return []
                     }
@@ -599,7 +622,7 @@ const TVMatcher = {
                     ? b.popularity - a.popularity
                     : 0
 
-                return (b.castMatch - a.castMatch)
+                return (b.castMatch.got - a.castMatch.got)
                     || (score.b - score.a)
                     || (b.titleMatch - a.titleMatch) // prioritise the title if we're still deadlocked
                     || popularity // last resort
@@ -632,11 +655,11 @@ const TVMatcher = {
     verify (imdb, $rt) {
         log('verifying TV show')
 
-        // match the cast or, if empty, the creator(s). if neither are
-        // available, match the RT executive producers against the IMDb
-        // creators, or, failing that, if all other data is unavailable (e.g.
-        // for TV documentaries), match the genres AND release date.
-
+        // match the following in descending order of priority:
+        //
+        //   - the show's cast (continue if it fails)
+        //   - the show's creators (IMDb) against the RT creators or producers
+        //   - the show's genre(s) AND release date
         let verified = false
 
         match: {
@@ -650,7 +673,14 @@ const TVMatcher = {
                         rt: rtCast,
                     })
 
-                    break match
+                    // the displayed RT cast is frequently wrong for TV
+                    // documentaries and shows like Black Mirror with a rolling
+                    // cast (in both cases it's a selection of crew members), so
+                    // accept the cast match if it works, but don't give up if
+                    // it doesn't
+                    if (verified) {
+                        break match
+                    }
                 }
             }
 
@@ -1157,6 +1187,7 @@ async function getIMDbMetadata (imdbId, rtType) {
     const main = get(data, 'props.pageProps.mainColumnData')
     const extra = get(data, 'props.pageProps.aboveTheFoldData')
     const cast = get(main, 'cast.edges.*.node.name.nameText.text', [])
+    const mainCast = get(extra, 'castPageTitle.edges.*.node.name.nameText.text', [])
     const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', title)
@@ -1185,6 +1216,7 @@ async function getIMDbMetadata (imdbId, rtType) {
         originalTitle,
         titles,
         cast,
+        mainCast,
         genres,
         releaseDate,
     }
@@ -1523,29 +1555,34 @@ function rtName (title) {
 }
 
 /**
- * given two arrays of strings, return an object containing:
+ * take two iterable collections of strings and returns an object containing:
  *
  *   - got: the number of shared strings (strings common to both)
  *   - want: the required number of shared strings (minimum: 1)
  *   - max: the maximum possible number of shared strings
  *
- * if either array is empty, the number of strings they have in common is -1
+ * if either collection is empty, the number of strings they have in common is -1
+ *
+ * @typedef Shared
+ * @prop {number} got
+ * @prop {number} want
+ * @prop {number} max
+ * @prop {Shared=} full
  *
  * @param {Iterable<string>} a
  * @param {Iterable<string>} b
- * @param {Object} [options]
- * @param {(smallest: Set<string>, largest: Set<string>) => number} [options.min]
- * @param {(value: string) => string} [options.map]
+ * @return Shared
  */
-function shared (a, b, options = {}) {
-    const { min = MINIMUM_SHARED, map: transform = normalize } = options
-    const $a = new Set(Array.from(a, transform))
+function _shared (a, b) {
+    /** @type {Set<string>} */
+    const $a = (a instanceof Set) ? a : new Set(Array.from(a, normalize))
 
     if ($a.size === 0) {
         return UNSHARED
     }
 
-    const $b = new Set(Array.from(b, transform))
+    /** @type {Set<string>} */
+    const $b = (b instanceof Set) ? b : new Set(Array.from(b, normalize))
 
     if ($b.size === 0) {
         return UNSHARED
@@ -1553,8 +1590,12 @@ function shared (a, b, options = {}) {
 
     const [smallest, largest] = $a.size < $b.size ? [$a, $b] : [$b, $a]
 
-    // we always want at least 1 even if the maximum is 0
-    const want = Math.max(min(smallest, largest), 1)
+    // the minimum number of elements shared between two Sets for them to be
+    // deemed similar
+    const minimumShared = Math.round(smallest.size / 2)
+
+    // we always want at least 1 even if the max is 0
+    const want = Math.max(minimumShared, 1)
 
     let count = 0
 
@@ -1565,6 +1606,36 @@ function shared (a, b, options = {}) {
     }
 
     return { got: count, want, max: smallest.size }
+}
+
+/**
+ * a curried wrapper for +_shared+ which takes two iterable collections of
+ * strings and returns an object containing:
+ *
+ *   - got: the number of shared strings (strings common to both)
+ *   - want: the required number of shared strings (minimum: 1)
+ *   - max: the maximum possible number of shared strings
+ *
+ * if either collection is empty, the number of strings they have in common is -1
+ *
+ * @overload
+ * @param {Iterable<string>} a
+ * @return {(b: Iterable<string>) => Shared}
+ *
+ * @overload
+ * @param {Iterable<string>} a
+ * @param {Iterable<string>} b
+ * @return {Shared}
+ *
+ * @type {(...args: [Iterable<string>] | [Iterable<string>, Iterable<string>]) => unknown}
+ */
+function shared (...args) {
+    if (args.length === 2) {
+        return _shared(...args)
+    } else {
+        const a = new Set(Array.from(args[0], normalize))
+        return (/** @type {Iterable<string>} */ b) => _shared(a, b)
+    }
 }
 
 /**
