@@ -41,7 +41,7 @@ rebuild: clean build
 
 .PHONY: typecheck
 typecheck:
-	$(BIN)/tsc-files --noEmit --noImplicitAny --noUnusedLocals --noUnusedParameters --strict src/*.ts
+	$(BIN)/tsc-files --noEmit --noImplicitAny --noUnusedLocals --noUnusedParameters --strict src/**/*.ts
 
 # http://blog.melski.net/2010/11/30/makefile-hacks-print-the-value-of-any-variable/
 print-%:
