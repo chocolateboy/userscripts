@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       6.1.0
+// @version       6.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -357,7 +357,7 @@ const MovieMatcher = {
                 // XXX only called after the other checks have filtered out
                 // non-matches, so the number of comparions remains small
                 // (usually 1 or 2, and seldom more than 3, even with 100 results)
-                const titleMatch = titleSimilarity({ imdb: imdb.titles, rt: rtTitles })
+                const titleMatch = titleSimilarity(imdb.titles, rtTitles)
 
                 const result = {
                     title,
@@ -576,7 +576,7 @@ const TVMatcher = {
                 // XXX only called after the other checks have filtered out
                 // non-matches, so the number of comparions remains small
                 // (usually 1 or 2, and seldom more than 3, even with 100 results)
-                const titleMatch = titleSimilarity({ imdb: imdb.titles, rt: rtTitles })
+                const titleMatch = titleSimilarity(imdb.titles, rtTitles)
 
                 const result = {
                     title,
@@ -712,7 +712,13 @@ const TVMatcher = {
 
             // last resort: match the genre(s) and release date
             if (imdb.genres.length && imdb.releaseDate) {
-                const rtGenres = rtProps($rt, 'series-details-genre')
+                // if it exists, the $.genre array in the RT page's JSON-LD
+                // contains all the genres included in the API result (e.g.
+                // "Documentary", "Crime"), whereas the UI may only list one
+                // (e.g. "Documentary"), so prefer the former if available
+                const rtGenres = $rt.meta.genre?.length
+                    ? $rt.meta.genre
+                    : rtProps($rt, 'series-details-genre')
 
                 if (!rtGenres.length) {
                     break match
@@ -1555,7 +1561,7 @@ function rtName (title) {
 }
 
 /**
- * take two iterable collections of strings and returns an object containing:
+ * take two iterable collections of strings and return an object containing:
  *
  *   - got: the number of shared strings (strings common to both)
  *   - want: the required number of shared strings (minimum: 1)
@@ -1670,25 +1676,24 @@ function similarity (a, b, transform = normalize) {
  * return the best match between the IMDb titles (display and original) and RT
  * titles (display and AKAs)
  *
- *   similarity({ imdb: "La haine", rt: "Hate" })                      // 0.2
- *   titleSimilarity({ imdb: ["La haine"], rt: ["Hate", "La Haine"] }) // 1
+ *   similarity("La haine", "Hate")                      // 0.2
+ *   titleSimilarity(["La haine"], ["Hate", "La Haine"]) // 1
  *
- * @param {Object} options
- * @param {string[]} options.imdb
- * @param {string[]} options.rt
+ * @param {string[]} aTitles
+ * @param {string[]} bTitles
  */
-function titleSimilarity ({ imdb: imdbTitles, rt: rtTitles }) {
+function titleSimilarity (aTitles, bTitles) {
     let max = 0
 
-    for (const [imdb, rt] of cartesianProduct([imdbTitles, rtTitles])) {
+    for (const [aTitle, bTitle] of cartesianProduct([aTitles, bTitles])) {
         ++PAGE_STATS.titleComparisons
 
-        const s = similarity(imdb, rt)
+        const score = similarity(aTitle, bTitle)
 
-        if (s === 2) {
-            return s
-        } else if (s > max) {
-            max = s
+        if (score === 2) {
+            return score
+        } else if (score > max) {
+            max = score
         }
     }
 
@@ -1754,11 +1759,13 @@ const { waitFor, TimeoutError } = (function () {
         let retry = true
         let found = false
 
-        callback(() => {
+        const done = () => {
             trace(() => `inside timeout handler for ${id}: ${found ? 'found' : 'not found'}`)
             retry = false
             return found
-        }, id)
+        }
+
+        callback(done, id)
 
         return new Promise((resolve, reject) => {
             /** @type {FrameRequestCallback} */
@@ -1785,7 +1792,8 @@ const { waitFor, TimeoutError } = (function () {
                 }
             }
 
-            check(0)
+            const now = document.timeline.currentTime ?? -1
+            check(now)
         })
     }
 
