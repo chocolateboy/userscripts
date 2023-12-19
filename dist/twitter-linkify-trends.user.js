@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.2.0
+// @version       2.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -25,7 +25,7 @@
 (() => {
   // src/twitter-linkify-trends.user.ts
   // @license       GPL
-  var CACHE = new exports.default(128);
+  var CACHE = exports.default(128);
   var DEBUG = {};
   var DISABLED_EVENTS = "click touch";
   var EVENT_DATA = "/2/guide.json";

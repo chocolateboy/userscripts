@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.2.0
+// @version       2.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -24,6 +24,11 @@
 
 // XXX needed to appease esbuild
 export {}
+
+declare const exports: {
+    default: typeof import('flru').default;
+    getter: typeof import('get-wild').getter;
+}
 
 type Debug = {
     event?: string;
@@ -46,10 +51,8 @@ type TwitterEvent = {
  * data (JSON)
  *
  * uses an LRU cache (flru) with up to 256 (128 * 2) entries
- *
- * @type {import("flru").flruCache}
  */
-const CACHE = new exports.default(128)
+const CACHE = exports.default(128)
 
 /*
  * debugging options
@@ -112,8 +115,6 @@ const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND, VIDEO].join(', ')
  *
  * we also use a simpler/faster path parser since we don't use the extended
  * syntax
- *
- * @type {typeof import("get-wild").get}
  */
 const pluck = exports.getter({ default: [], split: '.' })
 
