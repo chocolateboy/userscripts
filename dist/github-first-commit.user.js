@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -40,15 +40,15 @@
 
   // src/github-first-commit/first-commit.ts
   var DEFAULT_TIMEOUT = 1e3;
+  var DUMMY_MUTATIONS = [];
   var getCommitHistoryButton = (root) => {
-    return root.querySelector("svg.octicon.octicon-history")?.closest("a:not(.react-last-commit-history-icon)") || null;
+    return root.querySelector("svg.octicon.octicon-history")?.closest("a") || null;
   };
   var FirstCommit = class {
     constructor(state, options = {}) {
       this.state = state;
       this.timeout = options.timeout || DEFAULT_TIMEOUT;
     }
-    isLoggedIn = false;
     timeout;
     append($target, $firstCommit) {
       const $targetLi = $target.parent("li");
@@ -56,7 +56,8 @@
       $targetLi.after($firstCommitLi);
     }
     /*
-     * add the "1st Commit" button after the commit-history ("123 Commits") button
+     * add the "1st Commit" button after the commit-history ("123 Commits")
+     * button
      */
     attach(target) {
       console.log("inside attach:", target);
@@ -98,15 +99,19 @@
     // b) not there yet (still loading)
     // c) already loaded or still loading, but invalid
     //
-    // b) and c) can occur when navigating to a repo page via the back button or via
-    // on-site links, including self-links (i.e. from a repo page to itself).
+    // b) and c) can occur when navigating to a repo page via the back button or
+    // via on-site links, including self-links (i.e. from a repo page to
+    // itself).
     //
-    // in the c) case, the old button is displayed (with the old first-commit button
-    // still attached) before being replaced by the final, updated version, unless
-    // the user is not logged in, in which case the old first-commit button is not
-    // replaced.
+    // in the c) case, the "old" [1] button is displayed (with the old
+    // first-commit button still attached) before being replaced by the
+    // refreshed version, unless the user is not logged in, in which case the
+    // old first-commit button is not replaced.
     //
     // this method handles all 3 cases
+    //
+    // [1] actually restored (i.e. new) versions of these cached elements, but
+    // the behavior is the same
     onLoad(_event) {
       const state = this.state;
       const root = this.getRoot();
@@ -134,7 +139,9 @@
         disconnect();
       };
       const callback = (mutations) => {
-        console.debug("inside mutation callback:", mutations);
+        if (mutations !== DUMMY_MUTATIONS) {
+          console.debug("inside mutation callback:", mutations);
+        }
         if (!root.isConnected) {
           console.warn("root is not connected:", root);
           disconnect();
@@ -162,8 +169,9 @@
       };
       const generation = state.generation;
       const observer = new MutationObserver(callback);
-      callback([], observer);
+      callback(DUMMY_MUTATIONS, observer);
       if (!disconnected) {
+        console.debug("starting mutation observer");
         timerHandle = setTimeout(timeout, this.timeout);
         observer.observe(root, { childList: true, subtree: true });
       }
@@ -172,7 +180,6 @@
 
   // src/github-first-commit/first-commit-logged-in.ts
   var FirstCommitLoggedIn = class extends FirstCommit {
-    isLoggedIn = true;
     append($target, $firstCommit) {
       $target.after($firstCommit);
     }
@@ -189,20 +196,29 @@
 
   // src/github-first-commit.user.ts
   // @license       GPL
-  var REPO_PATH = /^\/[^\/]+\/[^\/]+\/*$/;
+  var LOCATION = 'meta[name="analytics-location"][content]';
   var TIMEOUT = 1e3;
   var USER_LOGIN = 'meta[name="user-login"][content]:not([content=""])';
   var main = () => {
     const state = { generation: 0 };
-    $(document).on("turbo:load", (event) => {
+    const anonHandler = new FirstCommit(state, { timeout: TIMEOUT });
+    const loggedInHandler = new FirstCommitLoggedIn(state, { timeout: TIMEOUT });
+    $(window).on("turbo:load", (event) => {
       ++state.generation;
-      console.log("inside turbo:load", { ...state, event });
-      if (!REPO_PATH.test(location.pathname)) {
-        console.log("skipping invalid path");
+      const path = document.querySelector(LOCATION)?.content;
+      const isRepoPage = path === "/<user-name>/<repo-name>";
+      console.log("inside turbo:load", {
+        path,
+        repo: isRepoPage,
+        ...state,
+        event
+      });
+      if (!isRepoPage) {
+        console.log("skipping: non-repo page");
         return;
       }
       const isLoggedIn = document.querySelector(USER_LOGIN);
-      const handler = isLoggedIn ? new FirstCommitLoggedIn(state, { timeout: TIMEOUT }) : new FirstCommit(state, { timeout: TIMEOUT });
+      const handler = isLoggedIn ? loggedInHandler : anonHandler;
       handler.onLoad(event);
     });
   };

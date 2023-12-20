@@ -6,6 +6,7 @@ export type Options = {
 }
 
 const DEFAULT_TIMEOUT = 1_000 // 1 second
+const DUMMY_MUTATIONS: MutationRecord[] = []
 
 // the markup is different for anon vs logged-in users. rather than using
 // different selectors for each case, use a query which works for both.
@@ -16,11 +17,18 @@ const DEFAULT_TIMEOUT = 1_000 // 1 second
 //
 // [1] there may be two copies of the commit-history icon in the commit bar, the
 // second (inside a.react-last-commit-history-icon) in a hidden commit-history
-// button (with no text) at the end of the bar, which is selected for mobile
+// button (with no text) at the end of the bar, which is used for mobile
 // displays
 const getCommitHistoryButton = (root: Element): HTMLAnchorElement | null => {
-    return root.querySelector('svg.octicon.octicon-history')
-        ?.closest('a:not(.react-last-commit-history-icon)') || null
+    // TODO
+    //
+    // const selector = [
+    //     'a',
+    //     'not(.react-last-commit-history-icon)'
+    //     'not([id="first-commit"])'
+    //     'has(svg.octicon.octicon-history)'
+    // ].join(':')
+    return root.querySelector('svg.octicon.octicon-history')?.closest('a') || null
 }
 
 /*
@@ -51,14 +59,13 @@ const getCommitHistoryButton = (root: Element): HTMLAnchorElement | null => {
  *                 [clock icon]
  *             </svg>
  *             <span class="d-none d-sm-inline">
- *                 <strong>123</strong> <!-- XXX label -->
+ *                 <strong>1st Commit</strong> <!-- XXX label -->
  *             </span>
  *         </a>
  *     </li>
  * </ul>
  */
 export default class FirstCommit {
-    protected isLoggedIn = false;
     protected timeout: number;
 
     constructor (protected state: State, options: Options = {}) {
@@ -75,12 +82,14 @@ export default class FirstCommit {
     }
 
     /*
-     * add the "1st Commit" button after the commit-history ("123 Commits") button
+     * add the "1st Commit" button after the commit-history ("123 Commits")
+     * button
      */
-    protected attach (target: HTMLElement) {
+    protected attach (target: HTMLElement): void {
         console.log('inside attach:', target)
 
-        // clone and tweak the commit-history button to create the "1st Commit" button
+        // clone and tweak the commit-history button to create the first-commit
+        // button
         const $target = $(target)
 
         const $firstCommit = $target
@@ -112,7 +121,7 @@ export default class FirstCommit {
         this.append($target, $firstCommit)
     }
 
-    protected findLabel ($firstCommit: JQuery) {
+    protected findLabel ($firstCommit: JQuery): JQuery {
         const $label = $firstCommit.find(':scope span > strong').first()
 
         // cash-dom doesn't support $el.end()
@@ -141,16 +150,20 @@ export default class FirstCommit {
     // b) not there yet (still loading)
     // c) already loaded or still loading, but invalid
     //
-    // b) and c) can occur when navigating to a repo page via the back button or via
-    // on-site links, including self-links (i.e. from a repo page to itself).
+    // b) and c) can occur when navigating to a repo page via the back button or
+    // via on-site links, including self-links (i.e. from a repo page to
+    // itself).
     //
-    // in the c) case, the old button is displayed (with the old first-commit button
-    // still attached) before being replaced by the final, updated version, unless
-    // the user is not logged in, in which case the old first-commit button is not
-    // replaced.
+    // in the c) case, the "old" [1] button is displayed (with the old
+    // first-commit button still attached) before being replaced by the
+    // refreshed version, unless the user is not logged in, in which case the
+    // old first-commit button is not replaced.
     //
     // this method handles all 3 cases
-    public onLoad (_event: Event) {
+    //
+    // [1] actually restored (i.e. new) versions of these cached elements, but
+    // the behavior is the same
+    public onLoad (_event: Event): void {
         const state = this.state
 
         // the nearest ancestor (with a stable-looking identifier) which doesn't
@@ -187,7 +200,9 @@ export default class FirstCommit {
         }
 
         const callback: MutationCallback = mutations => {
-            console.debug('inside mutation callback:', mutations)
+            if (mutations !== DUMMY_MUTATIONS) {
+                console.debug('inside mutation callback:', mutations)
+            }
 
             // make sure we've gone high enough up the tree to find a persistent
             // container element. it's not just the commit-history button or
@@ -237,9 +252,10 @@ export default class FirstCommit {
         const generation = state.generation
         const observer = new MutationObserver(callback)
 
-        callback([], observer)
+        callback(DUMMY_MUTATIONS, observer)
 
         if (!disconnected) {
+            console.debug('starting mutation observer')
             timerHandle = setTimeout(timeout, this.timeout)
             observer.observe(root, { childList: true, subtree: true })
         }

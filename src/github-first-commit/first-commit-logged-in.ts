@@ -42,13 +42,11 @@ import FirstCommit from './first-commit.js'
  * <div>
  */
 export default class FirstCommitLoggedIn extends FirstCommit {
-    protected isLoggedIn = true;
-
     protected override append ($target: JQuery, $firstCommit: JQuery): void {
         $target.after($firstCommit)
     }
 
-    protected override findLabel ($firstCommit: JQuery) {
+    protected override findLabel ($firstCommit: JQuery): JQuery {
         return $firstCommit
             .find(':scope [data-component="text"] > span')
             .first()
