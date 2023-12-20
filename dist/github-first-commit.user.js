@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -189,7 +189,7 @@
 
   // src/github-first-commit.user.ts
   // @license       GPL
-  var REPO_PATH = /^\/[^\/]+\/[^\/]+$/;
+  var REPO_PATH = /^\/[^\/]+\/[^\/]+\/*$/;
   var TIMEOUT = 1e3;
   var USER_LOGIN = 'meta[name="user-login"][content]:not([content=""])';
   var main = () => {

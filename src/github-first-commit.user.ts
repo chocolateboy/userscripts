@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -17,7 +17,7 @@
 import FirstCommit         from './github-first-commit/first-commit.js'
 import FirstCommitLoggedIn from './github-first-commit/first-commit-logged-in.js'
 
-const REPO_PATH = /^\/[^\/]+\/[^\/]+$/
+const REPO_PATH = /^\/[^\/]+\/[^\/]+\/*$/
 const TIMEOUT = 1_000 // 1 second
 const USER_LOGIN = 'meta[name="user-login"][content]:not([content=""])'
 
