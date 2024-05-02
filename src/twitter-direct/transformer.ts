@@ -282,7 +282,7 @@ export class Transformer {
         }
 
         if (unresolved.size) {
-            console.warn(`unresolved URIs (${path}):`, Object.fromEntries(state.unresolved))
+            console.warn(`unresolved URIs (${path}):`, Object.fromEntries(unresolved))
         }
 
         return state.count
