@@ -3,23 +3,23 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       6.1.1
+// @version       7.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
-// @require       https://code.jquery.com/jquery-3.6.1.min.js
+// @require       https://code.jquery.com/jquery-3.7.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.11.7/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.11.7/plugin/relativeTime.js
+// @require       https://unpkg.com/dayjs@1.11.11/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.11.11/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/@chocolatey/enumerator@1.1.1/dist/index.umd.min.js
 // @require       https://unpkg.com/@chocolatey/when@1.2.0/dist/index.umd.min.js
-// @require       https://unpkg.com/dset@3.1.2/dist/index.min.js
+// @require       https://unpkg.com/dset@3.1.3/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @require       https://unpkg.com/little-emitter@0.3.5/dist/emitter.js
 // @resource      api https://pastebin.com/raw/absEYaJ8
-// @resource      overrides https://pastebin.com/raw/kCQZJNai
+// @resource      overrides https://pastebin.com/raw/sRQpz471
 // @grant         GM_addStyle
 // @grant         GM_deleteValue
 // @grant         GM_getResourceText
@@ -47,7 +47,7 @@
 
 const API_LIMIT        = 100
 const CHANGE_TARGET    = 'target:change'
-const DATA_VERSION     = 1.2
+const DATA_VERSION     = 1.3
 const DATE_FORMAT      = 'YYYY-MM-DD'
 const DEBUG_KEY        = 'debug'
 const DISABLE_CACHE    = false
@@ -212,21 +212,6 @@ const get = exports.getter({ split: '.' })
 const getRTLinkTarget = () => JSON.parse(GM_getValue(TARGET_KEY, 'null'))?.data || '_self'
 
 /**
- * scan an RT document for properties defined in the text of metadata elements
- * of the specified type
- *
- * @param {RTDoc} $rt
- * @param {string} type
- * @return {string[]}
- */
-const rtProps = ($rt, type) => {
-    return $rt.find(`[data-qa="${type}"]`).get().flatMap(el => {
-        const name = $(el).text().trim()
-        return name ? [name] : []
-    })
-}
-
-/**
  * extract JSON-LD data for the loaded document
  *
  * used to extract metadata on IMDb and Rotten Tomatoes
@@ -255,37 +240,38 @@ function jsonLd (el, id) {
     return data
 }
 
-const MovieMatcher = {
+const BaseMatcher = {
     /**
-     * return the consensus from a movie page as a HTML string
+     * return the consensus from an RT page as a HTML string
      *
      * @param {RTDoc} $rt
-     * @return {[string]}
+     * @return {string}
      */
-    getConsensus ($rt) {
-        const $consensus = $rt
-            .find('[data-qa="score-panel-critics-consensus"], [data-qa="critics-consensus"]')
-            .first()
-
-        return [$consensus.html()]
+    consensus ($rt) {
+        return $rt.find('#critics-consensus p').html()
     },
 
     /**
-     * return the last time a movie page was updated based on its most recently
+     * return the last time an RT page was updated based on its most recently
      * published review
      *
      * @param {RTDoc} $rt
      * @return {DayJs | undefined}
      */
     lastModified ($rt) {
-        return $rt
-            .find('[data-qa="critic-review"][createdate]:not([createdate=""])')
-            .get()
-            .map(review => dayjs($(review).attr('createdate')))
+        return pluck($rt.meta.review, 'dateCreated')
+            .map(dayjs)
             .sort((a, b) => b.unix() - a.unix())
             .shift()
     },
 
+    rating ($rt) {
+        const $rating = $rt.find('rt-button[slot="criticsScore"]')
+        return parseInt($rating.text().trim()) || -1
+    },
+}
+
+const MovieMatcher = {
     /**
      * return a movie record ({ url: string }) from the API results which
      * matches the supplied IMDb data
@@ -430,7 +416,7 @@ const MovieMatcher = {
         log('verifying movie')
 
         // match the director(s)
-        const rtDirectors = rtProps($rt, 'movie-info-director')
+        const rtDirectors = pluck($rt.meta.director, 'name') || []
 
         return verifyShared({
             name: 'directors',
@@ -441,56 +427,6 @@ const MovieMatcher = {
 }
 
 const TVMatcher = {
-    /**
-     * return the consensus (HTML string) and rating (number) from a TV page
-     *
-     * @param {RTDoc} $rt
-     * @param {number} showRating
-     * @return {[string | undefined, number]}
-     */
-    getConsensus ($rt, showRating) {
-        const $consensus = $rt.find('season-list-item[consensus]:not([consensus=""])').last()
-        const $rating = $rt.find('season-list-item[tomatometerscore]:not([tomatometerscore=""])').last()
-
-        /** @type {string | undefined} */
-        let consensus
-
-        /** @type {string | undefined} */
-        let score
-
-        if ($consensus.length) {
-            consensus = $consensus.attr('consensus')
-            score = $consensus.attr('tomatometerscore')
-        } else if ($rating.length) {
-            score = $rating.attr('tomatometerscore')
-        }
-
-        let rating = showRating
-
-        if (score) {
-            const seasonRating = parseInt(score)
-
-            if (Number.isSafeInteger(seasonRating)) {
-                rating = seasonRating
-            }
-        }
-
-        return [consensus, rating]
-    },
-
-    /**
-     * return the last time a TV page was updated based on its most recently
-     * published review
-     *
-     * @param {RTDoc} _$rt
-     * @return {DayJs | undefined}
-     */
-    lastModified (_$rt) {
-        // XXX there's no way to determine this from the main page of a TV show
-        // and the +updated+ field doesn't correspond to the latest review
-        return undefined
-    },
-
     /**
      * return a TV show record ({ url: string }) from the API results which
      * matches the supplied IMDb data
@@ -567,7 +503,7 @@ const TVMatcher = {
                 }
 
                 const rtRating = rt.rottenTomatoes?.criticsScore
-                const url = `/tv/${slug}`
+                const url = `/tv/${slug}/s01`
 
                 // XXX the title is in the AKA array, but a) we don't want to
                 // assume that and b) it's not usually first
@@ -594,7 +530,6 @@ const TVMatcher = {
                     titles: rtTitles,
                     popularity: rt.pageViews_popularity ?? 0,
                     index,
-                    targetUrl: seasons.length === 1 ? `${RT_BASE}${url}/s01` : null,
                     updated: rt.updateDate,
                     verify,
                 }
@@ -637,12 +572,12 @@ const TVMatcher = {
      * return the likely RT path for an IMDb TV show title, e.g.:
      *
      *   title: "Sesame Street"
-     *   path:  "/tv/sesame_street"
+     *   path:  "/tv/sesame_street/s01"
      *
      * @param {string} title
      */
     rtPath (title) {
-        return `/tv/${rtName(title)}`
+        return `/tv/${rtName(title)}/s01`
     },
 
     /**
@@ -650,75 +585,18 @@ const TVMatcher = {
      *
      * @param {any} imdb
      * @param {RTDoc} $rt
-     * @return {boolean | string}
+     * @return {boolean}
      */
     verify (imdb, $rt) {
         log('verifying TV show')
 
-        // match the following in descending order of priority:
-        //
-        //   - the show's cast (continue if it fails)
-        //   - the show's creators (IMDb) against the RT creators or producers
-        //   - the show's genre(s) AND release date
+        // match the genre(s) AND release date
         let verified = false
 
         match: {
-            if (imdb.cast.length) {
-                const rtCast = rtProps($rt, 'cast-item-name')
-
-                if (rtCast.length) {
-                    verified = verifyShared({
-                        name: 'cast',
-                        imdb: imdb.cast,
-                        rt: rtCast,
-                    })
-
-                    // the displayed RT cast is frequently wrong for TV
-                    // documentaries and shows like Black Mirror with a rolling
-                    // cast (in both cases it's a selection of crew members), so
-                    // accept the cast match if it works, but don't give up if
-                    // it doesn't
-                    if (verified) {
-                        break match
-                    }
-                }
-            }
-
-            if (imdb.creators.length) {
-                const rtCreators = rtProps($rt, 'creator')
-
-                if (rtCreators.length) {
-                    verified = verifyShared({
-                        name: 'creators',
-                        imdb: imdb.creators,
-                        rt: rtCreators,
-                    })
-
-                    break match
-                }
-
-                const rtProducers = rtProps($rt, 'series-details-producer')
-
-                if (rtProducers.length) {
-                    verified = verifyShared({
-                        name: 'producers',
-                        imdb: imdb.creators,
-                        rt: rtProducers,
-                    })
-
-                    break match
-                }
-            }
-
-            // last resort: match the genre(s) and release date
             if (imdb.genres.length && imdb.releaseDate) {
-                // if it exists, the $.genre array in the RT page's JSON-LD
-                // contains all the genres included in the API result (e.g.
-                // "Documentary", "Crime"), whereas the UI may only list one
-                // (e.g. "Documentary"), so prefer the former if available
-                const rtGenres = $rt.meta.genre?.length
-                    ? $rt.meta.genre
-                    : rtProps($rt, 'series-details-genre')
+                const rtGenres = ($rt.meta.genre || [])
+                    .flatMap(it => it === 'Mystery & Thriller' ? it.split(' & ') : [it])
 
                 if (!rtGenres.length) {
                     break match
@@ -736,31 +614,17 @@ const TVMatcher = {
 
                 debug('verifying release date')
 
-                const [rtReleaseDate] = rtProps($rt, 'series-details-premiere-date')
-                    .map(date => dayjs(date).format(DATE_FORMAT))
+                const startDate = get($rt.meta, 'partOfSeries.startDate')
 
-                if (!rtReleaseDate) {
+                if (!startDate) {
                     break match
                 }
+
+                const rtReleaseDate = dayjs(startDate).format(DATE_FORMAT)
 
                 debug('imdb release date:', imdb.releaseDate)
                 debug('rt release date:', rtReleaseDate)
                 verified = rtReleaseDate === imdb.releaseDate
-            }
-        }
-
-        // change the target URL from "/tv/name" to "/tv/name/s01" if there's
-        // only one season
-        if (verified) {
-            /** @type {{ url: string }[] | undefined} */
-            const seasons = $rt.meta.containsSeason
-
-            if (seasons?.length === 1) {
-                const url = get(seasons, [0, 'url'])
-
-                if (url) {
-                    return url
-                }
             }
         }
 
@@ -841,11 +705,6 @@ class RTClient {
                     log(`error loading ${preload.fullUrl} (${preload.error.status} ${preload.error.statusText})`)
                 }
             }
-        }
-
-        if (typeof verified === 'string') {
-            state.targetUrl = verified
-            verified = true
         }
 
         log('verified:', verified)
@@ -1263,7 +1122,7 @@ async function getRTData (imdbId, title, rtType) {
     //   tvSeries:    "Sesame Street"
     //   preload URL: https://www.rottentomatoes.com/tv/sesame_street
     //
-    // this guess produces the correct URL most (~75%) of the time
+    // this guess produces the correct URL most (~70%) of the time
     //
     // preloading this page serves two purposes:
     //
@@ -1394,8 +1253,7 @@ async function getRTData (imdbId, title, rtType) {
     // values that can be modified by the RT client
     /** @type {RTState} */
     const state = {
-        targetUrl: match.targetUrl,
-        url:       RT_BASE + match.url,
+        url: RT_BASE + match.url
     }
 
     const rtClient = new RTClient({ match, matcher, preload, state })
@@ -1405,17 +1263,15 @@ async function getRTData (imdbId, title, rtType) {
         throw abort()
     }
 
-    const $rating = $rt.meta.aggregateRating
-    const metaRating = Number(($rating?.name === 'Tomatometer' ? $rating.ratingValue : null) ?? -1)
-    const [$consensus, rating = metaRating] = matcher.getConsensus($rt, metaRating)
+    const rating = BaseMatcher.rating($rt)
+    const $consensus = BaseMatcher.consensus($rt)
     const consensus = $consensus?.trim()?.replace(/--/g, '&#8212;') || NO_CONSENSUS
-    const updated = matcher.lastModified($rt)
-    const targetUrl = state.targetUrl || state.url
+    const updated = BaseMatcher.lastModified($rt)
+    const preloaded = state.url === preload.fullUrl
 
     return {
-        data: { consensus, rating, url: targetUrl },
-        matchUrl: state.url,
-        preloadUrl: preload.fullUrl,
+        data: { consensus, rating, url: state.url },
+        preloaded,
         updated,
     }
 }
@@ -1879,11 +1735,11 @@ async function run (imdbId) {
     }
 
     try {
-        const { data, matchUrl, preloadUrl, updated } = await getRTData(imdbId, title, rtType)
+        const { data, preloaded, updated } = await getRTData(imdbId, title, rtType)
 
         log('RT data:', data)
         bump('hit')
-        bump(matchUrl === preloadUrl ? 'preload.hit' : 'preload.miss')
+        bump(preloaded ? 'preload.hit' : 'preload.miss')
 
         let active = false
 
