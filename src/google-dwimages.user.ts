@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -11,15 +11,15 @@
 // @grant         none
 // ==/UserScript==
 
+import { observe }  from './lib/observer'
+import { constant } from './lib/util'
+
 // property (data attribute) on image result elements used to distinguish them
 // from new/unprocessed results
 const enum ResultStatus {
     PENDING = 'pending',
     FIXED   = 'fixed',
 }
-
-// an empty array of mutations, used for initial/simulated mutation callbacks
-const DUMMY_MUTATIONS: MutationRecord[] = []
 
 // events to intercept (stop propagating) in result elements
 const EVENTS = [
@@ -41,6 +41,8 @@ const RESULT = ':scope > :is([data-lpage], [data-ri]):not([data-status])'
 
 // selector for the image result container
 const RESULTS = ':has(> :is([data-lpage], [data-ri]))'
+
+const done = constant(true)
 
 /**
  * event handler for result elements which prevents their click/mousedown events
@@ -79,12 +81,11 @@ const onImageLink = (link: HTMLAnchorElement, result: HTMLElement): void => {
     link.href = src
     link.title = image.alt
     link.target = LINK_TARGET // make it consistent with the page link
+    result.dataset.status = ResultStatus.FIXED
 
     // force a reflow (once) so the updated URL is immediately visible on hover
     // (XXX Firefox issue, not needed in Chrome)
     image.parentElement!.replaceChild(image, image)
-
-    result.dataset.status = ResultStatus.FIXED
 }
 
 /*
@@ -111,22 +112,12 @@ const onResult = (result: HTMLElement): void => {
     }
 
     // wait for its href to be assigned (on the first hover)
-    const init = { attributeFilter: ['href'] }
-    const callback: MutationCallback = (_mutations, observer) => {
-        observer.disconnect()
-
-        if (imageLink.href) {
-            return onImageLink(imageLink, result)
-        }
-
-        observer.observe(imageLink, init)
-    }
-
-    callback(DUMMY_MUTATIONS, new MutationObserver(callback))
+    observe(imageLink, { attributeFilter: ['href'] }, () => {
+        return imageLink.href && done(onImageLink(imageLink, result))
+    })
 }
 
 const run = () => {
-    const init = { childList: true }
     const results = document.querySelector<HTMLElement>(RESULTS)
 
     if (!results) {
@@ -134,17 +125,11 @@ const run = () => {
         return
     }
 
-    const callback: MutationCallback = (_mutations, observer) => {
-        observer.disconnect()
-
+    observe(results, { childList: true }, () => {
         for (const result of results.querySelectorAll<HTMLElement>(RESULT)) {
             onResult(result)
         }
-
-        observer.observe(results, init)
-    }
-
-    callback(DUMMY_MUTATIONS, new MutationObserver(callback))
+    })
 }
 
 run()

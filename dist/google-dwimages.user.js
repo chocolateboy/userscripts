@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -15,9 +15,30 @@
 
 "use strict";
 (() => {
+  // src/lib/observer.ts
+  var DUMMY_MUTATIONS = [];
+  var INIT = { childList: true, subtree: true };
+  var observe = (target, ...args) => {
+    const [init, callback] = args.length === 1 ? [INIT, args[0]] : args;
+    const $callback = (mutations, observer2) => {
+      observer2.disconnect();
+      const result = callback(mutations, observer2);
+      if (!result) {
+        observer2.observe(target, init);
+      } else if (typeof result === "function") {
+        queueMicrotask(result);
+      }
+    };
+    const observer = new MutationObserver($callback);
+    queueMicrotask(() => $callback(DUMMY_MUTATIONS, observer));
+    return observer;
+  };
+
+  // src/lib/util.ts
+  var constant = (value) => (..._args) => value;
+
   // src/google-dwimages.user.ts
   // @license       GPL
-  var DUMMY_MUTATIONS = [];
   var EVENTS = [
     "auxclick",
     "click",
@@ -31,6 +52,7 @@
   var LINK_TARGET = "_blank";
   var RESULT = ":scope > :is([data-lpage], [data-ri]):not([data-status])";
   var RESULTS = ":has(> :is([data-lpage], [data-ri]))";
+  var done = constant(true);
   var stopPropagation = (e) => {
     e.stopPropagation();
   };
@@ -49,8 +71,8 @@
     link.href = src;
     link.title = image.alt;
     link.target = LINK_TARGET;
-    image.parentElement.replaceChild(image, image);
     result.dataset.status = "fixed" /* FIXED */;
+    image.parentElement.replaceChild(image, image);
   };
   var onResult = (result) => {
     result.dataset.status = "pending" /* PENDING */;
@@ -62,31 +84,21 @@
       console.warn("Can't find image link in result:", result);
       return;
     }
-    const init = { attributeFilter: ["href"] };
-    const callback = (_mutations, observer) => {
-      observer.disconnect();
-      if (imageLink.href) {
-        return onImageLink(imageLink, result);
-      }
-      observer.observe(imageLink, init);
-    };
-    callback(DUMMY_MUTATIONS, new MutationObserver(callback));
+    observe(imageLink, { attributeFilter: ["href"] }, () => {
+      return imageLink.href && done(onImageLink(imageLink, result));
+    });
   };
   var run = () => {
-    const init = { childList: true };
     const results = document.querySelector(RESULTS);
     if (!results) {
       console.warn("Can't find result container");
       return;
     }
-    const callback = (_mutations, observer) => {
-      observer.disconnect();
+    observe(results, { childList: true }, () => {
       for (const result of results.querySelectorAll(RESULT)) {
         onResult(result);
       }
-      observer.observe(results, init);
-    };
-    callback(DUMMY_MUTATIONS, new MutationObserver(callback));
+    });
   };
   run();
 })();
