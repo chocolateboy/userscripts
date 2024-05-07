@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -17,6 +17,7 @@
 (() => {
   // src/google-dwimages.user.ts
   // @license       GPL
+  var DUMMY_MUTATIONS = [];
   var EVENTS = [
     "auxclick",
     "click",
@@ -27,8 +28,9 @@
     "mousedown",
     "touchstart"
   ];
-  var RESULTS = ":has(> :is([data-lpage], [data-ri]))";
+  var LINK_TARGET = "_blank";
   var RESULT = ":scope > :is([data-lpage], [data-ri]):not([data-status])";
+  var RESULTS = ":has(> :is([data-lpage], [data-ri]))";
   var stopPropagation = (e) => {
     e.stopPropagation();
   };
@@ -36,7 +38,7 @@
     const { searchParams: params } = new URL(link.href);
     const src = params.get("imgurl");
     if (!src) {
-      console.warn("Can't find image URL in result link:", { link, params });
+      console.warn("Can't find image URL in result link:", { result, link, params });
       return;
     }
     const image = link.querySelector(":scope img");
@@ -46,12 +48,12 @@
     }
     link.href = src;
     link.title = image.alt;
-    link.target = "_blank";
-    result.dataset.status = "fixed";
+    link.target = LINK_TARGET;
     image.parentElement.replaceChild(image, image);
+    result.dataset.status = "fixed" /* FIXED */;
   };
   var onResult = (result) => {
-    result.dataset.status = "pending";
+    result.dataset.status = "pending" /* PENDING */;
     for (const event of EVENTS) {
       result.addEventListener(event, stopPropagation);
     }
@@ -68,7 +70,7 @@
       }
       observer.observe(imageLink, init);
     };
-    callback([], new MutationObserver(callback));
+    callback(DUMMY_MUTATIONS, new MutationObserver(callback));
   };
   var run = () => {
     const init = { childList: true };
@@ -84,7 +86,7 @@
       }
       observer.observe(results, init);
     };
-    callback([], new MutationObserver(callback));
+    callback(DUMMY_MUTATIONS, new MutationObserver(callback));
   };
   run();
 })();
