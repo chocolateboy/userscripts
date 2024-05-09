@@ -214,6 +214,8 @@ class Replacer {
             return message
         }
 
+        const $message = Array.from(message)
+
         for (let i = 0; i < urls.length; ++i) {
             const $url = urls[i]
 
@@ -235,7 +237,7 @@ class Replacer {
 
             const trackedUrl = (context.lang === 'zxx') // just a URL
                 ? message
-                : Array.from(message).slice(start, end).join('')
+                : $message.slice(start, end).join('')
 
             seen.set(trackedUrl, expandedUrl)
         }

@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://twitter.com/
@@ -164,6 +164,7 @@
       if (!(Array.isArray(urls) && urls.length)) {
         return message;
       }
+      const $message = Array.from(message);
       for (let i = 0; i < urls.length; ++i) {
         const $url = urls[i];
         if (!isURLData($url)) {
@@ -178,7 +179,7 @@
         if (!alreadyExpanded) {
           continue;
         }
-        const trackedUrl = context.lang === "zxx" ? message : Array.from(message).slice(start, end).join("");
+        const trackedUrl = context.lang === "zxx" ? message : $message.slice(start, end).join("");
         seen.set(trackedUrl, expandedUrl);
       }
       return message;
