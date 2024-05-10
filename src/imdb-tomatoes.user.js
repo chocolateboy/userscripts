@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.0.2
+// @version       7.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -417,7 +417,7 @@ const MovieMatcher = {
         log('verifying movie')
 
         // match the director(s)
-        const rtDirectors = pluck($rt.meta.director, 'name') || []
+        const rtDirectors = pluck($rt.meta.director, 'name')
 
         return verifyShared({
             name: 'directors',
@@ -592,44 +592,41 @@ const TVMatcher = {
         log('verifying TV show')
 
         // match the genre(s) AND release date
-        let verified = false
-
-        match: {
-            if (imdb.genres.length && imdb.releaseDate) {
-                const rtGenres = ($rt.meta.genre || [])
-                    .flatMap(it => it === 'Mystery & Thriller' ? it.split(' & ') : [it])
-
-                if (!rtGenres.length) {
-                    break match
-                }
-
-                const matchedGenres = verifyShared({
-                    name: 'genres',
-                    imdb: imdb.genres,
-                    rt: rtGenres,
-                })
-
-                if (!matchedGenres) {
-                    break match
-                }
-
-                debug('verifying release date')
-
-                const startDate = get($rt.meta, 'partOfSeries.startDate')
-
-                if (!startDate) {
-                    break match
-                }
-
-                const rtReleaseDate = dayjs(startDate).format(DATE_FORMAT)
-
-                debug('imdb release date:', imdb.releaseDate)
-                debug('rt release date:', rtReleaseDate)
-                verified = rtReleaseDate === imdb.releaseDate
-            }
+        if (!(imdb.genres.length && imdb.releaseDate)) {
+            return false
         }
 
-        return verified
+        const rtGenres = ($rt.meta.genre || [])
+            .flatMap(it => it === 'Mystery & Thriller' ? it.split(' & ') : [it])
+
+        if (!rtGenres.length) {
+            return false
+        }
+
+        const matchedGenres = verifyShared({
+            name: 'genres',
+            imdb: imdb.genres,
+            rt: rtGenres,
+        })
+
+        if (!matchedGenres) {
+            return false
+        }
+
+        debug('verifying release date')
+
+        const startDate = get($rt.meta, 'partOfSeries.startDate')
+
+        if (!startDate) {
+            return false
+        }
+
+        const rtReleaseDate = dayjs(startDate).format(DATE_FORMAT)
+
+        debug('imdb release date:', imdb.releaseDate)
+        debug('rt release date:', rtReleaseDate)
+
+        return rtReleaseDate === imdb.releaseDate
     }
 }
 
