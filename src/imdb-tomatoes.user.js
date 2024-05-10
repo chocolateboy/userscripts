@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.0.1
+// @version       7.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -1779,11 +1779,7 @@ async function run (imdbId) {
     } finally {
         bump('requests')
         debug('stats:', stats.data)
-
-        if (DEBUG) {
-            debug('page stats:', PAGE_STATS)
-        }
-
+        trace('page stats:', PAGE_STATS)
         GM_setValue(STATS_KEY, JSON.stringify(stats))
     }
 }
