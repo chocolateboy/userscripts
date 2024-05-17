@@ -3,12 +3,12 @@
 @description   Distinguish between images and links on Twitter
 @author        chocolateboy
 @copyright     chocolateboy
-@version       0.0.2
+@version       0.1.0
 @namespace     https://github.com/chocolateboy/userscripts
 @license       GPL
 ==/UserStyle== */
 
-@-moz-document url-prefix("https://twitter.com/"), url-prefix("https://mobile.twitter.com/") {
+@-moz-document url-prefix("https://twitter.com/"), url-prefix("https://mobile.twitter.com/"), url-prefix("https://x.com/"), url-prefix("https://mobile.x.com/") {
     a[role="link"][href^="/"][href$="/photo/1"],
     a[role="link"][href^="/"][href$="/photo/2"],
     a[role="link"][href^="/"][href$="/photo/3"],

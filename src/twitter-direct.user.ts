@@ -3,13 +3,15 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       https://twitter.com/
-// @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
+// @include       https://twitter.com/
+// @include       https://twitter.com/*
+// @include       https://x.com/
+// @include       https://x.com/*
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @run-at        document-start
 // ==/UserScript==
@@ -54,7 +56,7 @@ const STATS: Record<string, number> = {}
  * a pattern which matches the domain(s) we expect data (JSON) to come from.
  * responses which don't come from a matching domain are ignored.
  */
-const TWITTER_API = /^(?:(?:api|mobile)\.)?twitter\.com$/
+const TWITTER_API = /^(?:(?:api|mobile)\.)?(?:twitter|x)\.com$/
 
 /*
  * replacement for the default handler for XHR requests. we transform the

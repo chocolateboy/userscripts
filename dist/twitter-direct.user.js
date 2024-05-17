@@ -3,13 +3,15 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       https://twitter.com/
-// @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
+// @include       https://twitter.com/
+// @include       https://twitter.com/*
+// @include       https://x.com/
+// @include       https://x.com/*
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @run-at        document-start
 // ==/UserScript==
@@ -279,7 +281,7 @@
   var CONTENT_TYPE = /^application\/json\b/;
   var LOG_THRESHOLD = 1024;
   var STATS = {};
-  var TWITTER_API = /^(?:(?:api|mobile)\.)?twitter\.com$/;
+  var TWITTER_API = /^(?:(?:api|mobile)\.)?(?:twitter|x)\.com$/;
   var onResponse = (xhr, uri) => {
     const contentType = xhr.getResponseHeader("Content-Type");
     if (!contentType || !CONTENT_TYPE.test(contentType)) {

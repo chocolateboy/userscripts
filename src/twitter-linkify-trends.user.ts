@@ -3,13 +3,17 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.2.1
+// @version       2.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       https://twitter.com/
-// @include       https://twitter.com/*
 // @include       https://mobile.twitter.com/
 // @include       https://mobile.twitter.com/*
+// @include       https://mobile.x.com/
+// @include       https://mobile.x.com/*
+// @include       https://twitter.com/
+// @include       https://twitter.com/*
+// @include       https://x.com/
+// @include       https://x.com/*
 // @require       https://code.jquery.com/jquery-3.7.1.slim.min.js
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
@@ -273,7 +277,7 @@ function onTrendElement ($trend: JQuery) {
 function onVideoElement ($link: JQuery) {
     // const id = $link.data('testid').match(/^media-tweet-card-(\d+)$/)?[1]
     const id = $link.data('testid').split('-').at(-1)
-    const url = `https://twitter.com/i/web/status/${id}`
+    const url = `https://x.com/i/web/status/${id}`
     $link.wrap(linkFor(url))
 }
 
