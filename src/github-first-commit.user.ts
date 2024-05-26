@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.0
+// @version       4.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -14,7 +14,7 @@
 
 import { observe } from './lib/observer.js'
 
-type Commits = Array<{ html_url: string }>;
+type Commit = { html_url: string };
 
 /* the unique ID assigned to the first-commit widget */
 const ID = 'first-commit'
@@ -31,19 +31,19 @@ const USER_REPO = 'meta[name="octolytics-dimension-repository_network_root_nwo"]
 const $ = document
 
 /*
- * this function extracts the URL of the repo's first commit and navigates to it.
- * it is based on code by several developers, a list of whom can be found here:
+ * extract the URL of the repo's first commit and navigate to it. this is based
+ * on code by several developers, a list of whom can be found here:
  * https://github.com/FarhadG/init#contributors
  *
- * XXX it doesn't work on private repos. a way to do that can be found here,
- * but it requires an authentication token:
+ * XXX it doesn't work on private repos. a way to do that can be found here, but
+ * it requires an authentication token:
  * https://gist.github.com/simonewebdesign/a70f6c89ffd71e6ba4f7dcf7cc74ccf8
  */
 const openFirstCommit = (user: string, repo: string) => {
     return fetch(`https://api.github.com/repos/${user}/${repo}/commits`)
         // the `Link` header has additional URLs for paging.
         // parse the original JSON for the case where no other pages exist
-        .then(res => Promise.all([res.headers.get('link'), res.json() as Promise<Commits>]))
+        .then(res => Promise.all([res.headers.get('link'), res.json() as Promise<Commit[]>]))
 
         .then(([link, commits]) => {
             if (!link) {
@@ -68,7 +68,7 @@ const openFirstCommit = (user: string, repo: string) => {
         })
 
         // get the last commit and navigate to its target URL
-        .then((commits: Commits) => {
+        .then((commits: Commit[]) => {
             if (Array.isArray(commits)) {
                 location.href = commits[commits.length - 1].html_url
             } else {
@@ -91,16 +91,15 @@ observe($.body, () => {
     }
 
     // locate the commit-history widget (e.g. "1,234 Commits") via its clock icon
-    const historyIcon = $.querySelector('svg.octicon-history')
+    const commitHistory = $.querySelector('div svg.octicon-history')
+        ?.closest<HTMLDivElement>('div')
 
-    if (!historyIcon) {
+    if (!commitHistory) {
         return
     }
 
     // clone and customize it
-    const commitHistory = historyIcon.closest<HTMLDivElement>('div')!
-    const container = commitHistory.parentElement! as HTMLDivElement
-    const firstCommit = commitHistory.cloneNode(true) as HTMLDivElement
+    const firstCommit = commitHistory.cloneNode(true) as typeof commitHistory
     const label = firstCommit.querySelector(':scope [data-component="text"] > *')!
     const header = firstCommit.querySelector(':scope h2')!
     const link = firstCommit.querySelector(':scope a[href]')!
@@ -120,5 +119,5 @@ observe($.body, () => {
     }, { once: true })
 
     // append to the commit-history widget
-    container.appendChild(firstCommit)
+    commitHistory.after(firstCommit)
 })

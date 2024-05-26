@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.0
+// @version       4.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -63,12 +63,10 @@
     if ($.getElementById(ID)) {
       return;
     }
-    const historyIcon = $.querySelector("svg.octicon-history");
-    if (!historyIcon) {
+    const commitHistory = $.querySelector("div svg.octicon-history")?.closest("div");
+    if (!commitHistory) {
       return;
     }
-    const commitHistory = historyIcon.closest("div");
-    const container = commitHistory.parentElement;
     const firstCommit = commitHistory.cloneNode(true);
     const label = firstCommit.querySelector(':scope [data-component="text"] > *');
     const header = firstCommit.querySelector(":scope h2");
@@ -84,6 +82,6 @@
       label.textContent = "Loading...";
       openFirstCommit(user, repo);
     }, { once: true });
-    container.appendChild(firstCommit);
+    commitHistory.after(firstCommit);
   });
 })();
