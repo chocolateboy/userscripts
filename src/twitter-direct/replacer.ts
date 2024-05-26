@@ -246,7 +246,7 @@ class Replacer {
     }
 
     /*
-     * reduce the keys under context.legacy (typically around 30) to the
+     * reduce the keys under $.legacy (typically around 30) to the
      * handful we care about
      */
     private onLegacyObject (value: Dict): Dict {
@@ -299,7 +299,7 @@ class Replacer {
 
     /*
      * traverse an object by hijacking JSON.stringify's visitor (replacer).
-     * dispatches each node to the +visit+ function
+     * dispatches each node to the +visit+ method
      */
     private traverse (data: Json): void {
         if (!isObject(data)) {
@@ -339,7 +339,7 @@ class Replacer {
                 break
 
             case 'legacy':
-                // reduce the keys under context.legacy (typically around 30) to
+                // reduce the keys under $.legacy (typically around 30) to
                 // the handful we care about
                 if (isPlainObject(value)) {
                     return this.onLegacyObject(value)

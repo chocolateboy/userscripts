@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.twitter.com/
@@ -187,7 +187,7 @@
       return message;
     }
     /*
-     * reduce the keys under context.legacy (typically around 30) to the
+     * reduce the keys under $.legacy (typically around 30) to the
      * handful we care about
      */
     onLegacyObject(value) {
@@ -225,7 +225,7 @@
     }
     /*
      * traverse an object by hijacking JSON.stringify's visitor (replacer).
-     * dispatches each node to the +visit+ function
+     * dispatches each node to the +visit+ method
      */
     traverse(data) {
       if (!isObject(data)) {
