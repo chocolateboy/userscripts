@@ -25,8 +25,6 @@ export const observe: Observe = (
 
         if (!result) {
             observer.observe(target, init)
-        } else if (typeof result === 'function') {
-            queueMicrotask(result as VoidFunction)
         }
     }
 
