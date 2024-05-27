@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.1
+// @version       4.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -16,16 +16,16 @@ import { observe } from './lib/observer.js'
 
 type Commit = { html_url: string };
 
-/* the unique ID assigned to the first-commit widget */
+/* unique ID assigned to the first-commit widget */
 const ID = 'first-commit'
 
 /*
- * a selector for the page-type identifier, e.g. "/<user-name>/<repo-name>" or
+ * selector for the page-type identifier, e.g. "/<user-name>/<repo-name>" or
  * "/<user-name>/<repo-name>/issues/index"
  */
-const LOCATION = 'meta[name="analytics-location"][content]'
+const PATH = 'meta[name="analytics-location"][content]'
 
-/* a selector for the owner name/repo name, e.g. "chocolateboy/userscripts" */
+/* selector for the owner name/repo name, e.g. "chocolateboy/userscripts" */
 const USER_REPO = 'meta[name="octolytics-dimension-repository_network_root_nwo"][content]'
 
 const $ = document
@@ -60,7 +60,6 @@ const openFirstCommit = (user: string, repo: string) => {
             // extract the URL of the last page (commits are ordered in
             // reverse chronological order, like the git CLI, so the oldest
             // commit is on the last page)
-
             const lastPage = link.match(/^.+?<([^>]+)>;/)![1]
 
             // fetch the last page of results
@@ -70,7 +69,7 @@ const openFirstCommit = (user: string, repo: string) => {
         // get the last commit and navigate to its target URL
         .then((commits: Commit[]) => {
             if (Array.isArray(commits)) {
-                location.href = commits[commits.length - 1].html_url
+                location.href = commits.at(-1)!.html_url
             } else {
                 console.error(commits)
             }
@@ -78,7 +77,7 @@ const openFirstCommit = (user: string, repo: string) => {
 }
 
 observe($.body, () => {
-    const path = $.querySelector<HTMLMetaElement>(LOCATION)?.content
+    const path = $.querySelector<HTMLMetaElement>(PATH)?.content
     const isRepoPage = path === '/<user-name>/<repo-name>'
 
     if (!isRepoPage) {
@@ -91,8 +90,7 @@ observe($.body, () => {
     }
 
     // locate the commit-history widget (e.g. "1,234 Commits") via its clock icon
-    const commitHistory = $.querySelector('div svg.octicon-history')
-        ?.closest<HTMLDivElement>('div')
+    const commitHistory = $.querySelector('div svg.octicon-history')?.closest('div')
 
     if (!commitHistory) {
         return
@@ -110,8 +108,8 @@ observe($.body, () => {
     link.removeAttribute('href')
     link.setAttribute('aria-label', 'First commit')
 
-    // navigate to the first commit when clicked
-    firstCommit.addEventListener('click', (e: MouseEvent) => {
+    // navigate to the first commit on click
+    firstCommit.addEventListener('click', e => {
         e.preventDefault()
         e.stopPropagation()
         label.textContent = 'Loading...'

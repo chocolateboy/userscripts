@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.1
+// @version       4.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -36,7 +36,7 @@
   // src/github-first-commit.user.ts
   // @license       GPL
   var ID = "first-commit";
-  var LOCATION = 'meta[name="analytics-location"][content]';
+  var PATH = 'meta[name="analytics-location"][content]';
   var USER_REPO = 'meta[name="octolytics-dimension-repository_network_root_nwo"][content]';
   var $ = document;
   var openFirstCommit = (user, repo) => {
@@ -48,14 +48,14 @@
       return fetch(lastPage).then((res) => res.json());
     }).then((commits) => {
       if (Array.isArray(commits)) {
-        location.href = commits[commits.length - 1].html_url;
+        location.href = commits.at(-1).html_url;
       } else {
         console.error(commits);
       }
     });
   };
   observe($.body, () => {
-    const path = $.querySelector(LOCATION)?.content;
+    const path = $.querySelector(PATH)?.content;
     const isRepoPage = path === "/<user-name>/<repo-name>";
     if (!isRepoPage) {
       return;
