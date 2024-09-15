@@ -3,18 +3,18 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.0.3
+// @version       7.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
 // @require       https://code.jquery.com/jquery-3.7.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
-// @require       https://unpkg.com/dayjs@1.11.11/dayjs.min.js
-// @require       https://unpkg.com/dayjs@1.11.11/plugin/relativeTime.js
+// @require       https://unpkg.com/dayjs@1.11.13/dayjs.min.js
+// @require       https://unpkg.com/dayjs@1.11.13/plugin/relativeTime.js
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/@chocolatey/enumerator@1.1.1/dist/index.umd.min.js
 // @require       https://unpkg.com/@chocolatey/when@1.2.0/dist/index.umd.min.js
-// @require       https://unpkg.com/dset@3.1.3/dist/index.min.js
+// @require       https://unpkg.com/dset@3.1.4/dist/index.min.js
 // @require       https://unpkg.com/fast-dice-coefficient@1.0.3/dice.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @require       https://unpkg.com/little-emitter@0.3.5/dist/emitter.js
@@ -888,7 +888,7 @@ async function addWidgets ({ consensus, rating, url }) {
         })
 
         // 6) update the link's label and URL
-        const $link = $rtRating.find('a[role="button"]')
+        const $link = $rtRating.find('a[href]')
         $link.attr({ 'aria-label': 'View RT Rating', href: url, target: rtLinkTarget })
 
         // 7) observe changes to the link's target
@@ -990,7 +990,8 @@ function attachWidget (target, rtRating) {
     // restore the RT widget if it is removed. only called (once) if the widget
     // is added "quickly" (i.e. while the ratings bar is still being finalized),
     // e.g. when the result is cached
-    const callback = () => {
+
+    const checkRatingsWidget = () => {
         if (rtRating.parentElement !== target) {
             observer.disconnect()
             target.appendChild(rtRating)
@@ -998,9 +999,18 @@ function attachWidget (target, rtRating) {
         }
     }
 
+    const callback = () => {
+        // XXX if we restore the ratings widget here immediately, it (now)
+        // conflicts with/confuses the reconciliation algorithm in some way and
+        // rather than just removing the widget, the *whole ratings bar* gets
+        // removed and rebuilt (!)
+        //
+        // this "delay" appears to prevent that (+queueMicrotask+ doesn't work).
+        setTimeout(checkRatingsWidget, 0)
+    }
+
     const observer = new MutationObserver(callback)
-    target.appendChild(rtRating)
-    observer.observe(target, init)
+    callback()
 }
 
 /**
