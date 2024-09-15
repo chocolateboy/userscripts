@@ -1,6 +1,6 @@
 import { constant } from './util.js'
 
-type ObserverCallbackState<T extends Element = HTMLElement> = {
+export type ObserverCallbackState<T extends Element = HTMLElement> = {
     mutations: MutationRecord[];
     observer: MutationObserver;
     target: T;
