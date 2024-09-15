@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.1.0
+// @version       7.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -342,7 +342,7 @@ const MovieMatcher = {
                 const rtTitles = rt.aka ? [...new Set([title, ...rt.aka])] : [title]
 
                 // XXX only called after the other checks have filtered out
-                // non-matches, so the number of comparions remains small
+                // non-matches, so the number of comparisons remains small
                 // (usually 1 or 2, and seldom more than 3, even with 100 results)
                 const titleMatch = titleSimilarity(imdb.titles, rtTitles)
 
@@ -511,7 +511,7 @@ const TVMatcher = {
                 const rtTitles = rt.aka ? [...new Set([title, ...rt.aka])] : [title]
 
                 // XXX only called after the other checks have filtered out
-                // non-matches, so the number of comparions remains small
+                // non-matches, so the number of comparisons remains small
                 // (usually 1 or 2, and seldom more than 3, even with 100 results)
                 const titleMatch = titleSimilarity(imdb.titles, rtTitles)
 
