@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.2
+// @version       4.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -24,6 +24,12 @@ const ID = 'first-commit'
  * "/<user-name>/<repo-name>/issues/index"
  */
 const PATH = 'meta[name="analytics-location"][content]'
+
+/*
+ * the page-type identifier for repo pages, e.g.
+ * https://github.com/chocolateboy/userscripts
+ */
+const REPO_PAGE = '/<user-name>/<repo-name>'
 
 /* selector for the owner name/repo name, e.g. "chocolateboy/userscripts" */
 const USER_REPO = 'meta[name="octolytics-dimension-repository_network_root_nwo"][content]'
@@ -78,9 +84,9 @@ const openFirstCommit = (user: string, repo: string) => {
 
 observe($.body, () => {
     const path = $.querySelector<HTMLMetaElement>(PATH)?.content
-    const isRepoPage = path === '/<user-name>/<repo-name>'
 
-    if (!isRepoPage) {
+    // bail if we're not on a repo page
+    if (path !== REPO_PAGE) {
         return
     }
 
@@ -109,12 +115,14 @@ observe($.body, () => {
     link.setAttribute('aria-label', 'First commit')
 
     // navigate to the first commit on click
-    firstCommit.addEventListener('click', e => {
+    const onClick = (e: MouseEvent) => {
         e.preventDefault()
         e.stopPropagation()
         label.textContent = 'Loading...'
         openFirstCommit(user, repo) // async
-    }, { once: true })
+    }
+
+    firstCommit.addEventListener('click', onClick, { once: true })
 
     // append to the commit-history widget
     commitHistory.after(firstCommit)

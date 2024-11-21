@@ -16,20 +16,24 @@
 
 "use strict";
 (() => {
+  // src/lib/util.ts
+  var constant = (value) => (..._args) => value;
+
   // src/lib/observer.ts
-  var DUMMY_MUTATIONS = [];
   var INIT = { childList: true, subtree: true };
+  var done = constant(true);
+  var resume = constant(false);
   var observe = (target, ...args) => {
     const [init, callback] = args.length === 1 ? [INIT, args[0]] : args;
     const $callback = (mutations, observer2) => {
       observer2.disconnect();
-      const result = callback(mutations, observer2);
-      if (!result) {
+      const done2 = callback({ mutations, observer: observer2, target, init });
+      if (!done2) {
         observer2.observe(target, init);
       }
     };
     const observer = new MutationObserver($callback);
-    queueMicrotask(() => $callback(DUMMY_MUTATIONS, observer));
+    queueMicrotask(() => $callback([], observer));
     return observer;
   };
 
@@ -37,6 +41,7 @@
   // @license       GPL
   var ID = "first-commit";
   var PATH = 'meta[name="analytics-location"][content]';
+  var REPO_PAGE = "/<user-name>/<repo-name>";
   var USER_REPO = 'meta[name="octolytics-dimension-repository_network_root_nwo"][content]';
   var $ = document;
   var openFirstCommit = (user, repo) => {
@@ -56,8 +61,7 @@
   };
   observe($.body, () => {
     const path = $.querySelector(PATH)?.content;
-    const isRepoPage = path === "/<user-name>/<repo-name>";
-    if (!isRepoPage) {
+    if (path !== REPO_PAGE) {
       return;
     }
     if ($.getElementById(ID)) {
@@ -76,12 +80,13 @@
     header.textContent = label.textContent = "1st Commit";
     link.removeAttribute("href");
     link.setAttribute("aria-label", "First commit");
-    firstCommit.addEventListener("click", (e) => {
+    const onClick = (e) => {
       e.preventDefault();
       e.stopPropagation();
       label.textContent = "Loading...";
       openFirstCommit(user, repo);
-    }, { once: true });
+    };
+    firstCommit.addEventListener("click", onClick, { once: true });
     commitHistory.after(firstCommit);
   });
 })();
