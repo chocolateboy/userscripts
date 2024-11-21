@@ -29,9 +29,9 @@ export const observe: Observe = (
     const $callback: MutationCallback = (mutations, observer) => {
         observer.disconnect()
 
-        const result = callback({ mutations, observer, target, init })
+        const done = callback({ mutations, observer, target, init })
 
-        if (!result) {
+        if (!done) {
             observer.observe(target, init)
         }
     }

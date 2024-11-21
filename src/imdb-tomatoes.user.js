@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.1.1
+// @version       7.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -266,8 +266,7 @@ const BaseMatcher = {
     },
 
     rating ($rt) {
-        const $rating = $rt.find('rt-button[slot="criticsScore"]')
-        const rating = parseInt($rating.text().trim())
+        const rating = parseInt($rt.meta.criticsScore.scorePercent)
         return rating >= 0 ? rating : -1
     },
 }
@@ -657,7 +656,7 @@ class RTClient {
 
     /**
      * transform an XHR response into a JQuery document wrapper with a +meta+
-     * property containing the page's parsed JSON-LD data
+     * property containing the page's parsed JSON metadata
      *
      * @param {Tampermonkey.Response<any>} res
      * @param {string} id
@@ -667,7 +666,8 @@ class RTClient {
         const parser = new DOMParser()
         const dom = parser.parseFromString(res.responseText, 'text/html')
         const $rt = $(dom)
-        const meta = jsonLd(dom, id)
+        const script = dom.querySelector('script#media-scorecard-json')
+        const meta = jsonLd(script, id)
         return Object.assign($rt, { meta, document: dom })
     }
 
@@ -990,7 +990,6 @@ function attachWidget (target, rtRating) {
     // restore the RT widget if it is removed. only called (once) if the widget
     // is added "quickly" (i.e. while the ratings bar is still being finalized),
     // e.g. when the result is cached
-
     const checkRatingsWidget = () => {
         if (rtRating.parentElement !== target) {
             observer.disconnect()
@@ -1222,7 +1221,7 @@ async function getRTData (imdbId, title, rtType) {
     }
 
     if (!Array.isArray(results)) {
-        throw new Error('invalid response type')
+        throw new TypeError('invalid response type')
     }
 
     // reorder the fields so the main fields are visible in the console without
@@ -1311,8 +1310,8 @@ function pluck (array, path) {
 }
 
 /**
- * purge expired entries from the cache older than the supplied date
- * (milliseconds since the epoch). if the date is -1, purge all entries
+ * remove expired cache entries older than the supplied date (milliseconds since
+ * the epoch). if the date is -1, remove all entries
  *
  * @param {number} date
  */
@@ -1592,7 +1591,7 @@ const { waitFor, TimeoutError } = (function () {
     // "pin" the window.load event
     //
     // we only wait for DOM elements, so if they don't exist by the time the
-    // last DOM lifecycle event fires, then they never will
+    // last DOM lifecycle event fires, they never will
     const onLoad = exports.when(/** @type {(done: () => boolean) => void} */ done => {
         window.addEventListener('load', done, { once: true })
     })
