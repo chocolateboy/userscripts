@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.2.1
+// @version       7.2.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -259,8 +259,9 @@ const BaseMatcher = {
      * @return {DayJs | undefined}
      */
     lastModified ($rt) {
-        return pluck($rt.meta.review, 'dateCreated')
-            .map(dayjs)
+        return $rt.find('.critics-reviews rt-text[slot="createDate"] span')
+            .get()
+            .map(el => dayjs($(el).text().trim()))
             .sort((a, b) => b.unix() - a.unix())
             .shift()
     },
@@ -999,7 +1000,7 @@ function attachWidget (target, rtRating, index) {
     // completely blown away and rebuilt (so we can't scope our observer to it)
     //
     // even with this caveat, I haven't seen the widgets removed more than twice
-    // (and only once if the result isn't cached), so we could turn off the
+    // (or more than once if the result isn't cached), so we could turn off the
     // observer after the second restoration
     const callback = () => {
         observer.disconnect()
