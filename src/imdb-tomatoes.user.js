@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.2.0
+// @version       7.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -266,7 +266,7 @@ const BaseMatcher = {
     },
 
     rating ($rt) {
-        const rating = parseInt($rt.meta.criticsScore.scorePercent)
+        const rating = parseInt($rt.meta?.aggregateRating?.ratingValue)
         return rating >= 0 ? rating : -1
     },
 }
@@ -666,8 +666,7 @@ class RTClient {
         const parser = new DOMParser()
         const dom = parser.parseFromString(res.responseText, 'text/html')
         const $rt = $(dom)
-        const script = dom.querySelector('script#media-scorecard-json')
-        const meta = jsonLd(script, id)
+        const meta = jsonLd(dom, id)
         return Object.assign($rt, { meta, document: dom })
     }
 
