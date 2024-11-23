@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.1.2
+// @version       7.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -861,7 +861,8 @@ async function addWidgets ({ consensus, rating, url }) {
     // the markup for the small (e.g. mobile) and large (e.g. desktop) IMDb
     // ratings widgets is exactly the same - they only differ in the way they're
     // (externally) styled
-    for (const imdbRating of imdbRatings) {
+    for (let i = 0; i < imdbRatings.length; ++i) {
+        const imdbRating = imdbRatings.item(i)
         const $imdbRating = $(imdbRating)
         const $ratings = $imdbRating.parent()
 
@@ -898,7 +899,7 @@ async function addWidgets ({ consensus, rating, url }) {
         $rtRating.balloon(balloonOptions)
 
         // 9) prepend the widget to the ratings bar
-        attachWidget($ratings.get(0), $rtRating.get(0))
+        attachWidget($ratings.get(0), $rtRating.get(0), i)
     }
 
     trace('added RT widgets')
@@ -975,8 +976,9 @@ function asyncGet (url, options = {}) {
  *
  * @param {HTMLElement | undefined} target
  * @param {HTMLElement | undefined} rtRating
+ * @param {number} index
  */
-function attachWidget (target, rtRating) {
+function attachWidget (target, rtRating, index) {
     if (!target) {
         throw new ReferenceError("can't find ratings bar")
     }
@@ -985,27 +987,34 @@ function attachWidget (target, rtRating) {
         throw new ReferenceError("can't find RT widget")
     }
 
-    const init = { childList: true }
+    const ids = ['rt-rating-large', 'rt-rating-small']
+    const id = ids[index]
+    const init = { childList: true, subtree: true }
+    const $ = document.body
 
-    // restore the RT widget if it is removed. only called (once) if the widget
-    // is added "quickly" (i.e. while the ratings bar is still being finalized),
-    // e.g. when the result is cached
-    const checkRatingsWidget = () => {
-        if (rtRating.parentElement !== target) {
-            observer.disconnect()
-            target.appendChild(rtRating)
-            observer.observe(target, init)
-        }
-    }
+    rtRating.id = id
 
+    // restore the RT widget if it's removed
+    //
+    // work around the fact that the target element (the ratings bar) can be
+    // completely blown away and rebuilt (so we can't scope our observer to it)
+    //
+    // even with this caveat, I haven't seen the widgets removed more than twice
+    // (and only once if the result isn't cached), so we could turn off the
+    // observer after the second restoration
     const callback = () => {
-        // XXX if we restore the ratings widget here immediately, it (now)
-        // conflicts with/confuses the reconciliation algorithm in some way and
-        // rather than just removing the widget, the *whole ratings bar* gets
-        // removed and rebuilt (!)
-        //
-        // this "delay" appears to prevent that (+queueMicrotask+ doesn't work).
-        setTimeout(checkRatingsWidget, 0)
+        observer.disconnect()
+
+        const imdbWidgets = $.querySelectorAll('[data-testid="hero-rating-bar__aggregate-rating"]')
+        const imdbWidget = imdbWidgets.item(index)
+        const ratingsBar = imdbWidget.parentElement
+        const rtWidget = ratingsBar.querySelector(`:scope #${id}`)
+
+        if (!rtWidget) {
+            ratingsBar.appendChild(rtRating)
+        }
+
+        observer.observe($, init)
     }
 
     const observer = new MutationObserver(callback)
