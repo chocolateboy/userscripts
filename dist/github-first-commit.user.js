@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.2
+// @version       4.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -21,14 +21,15 @@
 
   // src/lib/observer.ts
   var INIT = { childList: true, subtree: true };
-  var done = constant(true);
-  var resume = constant(false);
-  var observe = (target, ...args) => {
-    const [init, callback] = args.length === 1 ? [INIT, args[0]] : args;
+  var done = constant(false);
+  var resume = constant(true);
+  var observe = (...args) => {
+    const $2 = document;
+    const [target, init, callback] = args.length === 3 ? args : args.length === 2 ? args[0] instanceof Element ? [args[0], INIT, args[1]] : [$2.body, args[0], args[1]] : [$2.body, INIT, args[0]];
     const $callback = (mutations, observer2) => {
       observer2.disconnect();
-      const done2 = callback({ mutations, observer: observer2, target, init });
-      if (!done2) {
+      const resume2 = callback({ mutations, observer: observer2, target, init });
+      if (resume2 !== false) {
         observer2.observe(target, init);
       }
     };
@@ -59,7 +60,7 @@
       }
     });
   };
-  observe($.body, () => {
+  observe(() => {
     const path = $.querySelector(PATH)?.content;
     if (path !== REPO_PAGE) {
       return;

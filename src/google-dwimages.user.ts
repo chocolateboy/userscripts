@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -11,8 +11,7 @@
 // @grant         none
 // ==/UserScript==
 
-import { observe }  from './lib/observer'
-import { constant } from './lib/util'
+import { done, observe } from './lib/observer'
 
 // property (data attribute) on image result elements used to distinguish them
 // from new/unprocessed results
@@ -41,8 +40,6 @@ const RESULT = ':scope > :is([data-lpage], [data-ri]):not([data-status])'
 
 // selector for the image result container
 const RESULTS = ':has(> :is([data-lpage], [data-ri]))'
-
-const done = constant(true)
 
 /**
  * event handler for result elements which prevents their click/mousedown events
@@ -96,6 +93,7 @@ const onImageLink = (link: HTMLAnchorElement, result: HTMLElement): void => {
  *    extract the direct image URL from it
  */
 const onResult = (result: HTMLElement): void => {
+    // tag the result so we don't process it again
     result.dataset.status = ResultStatus.PENDING
 
     // disable the click interceptors
@@ -126,9 +124,7 @@ const run = () => {
     }
 
     observe(results, { childList: true }, () => {
-        for (const result of results.querySelectorAll<HTMLElement>(RESULT)) {
-            onResult(result)
-        }
+        results.querySelectorAll<HTMLElement>(RESULT).forEach(onResult)
     })
 }
 

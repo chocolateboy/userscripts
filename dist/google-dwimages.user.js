@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -15,27 +15,27 @@
 
 "use strict";
 (() => {
+  // src/lib/util.ts
+  var constant = (value) => (..._args) => value;
+
   // src/lib/observer.ts
-  var DUMMY_MUTATIONS = [];
   var INIT = { childList: true, subtree: true };
-  var observe = (target, ...args) => {
-    const [init, callback] = args.length === 1 ? [INIT, args[0]] : args;
+  var done = constant(false);
+  var resume = constant(true);
+  var observe = (...args) => {
+    const $ = document;
+    const [target, init, callback] = args.length === 3 ? args : args.length === 2 ? args[0] instanceof Element ? [args[0], INIT, args[1]] : [$.body, args[0], args[1]] : [$.body, INIT, args[0]];
     const $callback = (mutations, observer2) => {
       observer2.disconnect();
-      const result = callback(mutations, observer2);
-      if (!result) {
+      const resume2 = callback({ mutations, observer: observer2, target, init });
+      if (resume2 !== false) {
         observer2.observe(target, init);
-      } else if (typeof result === "function") {
-        queueMicrotask(result);
       }
     };
     const observer = new MutationObserver($callback);
-    queueMicrotask(() => $callback(DUMMY_MUTATIONS, observer));
+    queueMicrotask(() => $callback([], observer));
     return observer;
   };
-
-  // src/lib/util.ts
-  var constant = (value) => (..._args) => value;
 
   // src/google-dwimages.user.ts
   // @license       GPL
@@ -52,7 +52,6 @@
   var LINK_TARGET = "_blank";
   var RESULT = ":scope > :is([data-lpage], [data-ri]):not([data-status])";
   var RESULTS = ":has(> :is([data-lpage], [data-ri]))";
-  var done = constant(true);
   var stopPropagation = (e) => {
     e.stopPropagation();
   };
@@ -95,9 +94,7 @@
       return;
     }
     observe(results, { childList: true }, () => {
-      for (const result of results.querySelectorAll(RESULT)) {
-        onResult(result);
-      }
+      results.querySelectorAll(RESULT).forEach(onResult);
     });
   };
   run();

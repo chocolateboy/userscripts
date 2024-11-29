@@ -82,7 +82,7 @@ const openFirstCommit = (user: string, repo: string) => {
         })
 }
 
-observe($.body, () => {
+observe(() => {
     const path = $.querySelector<HTMLMetaElement>(PATH)?.content
 
     // bail if we're not on a repo page
