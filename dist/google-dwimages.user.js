@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.3
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -71,7 +71,7 @@
     link.title = image.alt;
     link.target = LINK_TARGET;
     result.dataset.status = "fixed" /* FIXED */;
-    image.parentElement.replaceChild(image, image);
+    image.parentElement.innerHTML = image.parentElement.innerHTML;
   };
   var onResult = (result) => {
     result.dataset.status = "pending" /* PENDING */;

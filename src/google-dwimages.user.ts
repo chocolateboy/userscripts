@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.3
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -82,7 +82,11 @@ const onImageLink = (link: HTMLAnchorElement, result: HTMLElement): void => {
 
     // force a reflow (once) so the updated URL is immediately visible on hover
     // (XXX Firefox issue, not needed in Chrome)
-    image.parentElement!.replaceChild(image, image)
+    //
+    // this no longer works (parent is a custom element (g-img)):
+    //
+    //   image.parentElement!.replaceChild(image, image)
+    image.parentElement!.innerHTML = image.parentElement!.innerHTML
 }
 
 /*
