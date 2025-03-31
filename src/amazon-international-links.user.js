@@ -3,15 +3,14 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.7.0
+// @version       4.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://smile.amazon.tld/*
 // @include       https://www.amazon.com.be/*
 // @include       https://www.amazon.tld/*
-// @require       https://code.jquery.com/jquery-3.6.1.slim.min.js
+// @require       https://code.jquery.com/jquery-3.7.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@43fd0fe4de1166f343883511e53546e87840aeaf/gm_config.js
-// @require       https://cdn.jsdelivr.net/gh/aduth/hijinks@b4fbbd462c98248c585659fcc35a50b00fec147c/hijinks.min.js
 // @grant         GM_registerMenuCommand
 // @grant         GM_getValue
 // @grant         GM_setValue
@@ -59,12 +58,6 @@ const SITES = {
  */
 const SMILE = new Set(['com', 'co.uk', 'de'])
 
-/*
- * a tiny DOM builder to avoid cluttering the code with HTML templates
- * https://github.com/aduth/hijinks
- */
-const el = hijinks
-
 /*********************** Functions and Classes ********************************/
 
 /*
@@ -76,13 +69,15 @@ class Linker {
      * for this product, or return a falsey value if it's not found
      */
     static getASIN () {
-        let asin, $asin = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]')
+        const $asin = $('input#ASIN, input[name="ASIN"], input[name="ASIN.0"]')
+          let asin
 
         if ($asin.length) {
             asin = $asin.val()
         } else { // if there's a canonical link, try to retrieve the ASIN from its URI
             // <link rel="canonical" href="https://www.amazon.com/Follows-Movie-Poster-18-28/dp/B01BKUBARA" />
-            let match, canonical = $('link[rel="canonical"][href]').attr('href')
+            const canonical = $('link[rel="canonical"][href]').attr('href')
+              let match
 
             if (canonical && (match = canonical.match('/dp/(\\w+)$'))) {
                 asin = match[1]
@@ -97,10 +92,10 @@ class Linker {
         this.asin = asin
 
         // the navbar to add the cross-site links to
-        this.crossSiteLinks = $('#nav-xshop')
+        this.navbar = $('#nav-xshop .nav-ul')
 
-        // an array of our added elements - jQuery objects representing
-        // <a>...</a> links
+        // an array of our added elements - jQuery wrappers of child elements of
+        // the cross-site links navbar
         //
         // we keep a reference to these elements so we can easily remove them
         // from the DOM (and replace them with new elements) whenever the
@@ -111,21 +106,20 @@ class Linker {
         // (e.g. "co.uk") of the current site
         const parts = location.hostname.split('.')
 
-        // 1) the subdomain (part before the TLD) of the current site e.g.
+        // 1) the subdomain (part before the TLD) of the current site, e.g.
         // "www.amazon" or "smile.amazon"
         this.subdomain = parts.slice(0, 2).join('.')
 
-        // 2) the TLD of the current site e.g. "co.uk" or "com"
+        // 2) the TLD of the current site, e.g. "co.uk" or "com"
         this.tld = parts.slice(2).join('.')
     }
 
     /*
-     * add a link element to the internal `links` array
+     * add a child element to the internal `links` array
      */
     addLink (tld, country) {
         const attrs = {
             class: 'nav-a',
-            style: 'display: inline-block',
             title: `amazon.${tld}`
         }
 
@@ -142,7 +136,17 @@ class Linker {
             attrs.href = `//${subdomain}.${tld}/dp/${this.asin}`
         }
 
-        const link = el(tag, attrs, country)
+        // serialize the attributes, e.g. { title: 'amazon.com' } -> `title="amazon.com"`
+        const $attrs = Object.entries(attrs)
+            .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+            .join(' ')
+
+        const link =
+            `<li class="nav-li">
+                <div class="nav-div">
+                    <${tag} ${$attrs}>${country}</${tag}>
+                </div>
+            </li>`
 
         this.links.push($(link))
     }
@@ -164,15 +168,14 @@ class Linker {
             // const tlds = sortBy(Object.keys(sites), tld => sites[tld])
             const tlds = Object.keys(sites).sort((a, b) => sites[a].localeCompare(sites[b]))
 
-            // populate the `links` array with jQuery wrappers for link elements
-            // (i.e. <a>...</a>)
+            // populate the `links` array with jQuery wrappers for each link
+            // element (e.g. <li>...</li>)
             for (const tld of tlds) {
                 this.addLink(tld, sites[tld])
             }
 
-            // prepend the cross-site links to the body of the crossSiteLinks
-            // container
-            this.crossSiteLinks.prepend.apply(this.crossSiteLinks, this.links)
+            // prepend the cross-site links to the body of the navbar
+            this.navbar.prepend(...this.links)
         }
     }
 
