@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.1
+// @version       3.1.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.twitter.com/
@@ -116,7 +116,7 @@ const onResponse = (xhr: XMLHttpRequest, uri: string): void => {
     STATS[path] = (STATS[path] || 0) + count
 
     if (!count) {
-        if (!STATS[path] && size > LOG_THRESHOLD) {
+        if (STATS[path] === 0 && size > LOG_THRESHOLD) {
             console.debug(`no replacements in ${path} (${size} B)`)
         }
 

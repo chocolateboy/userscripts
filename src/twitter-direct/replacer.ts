@@ -136,7 +136,7 @@ class Replacer {
      *
      * returns the number of substituted URLs
      */
-    public transform (data: JsonObject, path: string): number {
+    protected transform (data: JsonObject, path: string): number {
         const { seen, unresolved } = this
 
         // [1] top-level tweet or user data (e.g. /favorites/create.json)
