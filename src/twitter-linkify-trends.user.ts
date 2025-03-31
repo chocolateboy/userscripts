@@ -3,15 +3,11 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.0
+// @version       3.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       https://mobile.twitter.com/
-// @include       https://mobile.twitter.com/*
 // @include       https://mobile.x.com/
 // @include       https://mobile.x.com/*
-// @include       https://twitter.com/
-// @include       https://twitter.com/*
 // @include       https://x.com/
 // @include       https://x.com/*
 // @require       https://code.jquery.com/jquery-3.7.1.slim.min.js
@@ -29,25 +25,11 @@
 // XXX needed to appease esbuild
 export {}
 
+import { observe } from './lib/observer.js'
+
 declare const exports: {
     default: typeof import('flru').default;
-    getter: typeof import('get-wild').getter;
-}
-
-type Debug = {
-    event?: string;
-    trend?: string;
-    video?: string;
-}
-
-type OnEventOptions = {
-    wrapImage?: boolean;
-}
-
-type TwitterEvent = {
-    image: { url?: string };
-    title: string;
-    url: { url: string };
+    get:     typeof import('get-wild').get;
 }
 
 /**
@@ -59,15 +41,6 @@ type TwitterEvent = {
 const CACHE = exports.default(128)
 
 /*
- * debugging options
- *
- * uncomment this to debug the selectors by assigning distinct background colors
- * to trend and event elements
- */
-// const DEBUG: Debug = { event: 'powderblue', trend: 'palegreen' }
-const DEBUG: Debug = {}
-
-/*
  * events to disable (stop propagating) on event and trend elements
  */
 const DISABLED_EVENTS = 'click touch'
@@ -75,52 +48,23 @@ const DISABLED_EVENTS = 'click touch'
 /*
  * URL path (suffix) of the JSON document containing event data
  */
-const EVENT_DATA = '/2/guide.json' // e.g. https://api.twitter.com/2/guide.json
+const EVENT_DATA_ENDPOINT = '/ExplorePage' // e.g. https://x.com/i/api/graphql/abc123/ExplorePage?...
 
 /*
- * path to the array of event records within the JSON document; each record
- * includes an ID, title, URL and image URL
+ * path to event records within the JSON document; each record includes a title
+ * and target URL
  */
-const EVENT_PATH = 'timeline.instructions.*.addEntries.entries.*.content.timelineModule.items.*.item.content.eventSummary'
-
-/*
- * path to the data for the main image/link on trend pages
- * (https://twitter.com/explore/tabs/*)
- */
-const EVENT_HERO_PATH = 'timeline.instructions.*.addEntries.entries.*.content.item.content.eventSummary'
-
-/*
- * the shared identifier (key) for live events (if they don't have a custom
- * image). if an event has this key, we identify it by its title rather than its
- * image URL
- */
-const LIVE_EVENT_KEY = '/lex/placeholder_live_nomargin'
+const EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[1].content.items.*.item.itemContent'
 
 /*
  * selectors for trend elements and event elements (i.e. Twitter's curated news
  * links). works for trends/events in the "What's happening" panel in the
- * sidebar and the dedicated trends pages (https://twitter.com/explore/tabs/*)
+ * sidebar and the dedicated trends pages (https://x.com/explore/tabs/*)
  */
-
-// NOTE: we detect the image inside an event/event-hero element and then
-// navigate up to the event to avoid the overhead of using :has()
-const EVENT = '[data-testid="sidebarColumn"] div[role="link"]:not([data-testid]):not([data-linked])'
-const EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([src=""])`
-const EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])'
-const EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`
-const TREND = 'div[role="link"][data-testid="trend"]:not([data-linked])'
+const EVENT = 'div[role="link"][data-testid="trend"]:has([data-testid^="UserAvatar-Container"]):not([data-linked])'
+const TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])'
 const VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])'
-const EVENT_ANY = [EVENT, EVENT_HERO].join(', ')
-const SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND, VIDEO].join(', ')
-
-/**
- * a custom version of get-wild's `get` function which automatically removes
- * missing/undefined results
- *
- * we also use a simpler/faster path parser since we don't use the extended
- * syntax
- */
-const pluck = exports.getter({ default: [], split: '.' })
+const SELECTOR = [EVENT, TREND, VIDEO].join(', ')
 
 /*
  * remove the onclick interceptors from event elements
@@ -153,27 +97,15 @@ function disableSome (this: HTMLElement, e: JQueryEventObject) {
  */
 function hookXHROpen (oldOpen: XMLHttpRequest['open']) {
     return function open (this: XMLHttpRequest, _method: string, url: string) { // preserve the arity
-        const $url = new URL(url)
+        const $url = URL.parse(url)!
 
-        if ($url.pathname.endsWith(EVENT_DATA)) {
+        if ($url.pathname.endsWith(EVENT_DATA_ENDPOINT)) {
             // register a new listener
             this.addEventListener('load', () => processEventData(this.responseText))
         }
 
         return GMCompat.apply(this, oldOpen, arguments)
     }
-}
-
-/*
- * translate an event's ID to its canonical form
- *
- * takes an identifier for an event image (its URL) and returns the portion of
- * that identifier which the data and the element have in common
- */
-function keyFor (url: string) {
-    const { pathname: path } = new URL(url)
-    // /semantic_core_img/1234567891234567890/abcDEFh1
-    return path === LIVE_EVENT_KEY ? path : path.split('/')[2]
 }
 
 /*
@@ -193,68 +125,59 @@ function linkFor (href: string) {
 function onElement (el: HTMLElement) {
     const $el = $(el)
 
-    let $target: JQuery
-    let type: 'event' | 'trend' | 'video'
+    let fixPointer = true
+    let linked = true
 
     // determine the element's type and pass it to the appropriate handler
-    if ($el.is(TREND)) {
-        [$target, type] = [$el, 'trend']
+    if ($el.is(EVENT)) {
+        $el.on(DISABLED_EVENTS, disableAll)
+        linked = onEventElement($el)
+    } else if ($el.is(TREND)) {
         $el.on(DISABLED_EVENTS, disableSome)
         onTrendElement($el)
     } else if ($el.is(VIDEO)) {
-        [$target, type] = [$el, 'video']
+        fixPointer = false
         $el.on(DISABLED_EVENTS, disableAll)
         onVideoElement($el)
-    } else {
-        const $event = $el.closest(EVENT_ANY)
-        const wrapImage = $event.is(EVENT);
-
-        [$target, type] = [$event, 'event']
-        $event.on(DISABLED_EVENTS, disableAll)
-        onEventElement($event, $el as JQuery<HTMLImageElement>, { wrapImage })
     }
 
     // tag so we don't select it again
-    $target.attr('data-linked', 'true')
-
-    // remove the fake pointer
-    if (type !== 'video') {
-        $target.css('cursor', 'auto')
+    if (linked) {
+        $el.attr('data-linked', 'true')
     }
 
-    if (DEBUG[type]) {
-        $target.css('backgroundColor', DEBUG[type]!)
+    // remove the fake pointer
+    if (fixPointer) {
+        $el.css('cursor', 'auto')
     }
 }
 
 /*
  * linkify an event element: the target URL is (was) extracted from the
  * intercepted JSON
+ *
+ * returns true if the link has been updated (i.e. the event data has been
+ * loaded), false otherwise (i.e. try again on the next DOM update)
  */
-function onEventElement ($event: JQuery, $image: JQuery<HTMLImageElement>, options: OnEventOptions = {}) {
+function onEventElement ($event: JQuery): boolean {
     const { target, title } = targetFor($event)
-    const key = keyFor($image.attr('src')!)
+    const url = CACHE.get(title)
 
-    console.debug('element (event):', JSON.stringify(title))
-
-    const url = key === LIVE_EVENT_KEY ? CACHE.get(title) : CACHE.get(key)
-
-    if (url) {
-        const $link = linkFor(url)
-
-        $(target).parent().wrap($link)
-
-        if (options.wrapImage) {
-            $image.wrap($link)
-        }
-    } else {
-        console.warn("Can't find URL for event (element):", JSON.stringify(title))
+    // the JSON may be loaded after the element is detected,
+    // so wait until the link arrives
+    if (!url) {
+        return false
     }
+
+    console.debug(`element (event):`, JSON.stringify(title))
+    const $link = linkFor(url)
+    $(target).parent().wrap($link)
+    return true
 }
 
 /*
  * linkify a trend element: the target URL is derived from the title in the
- * element rather than from the JSON
+ * element rather than from the JSON data
  */
 function onTrendElement ($trend: JQuery) {
     const { target, title } = targetFor($trend)
@@ -275,7 +198,6 @@ function onTrendElement ($trend: JQuery) {
  *     <div role="link" data-testid="media-tweet-card-12345678">...</div>
  */
 function onVideoElement ($link: JQuery) {
-    // const id = $link.data('testid').match(/^media-tweet-card-(\d+)$/)?[1]
     const id = $link.data('testid').split('-').at(-1)
     const url = `https://x.com/i/web/status/${id}`
     $link.wrap(linkFor(url))
@@ -287,37 +209,14 @@ function onVideoElement ($link: JQuery) {
  */
 function processEventData (json: string) {
     const data = JSON.parse(json)
-    const events: TwitterEvent[] = pluck(data, EVENT_PATH)
+    const events = exports.get(data, EVENT_DATA, [])
 
-    // always returns an array even though there's at most 1
-    const eventHero: TwitterEvent[] = pluck(data, EVENT_HERO_PATH)
-
-    const $events = eventHero.concat(events)
-    const nEvents = $events.length
-
-    if (!nEvents) {
-        return
-    }
-
-    for (const event of $events) {
-        const { title, url: { url } } = event
-        const imageURL = event.image?.url
-
-        if (!imageURL) {
-            // XXX not all event heroes (or adverts) have images
-            console.warn("Can't find image for event (data):", title)
-            continue
-        }
-
-        const key = keyFor(imageURL)
-
-        console.debug('data (event):', JSON.stringify(title))
-
-        if (key === LIVE_EVENT_KEY) {
-            CACHE.set(title, url)
-        } else {
-            CACHE.set(key, url)
-        }
+    for (const event of events) {
+        const title = event.name
+        const uri = event.trend_url.url
+        const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`)
+        console.debug('data (event):', { title, url })
+        CACHE.set(title, url)
     }
 }
 
@@ -347,7 +246,6 @@ function targetFor ($el: JQuery) {
  * monitor the creation of trend/event elements
  */
 function run () {
-    const init = { childList: true, subtree: true }
     const target = document.getElementById('react-root')
 
     if (!target) {
@@ -355,18 +253,11 @@ function run () {
         return
     }
 
-    const callback = (_mutations: MutationRecord[], observer: MutationObserver) => {
-        observer.disconnect()
-
+    observe(target, () => {
         for (const el of $(SELECTOR)) {
             onElement(el)
         }
-
-        observer.observe(target, init)
-    }
-
-    new MutationObserver(callback)
-        .observe(target, init)
+    })
 }
 
 // hook HMLHTTPRequest#open so we can extract event data from the JSON

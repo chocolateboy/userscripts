@@ -3,15 +3,11 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.0
+// @version       3.0.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       https://mobile.twitter.com/
-// @include       https://mobile.twitter.com/*
 // @include       https://mobile.x.com/
 // @include       https://mobile.x.com/*
-// @include       https://twitter.com/
-// @include       https://twitter.com/*
 // @include       https://x.com/
 // @include       https://x.com/*
 // @require       https://code.jquery.com/jquery-3.7.1.slim.min.js
@@ -27,24 +23,37 @@
 
 "use strict";
 (() => {
+  // src/lib/util.ts
+  var constant = (value) => (..._args) => value;
+
+  // src/lib/observer.ts
+  var INIT = { childList: true, subtree: true };
+  var done = constant(false);
+  var resume = constant(true);
+  var observe = (...args) => {
+    const [target, init, callback] = args.length === 3 ? args : args.length === 2 ? args[0] instanceof Element ? [args[0], INIT, args[1]] : [document.body, args[0], args[1]] : [document.body, INIT, args[0]];
+    const onMutate = (mutations, observer2) => {
+      observer2.disconnect();
+      const resume2 = callback({ mutations, observer: observer2, target });
+      if (resume2 !== false) {
+        observer2.observe(target, init);
+      }
+    };
+    const observer = new MutationObserver(onMutate);
+    queueMicrotask(() => onMutate([], observer));
+    return observer;
+  };
+
   // src/twitter-linkify-trends.user.ts
   // @license       GPL
   var CACHE = exports.default(128);
-  var DEBUG = {};
   var DISABLED_EVENTS = "click touch";
-  var EVENT_DATA = "/2/guide.json";
-  var EVENT_PATH = "timeline.instructions.*.addEntries.entries.*.content.timelineModule.items.*.item.content.eventSummary";
-  var EVENT_HERO_PATH = "timeline.instructions.*.addEntries.entries.*.content.item.content.eventSummary";
-  var LIVE_EVENT_KEY = "/lex/placeholder_live_nomargin";
-  var EVENT = '[data-testid="sidebarColumn"] div[role="link"]:not([data-testid]):not([data-linked])';
-  var EVENT_IMAGE = `${EVENT} > div > div:nth-child(2):last-child img[src]:not([src=""])`;
-  var EVENT_HERO = 'div[role="link"][data-testid="eventHero"]:not([data-linked])';
-  var EVENT_HERO_IMAGE = `${EVENT_HERO} > div:first-child [data-testid="image"] > img[src]:not([src=""])`;
-  var TREND = 'div[role="link"][data-testid="trend"]:not([data-linked])';
+  var EVENT_DATA_ENDPOINT = "/ExplorePage";
+  var EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[1].content.items.*.item.itemContent";
+  var EVENT = 'div[role="link"][data-testid="trend"]:has([data-testid^="UserAvatar-Container"]):not([data-linked])';
+  var TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])';
   var VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])';
-  var EVENT_ANY = [EVENT, EVENT_HERO].join(", ");
-  var SELECTOR = [EVENT_IMAGE, EVENT_HERO_IMAGE, TREND, VIDEO].join(", ");
-  var pluck = exports.getter({ default: [], split: "." });
+  var SELECTOR = [EVENT, TREND, VIDEO].join(", ");
   function disableAll(e) {
     e.stopPropagation();
   }
@@ -57,61 +66,48 @@
   }
   function hookXHROpen(oldOpen) {
     return function open(_method, url) {
-      const $url = new URL(url);
-      if ($url.pathname.endsWith(EVENT_DATA)) {
+      const $url = URL.parse(url);
+      if ($url.pathname.endsWith(EVENT_DATA_ENDPOINT)) {
         this.addEventListener("load", () => processEventData(this.responseText));
       }
       return GMCompat.apply(this, oldOpen, arguments);
     };
-  }
-  function keyFor(url) {
-    const { pathname: path } = new URL(url);
-    return path === LIVE_EVENT_KEY ? path : path.split("/")[2];
   }
   function linkFor(href) {
     return $("<a></a>").attr({ href, role: "link", "data-focusable": true }).css({ color: "inherit", textDecoration: "inherit" });
   }
   function onElement(el) {
     const $el = $(el);
-    let $target;
-    let type;
-    if ($el.is(TREND)) {
-      [$target, type] = [$el, "trend"];
+    let fixPointer = true;
+    let linked = true;
+    if ($el.is(EVENT)) {
+      $el.on(DISABLED_EVENTS, disableAll);
+      linked = onEventElement($el);
+    } else if ($el.is(TREND)) {
       $el.on(DISABLED_EVENTS, disableSome);
       onTrendElement($el);
     } else if ($el.is(VIDEO)) {
-      [$target, type] = [$el, "video"];
+      fixPointer = false;
       $el.on(DISABLED_EVENTS, disableAll);
       onVideoElement($el);
-    } else {
-      const $event = $el.closest(EVENT_ANY);
-      const wrapImage = $event.is(EVENT);
-      [$target, type] = [$event, "event"];
-      $event.on(DISABLED_EVENTS, disableAll);
-      onEventElement($event, $el, { wrapImage });
     }
-    $target.attr("data-linked", "true");
-    if (type !== "video") {
-      $target.css("cursor", "auto");
+    if (linked) {
+      $el.attr("data-linked", "true");
     }
-    if (DEBUG[type]) {
-      $target.css("backgroundColor", DEBUG[type]);
+    if (fixPointer) {
+      $el.css("cursor", "auto");
     }
   }
-  function onEventElement($event, $image, options = {}) {
+  function onEventElement($event) {
     const { target, title } = targetFor($event);
-    const key = keyFor($image.attr("src"));
-    console.debug("element (event):", JSON.stringify(title));
-    const url = key === LIVE_EVENT_KEY ? CACHE.get(title) : CACHE.get(key);
-    if (url) {
-      const $link = linkFor(url);
-      $(target).parent().wrap($link);
-      if (options.wrapImage) {
-        $image.wrap($link);
-      }
-    } else {
-      console.warn("Can't find URL for event (element):", JSON.stringify(title));
+    const url = CACHE.get(title);
+    if (!url) {
+      return false;
     }
+    console.debug(`element (event):`, JSON.stringify(title));
+    const $link = linkFor(url);
+    $(target).parent().wrap($link);
+    return true;
   }
   function onTrendElement($trend) {
     const { target, title } = targetFor($trend);
@@ -128,27 +124,13 @@
   }
   function processEventData(json) {
     const data = JSON.parse(json);
-    const events = pluck(data, EVENT_PATH);
-    const eventHero = pluck(data, EVENT_HERO_PATH);
-    const $events = eventHero.concat(events);
-    const nEvents = $events.length;
-    if (!nEvents) {
-      return;
-    }
-    for (const event of $events) {
-      const { title, url: { url } } = event;
-      const imageURL = event.image?.url;
-      if (!imageURL) {
-        console.warn("Can't find image for event (data):", title);
-        continue;
-      }
-      const key = keyFor(imageURL);
-      console.debug("data (event):", JSON.stringify(title));
-      if (key === LIVE_EVENT_KEY) {
-        CACHE.set(title, url);
-      } else {
-        CACHE.set(key, url);
-      }
+    const events = exports.get(data, EVENT_DATA, []);
+    for (const event of events) {
+      const title = event.name;
+      const uri = event.trend_url.url;
+      const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`);
+      console.debug("data (event):", { title, url });
+      CACHE.set(title, url);
     }
   }
   function targetFor($el) {
@@ -161,20 +143,16 @@
     return { target, title };
   }
   function run() {
-    const init = { childList: true, subtree: true };
     const target = document.getElementById("react-root");
     if (!target) {
       console.warn("can't find react-root element");
       return;
     }
-    const callback = (_mutations, observer) => {
-      observer.disconnect();
+    observe(target, () => {
       for (const el of $(SELECTOR)) {
         onElement(el);
       }
-      observer.observe(target, init);
-    };
-    new MutationObserver(callback).observe(target, init);
+    });
   }
   var xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype;
   xhrProto.open = GMCompat.export(hookXHROpen(xhrProto.open));
