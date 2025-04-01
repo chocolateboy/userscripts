@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -33,8 +33,8 @@ declare const exports: {
 }
 
 /**
- * a map from event IDs to their URLs. populated via the intercepted trends
- * data (JSON)
+ * a map from event IDs to their URLs. populated via the intercepted event data
+ * (JSON)
  *
  * uses an LRU cache (flru) with up to 256 (128 * 2) entries
  */
@@ -46,15 +46,15 @@ const CACHE = exports.default(128)
 const DISABLED_EVENTS = 'click touch'
 
 /*
- * URL path (suffix) of the JSON document containing event data
- */
-const EVENT_DATA_ENDPOINT = '/ExplorePage' // e.g. https://x.com/i/api/graphql/abc123/ExplorePage?...
-
-/*
  * path to event records within the JSON document; each record includes a title
  * and target URL
  */
 const EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[1].content.items.*.item.itemContent'
+
+/*
+ * URL path (suffix) of the JSON document containing event data
+ */
+const EVENT_DATA_ENDPOINT = '/ExplorePage' // e.g. https://x.com/i/api/graphql/abc123/ExplorePage?...
 
 /*
  * selectors for trend elements and event elements (i.e. Twitter's curated news
@@ -89,8 +89,8 @@ function disableSome (this: HTMLElement, e: JQueryEventObject) {
 }
 
 /**
- * intercept XMLHTTPRequest#open requests for trend data (guide.json) and pass
- * the response to a custom handler which extracts data for the event elements
+ * intercept XMLHTTPRequest#open requests for event data and pass the response
+ * to a custom handler which extracts the URLs for the event elements
  *
  * @param {XMLHttpRequest['open']} oldOpen
  * @returns {XMLHttpRequest['open']}
@@ -163,8 +163,8 @@ function onEventElement ($event: JQuery): boolean {
     const { target, title } = targetFor($event)
     const url = CACHE.get(title)
 
-    // the JSON may be loaded after the element is detected,
-    // so wait until the link arrives
+    // the JSON may be loaded after the element is detected, so wait until the
+    // link becomes available
     if (!url) {
         return false
     }
@@ -199,13 +199,13 @@ function onTrendElement ($trend: JQuery) {
  */
 function onVideoElement ($link: JQuery) {
     const id = $link.data('testid').split('-').at(-1)
-    const url = `https://x.com/i/web/status/${id}`
+    const url = `${location.origin}/i/web/status/${id}`
     $link.wrap(linkFor(url))
 }
 
 /*
- * process the events data (JSON): extract ID/URL pairs for the event elements
- * and store them in a cache
+ * process the events data (JSON): extract title/URL pairs for the event
+ * elements and store them in a cache
  */
 function processEventData (json: string) {
     const data = JSON.parse(json)

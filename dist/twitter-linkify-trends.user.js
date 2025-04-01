@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -48,8 +48,8 @@
   // @license       GPL
   var CACHE = exports.default(128);
   var DISABLED_EVENTS = "click touch";
-  var EVENT_DATA_ENDPOINT = "/ExplorePage";
   var EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[1].content.items.*.item.itemContent";
+  var EVENT_DATA_ENDPOINT = "/ExplorePage";
   var EVENT = 'div[role="link"][data-testid="trend"]:has([data-testid^="UserAvatar-Container"]):not([data-linked])';
   var TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])';
   var VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])';
@@ -119,7 +119,7 @@
   }
   function onVideoElement($link) {
     const id = $link.data("testid").split("-").at(-1);
-    const url = `https://x.com/i/web/status/${id}`;
+    const url = `${location.origin}/i/web/status/${id}`;
     $link.wrap(linkFor(url));
   }
   function processEventData(json) {
