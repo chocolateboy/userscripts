@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -33,15 +33,15 @@ declare const exports: {
 }
 
 /**
- * a map from event IDs to their URLs. populated via the intercepted event data
- * (JSON)
+ * a map from event titles to their URLs. populated via the intercepted event
+ * data (JSON)
  *
  * uses an LRU cache (flru) with up to 256 (128 * 2) entries
  */
 const CACHE = exports.default(128)
 
 /*
- * events to disable (stop propagating) on event and trend elements
+ * DOM events to disable (stop propagating) on event and trend elements
  */
 const DISABLED_EVENTS = 'click touch'
 
@@ -164,7 +164,7 @@ function onEventElement ($event: JQuery): boolean {
     const url = CACHE.get(title)
 
     // the JSON may be loaded after the element is detected, so wait until the
-    // link becomes available
+    // target URL becomes available
     if (!url) {
         return false
     }
