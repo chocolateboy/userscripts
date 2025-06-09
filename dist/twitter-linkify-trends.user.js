@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -48,7 +48,7 @@
   // @license       GPL
   var CACHE = exports.default(128);
   var DISABLED_EVENTS = "click touch";
-  var EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[1].content.items.*.item.itemContent";
+  var EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[0].content.items.*.item.itemContent";
   var EVENT_DATA_ENDPOINT = "/ExplorePage";
   var EVENT = 'div[role="link"][data-testid="trend"]:has([data-testid^="UserAvatar-Container"]):not([data-linked])';
   var TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])';
@@ -111,7 +111,7 @@
   }
   function onTrendElement($trend) {
     const { target, title } = targetFor($trend);
-    const param = /\s+/.test(title) ? '"' + title.replace(/"/g, "") + '"' : title;
+    const param = /\W/.test(title) ? '"' + title.replace(/"/g, "") + '"' : title;
     console.debug("element (trend):", param);
     const query = encodeURIComponent(param);
     const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`;

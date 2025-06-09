@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -49,7 +49,7 @@ const DISABLED_EVENTS = 'click touch'
  * path to event records within the JSON document; each record includes a title
  * and target URL
  */
-const EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[1].content.items.*.item.itemContent'
+const EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[0].content.items.*.item.itemContent'
 
 /*
  * URL path (suffix) of the JSON document containing event data
@@ -181,7 +181,7 @@ function onEventElement ($event: JQuery): boolean {
  */
 function onTrendElement ($trend: JQuery) {
     const { target, title } = targetFor($trend)
-    const param = /\s+/.test(title) ? ('"' + title.replace(/"/g, '') + '"') : title
+    const param = /\W/.test(title) ? ('"' + title.replace(/"/g, '') + '"') : title
 
     console.debug('element (trend):', param)
 
