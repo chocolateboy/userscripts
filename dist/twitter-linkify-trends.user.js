@@ -111,9 +111,9 @@
   }
   function onTrendElement($trend) {
     const { target, title } = targetFor($trend);
-    const param = /\W/.test(title) ? '"' + title.replace(/"/g, "") + '"' : title;
-    console.debug("element (trend):", param);
-    const query = encodeURIComponent(param);
+    const trend = /\s/.test(title) ? `"${title.replace(/"/g, "")}"` : title;
+    console.debug("element (trend):", trend);
+    const query = encodeURIComponent(trend);
     const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`;
     $(target).wrap(linkFor(url));
   }

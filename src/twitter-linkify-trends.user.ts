@@ -181,11 +181,12 @@ function onEventElement ($event: JQuery): boolean {
  */
 function onTrendElement ($trend: JQuery) {
     const { target, title } = targetFor($trend)
-    const param = /\W/.test(title) ? ('"' + title.replace(/"/g, '') + '"') : title
+    // use Twitter's quoting rule for compatibility
+    const trend = /\s/.test(title) ? `"${title.replace(/"/g, '')}"` : title
 
-    console.debug('element (trend):', param)
+    console.debug('element (trend):', trend)
 
-    const query = encodeURIComponent(param)
+    const query = encodeURIComponent(trend)
     const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`
 
     $(target).wrap(linkFor(url))
@@ -226,7 +227,7 @@ function processEventData (json: string) {
  */
 function targetFor ($el: JQuery) {
     // the target element is the last bold SPAN (live events have a preceding
-    // bold span containing the word "LIVE" in the header)
+    // bold SPAN containing the word "LIVE" in the header)
     const targets = $el.find('div[dir="ltr"] > span').filter((_, el) => {
         // the class for this is currently r-b88u0q (700) or r-1vr29t4 for
         // hero images (800)
