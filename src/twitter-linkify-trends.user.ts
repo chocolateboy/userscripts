@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -32,6 +32,12 @@ declare const exports: {
     get:     typeof import('get-wild').get;
 }
 
+type TimelineEvent = {
+    itemType: string;
+    name: string;
+    trend_url: { url: string };
+}
+
 /**
  * a map from event titles to their URLs. populated via the intercepted event
  * data (JSON)
@@ -49,7 +55,7 @@ const DISABLED_EVENTS = 'click touch'
  * path to event records within the JSON document; each record includes a title
  * and target URL
  */
-const EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[0].content.items.*.item.itemContent'
+const EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent'
 
 /*
  * URL path (suffix) of the JSON document containing event data
@@ -210,11 +216,15 @@ function onVideoElement ($link: JQuery) {
  */
 function processEventData (json: string) {
     const data = JSON.parse(json)
-    const events = exports.get(data, EVENT_DATA, [])
+    const events = exports.get<TimelineEvent[]>(data, EVENT_DATA, [])
 
     for (const event of events) {
-        const title = event.name
-        const uri = event.trend_url.url
+        // the index of records with event data isn't fixed, so filter them by type
+        if (event.itemType !== 'TimelineTrend') {
+            break
+        }
+
+        const { name: title, trend_url: { url: uri } } = event
         const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`)
         console.debug('data (event):', { title, url })
         CACHE.set(title, url)

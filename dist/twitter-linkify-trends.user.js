@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -48,7 +48,7 @@
   // @license       GPL
   var CACHE = exports.default(128);
   var DISABLED_EVENTS = "click touch";
-  var EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries[0].content.items.*.item.itemContent";
+  var EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent";
   var EVENT_DATA_ENDPOINT = "/ExplorePage";
   var EVENT = 'div[role="link"][data-testid="trend"]:has([data-testid^="UserAvatar-Container"]):not([data-linked])';
   var TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])';
@@ -126,8 +126,10 @@
     const data = JSON.parse(json);
     const events = exports.get(data, EVENT_DATA, []);
     for (const event of events) {
-      const title = event.name;
-      const uri = event.trend_url.url;
+      if (event.itemType !== "TimelineTrend") {
+        break;
+      }
+      const { name: title, trend_url: { url: uri } } = event;
       const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`);
       console.debug("data (event):", { title, url });
       CACHE.set(title, url);
