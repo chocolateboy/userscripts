@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.1
+// @version       2.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -23,13 +23,6 @@
   var ISSUES_LINK = "a#issues-tab";
   var MY_ISSUES = "My Issues";
   var MY_ISSUES_LINK = `li a#${ID}`;
-  var REPO = "octolytics-dimension-repository_nwo";
-  var SELF = "user-login";
-  var USER = "octolytics-dimension-user_login";
-  var meta = (name, key = "name") => {
-    const quotedName = JSON.stringify(name);
-    return $(`meta[${key}=${quotedName}]`).attr("content");
-  };
   var run = () => {
     $(MY_ISSUES_LINK).closest("li").remove();
     const $issuesLink = $(`li ${ISSUES_LINK}`);
@@ -37,7 +30,9 @@
     if ($issues.length !== 1) {
       return;
     }
-    const [self, user, repo] = [meta(SELF), meta(USER), meta(REPO)];
+    const self = $('meta[name="user-login"]').attr("content");
+    const repo = $("[data-current-repository]").data("currentRepository");
+    const user = repo?.split("/")?.at(0);
     if (!(self && user && repo)) {
       return;
     }

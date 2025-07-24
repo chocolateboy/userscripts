@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.1
+// @version       2.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -36,29 +36,6 @@ const MY_ISSUES = 'My Issues'
 const MY_ISSUES_LINK = `li a#${ID}`
 
 /*
- * meta-tag selector for the `<user>/<repo>` identifier
- */
-const REPO = 'octolytics-dimension-repository_nwo'
-
-/*
- * meta-tag selector for the name of the logged-in user
- */
-const SELF = 'user-login'
-
-/*
- * meta-tag selector for the owner of a repo
- */
-const USER = 'octolytics-dimension-user_login'
-
-/*
- * helper function which extracts a value from a META tag
- */
-const meta = (name: string, key = 'name') => {
-    const quotedName = JSON.stringify(name)
-    return $(`meta[${key}=${quotedName}]`).attr('content')
-}
-
-/*
  * add the "My Issues" link
  */
 const run = () => {
@@ -74,7 +51,9 @@ const run = () => {
         return
     }
 
-    const [self, user, repo] = [meta(SELF), meta(USER), meta(REPO)]
+    const self = $('meta[name="user-login"]').attr('content')
+    const repo = $('[data-current-repository]').data('currentRepository')
+    const user = repo?.split('/')?.at(0)
 
     if (!(self && user && repo)) {
         return
