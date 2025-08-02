@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.0
+// @version       2.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -33,7 +33,7 @@
     const self = $('meta[name="user-login"]').attr("content");
     const repo = $("[data-current-repository]").data("currentRepository");
     const user = repo?.split("/")?.at(0);
-    if (!(self && user && repo)) {
+    if (!(self && repo && user)) {
       return;
     }
     const myIssues = `involves:${self}`;
@@ -45,7 +45,7 @@
     const path = `/${repo}/issues`;
     const href = `${path}?q=${escape(query)}`;
     const $myIssues = $issues.clone();
-    const $link = $myIssues.find(`:scope ${ISSUES_LINK}`).removeClass("selected").removeClass("deselected").attr({
+    const $link = $myIssues.find(`:scope ${ISSUES_LINK}`).removeClass("selected deselected").attr({
       id: ID,
       role: "tab",
       href,
