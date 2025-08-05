@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.1
+// @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -48,9 +48,13 @@
   // @license       GPL
   var CACHE = exports.default(128);
   var DISABLED_EVENTS = "click touch";
-  var EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent";
-  var EVENT_DATA_ENDPOINT = "/ExplorePage";
-  var EVENT = 'div[role="link"][data-testid="trend"]:has([data-testid^="UserAvatar-Container"]):not([data-linked])';
+  var TIMELINE_EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent";
+  var SIDEBAR_EVENT_DATA = "data.story_topic.stories.items.*.trend_results.result";
+  var TIMELINE_EVENT_DATA_ENDPOINT = "/ExplorePage";
+  var SIDEBAR_EVENT_DATA_ENDPOINT = "/useStoryTopicQuery";
+  var TIMELINE_EVENT = '[data-testid="trend"]:has([data-testid^="UserAvatar-Container"])';
+  var SIDEBAR_EVENT = '[data-testid^="news_sidebar_article_"]';
+  var EVENT = `div[role="link"]:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT}):not([data-linked])`;
   var TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])';
   var VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])';
   var SELECTOR = [EVENT, TREND, VIDEO].join(", ");
@@ -66,9 +70,15 @@
   }
   function hookXHROpen(oldOpen) {
     return function open(_method, url) {
-      const $url = URL.parse(url);
-      if ($url.pathname.endsWith(EVENT_DATA_ENDPOINT)) {
-        this.addEventListener("load", () => processEventData(this.responseText));
+      const { pathname } = URL.parse(url);
+      let onEventData;
+      if (pathname.endsWith(TIMELINE_EVENT_DATA_ENDPOINT)) {
+        onEventData = onTimelineEventData;
+      } else if (pathname.endsWith(SIDEBAR_EVENT_DATA_ENDPOINT)) {
+        onEventData = onSidebarEventData;
+      }
+      if (onEventData) {
+        this.addEventListener("load", () => onEventData(this.responseText));
       }
       return GMCompat.apply(this, oldOpen, arguments);
     };
@@ -109,6 +119,16 @@
     $(target).parent().wrap($link);
     return true;
   }
+  function onSidebarEventData(json) {
+    const data = JSON.parse(json);
+    const events = exports.get(data, SIDEBAR_EVENT_DATA, []);
+    for (const event of events) {
+      const { core: { name: title }, rest_id: id } = event;
+      const url = `${location.origin}/i/trending/${id}`;
+      console.debug("data (sidebar event):", { title, url });
+      CACHE.set(title, url);
+    }
+  }
   function onTrendElement($trend) {
     const { target, title } = targetFor($trend);
     const trend = /\s/.test(title) ? `"${title.replace(/"/g, "")}"` : title;
@@ -117,23 +137,23 @@
     const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`;
     $(target).wrap(linkFor(url));
   }
-  function onVideoElement($link) {
-    const id = $link.data("testid").split("-").at(-1);
-    const url = `${location.origin}/i/web/status/${id}`;
-    $link.wrap(linkFor(url));
-  }
-  function processEventData(json) {
+  function onTimelineEventData(json) {
     const data = JSON.parse(json);
-    const events = exports.get(data, EVENT_DATA, []);
+    const events = exports.get(data, TIMELINE_EVENT_DATA, []);
     for (const event of events) {
       if (event.itemType !== "TimelineTrend") {
         break;
       }
       const { name: title, trend_url: { url: uri } } = event;
       const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`);
-      console.debug("data (event):", { title, url });
+      console.debug("data (timeline event):", { title, url });
       CACHE.set(title, url);
     }
+  }
+  function onVideoElement($link) {
+    const id = $link.data("testid").split("-").at(-1);
+    const url = `${location.origin}/i/web/status/${id}`;
+    $link.wrap(linkFor(url));
   }
   function targetFor($el) {
     const targets = $el.find('div[dir="ltr"] > span').filter((_, el) => {

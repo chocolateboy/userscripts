@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.1
+// @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -32,6 +32,11 @@ declare const exports: {
     get:     typeof import('get-wild').get;
 }
 
+type SidebarEvent = {
+    core: { name: string };
+    rest_id: string;
+}
+
 type TimelineEvent = {
     itemType: string;
     name: string;
@@ -52,22 +57,35 @@ const CACHE = exports.default(128)
 const DISABLED_EVENTS = 'click touch'
 
 /*
- * path to event records within the JSON document; each record includes a title
- * and target URL
+ * path to timeline event records within the JSON document; each record includes
+ * a title and target URL
  */
-const EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent'
+const TIMELINE_EVENT_DATA = 'data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent'
 
 /*
- * URL path (suffix) of the JSON document containing event data
+ * path to event records for the "Today's News" sidebar within the JSON document;
+ * each record includes a title and target URL
  */
-const EVENT_DATA_ENDPOINT = '/ExplorePage' // e.g. https://x.com/i/api/graphql/abc123/ExplorePage?...
+const SIDEBAR_EVENT_DATA = 'data.story_topic.stories.items.*.trend_results.result'
 
 /*
- * selectors for trend elements and event elements (i.e. Twitter's curated news
- * links). works for trends/events in the "What's happening" panel in the
- * sidebar and the dedicated trends pages (https://x.com/explore/tabs/*)
+ * the last part of the pathname of the JSON document containing timeline event data
  */
-const EVENT = 'div[role="link"][data-testid="trend"]:has([data-testid^="UserAvatar-Container"]):not([data-linked])'
+const TIMELINE_EVENT_DATA_ENDPOINT = '/ExplorePage' // e.g. /i/api/graphql/abc123/ExplorePage
+
+/*
+ * the last part of the pathname of the JSON document containing sidebar event data
+ */
+const SIDEBAR_EVENT_DATA_ENDPOINT = '/useStoryTopicQuery' // e.g. /i/api/graphql/abc123/useStoryTopicQuery
+
+/*
+ * selectors for trend elements and event elements (i.e. Twitter's AI-curated
+ * news links). works for trends/events in the "What's happening" panel in the
+ * sidebar and on the dedicated trends pages (https://x.com/explore/tabs/*)
+ */
+const TIMELINE_EVENT = '[data-testid="trend"]:has([data-testid^="UserAvatar-Container"])'
+const SIDEBAR_EVENT = '[data-testid^="news_sidebar_article_"]'
+const EVENT = `div[role="link"]:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT}):not([data-linked])`
 const TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])'
 const VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])'
 const SELECTOR = [EVENT, TREND, VIDEO].join(', ')
@@ -103,13 +121,22 @@ function disableSome (this: HTMLElement, e: JQueryEventObject) {
  */
 function hookXHROpen (oldOpen: XMLHttpRequest['open']) {
     return function open (this: XMLHttpRequest, _method: string, url: string) { // preserve the arity
-        const $url = URL.parse(url)!
+        const { pathname } = URL.parse(url)!
 
-        if ($url.pathname.endsWith(EVENT_DATA_ENDPOINT)) {
-            // register a new listener
-            this.addEventListener('load', () => processEventData(this.responseText))
+        let onEventData: ((data: string) => void) | undefined
+
+        if (pathname.endsWith(TIMELINE_EVENT_DATA_ENDPOINT)) {
+            onEventData = onTimelineEventData
+        } else if (pathname.endsWith(SIDEBAR_EVENT_DATA_ENDPOINT)) {
+            onEventData = onSidebarEventData
         }
 
+        if (onEventData) {
+            // register a new listener
+            this.addEventListener('load', () => onEventData(this.responseText))
+        }
+
+        // delegate to the original XHR#open handler
         return GMCompat.apply(this, oldOpen, arguments)
     }
 }
@@ -147,7 +174,7 @@ function onElement (el: HTMLElement) {
         onVideoElement($el)
     }
 
-    // tag so we don't select it again
+    // a link was added: tag the element so we don't select it again
     if (linked) {
         $el.attr('data-linked', 'true')
     }
@@ -182,6 +209,22 @@ function onEventElement ($event: JQuery): boolean {
 }
 
 /*
+ * process the (JSON) data for events in the "Today's News" sidebar: extract
+ * title/URL pairs for the event elements and store them in a cache
+ */
+function onSidebarEventData (json: string) {
+    const data = JSON.parse(json)
+    const events = exports.get<SidebarEvent[]>(data, SIDEBAR_EVENT_DATA, [])
+
+    for (const event of events) {
+        const { core: { name: title }, rest_id: id } = event
+        const url = `${location.origin}/i/trending/${id}`
+        console.debug('data (sidebar event):', { title, url })
+        CACHE.set(title, url)
+    }
+}
+
+/*
  * linkify a trend element: the target URL is derived from the title in the
  * element rather than from the JSON data
  */
@@ -199,6 +242,28 @@ function onTrendElement ($trend: JQuery) {
 }
 
 /*
+ * process the (JSON) data for timeline events: extract title/URL pairs for the
+ * event elements and store them in a cache
+ */
+function onTimelineEventData (json: string) {
+    const data = JSON.parse(json)
+    const events = exports.get<TimelineEvent[]>(data, TIMELINE_EVENT_DATA, [])
+
+    for (const event of events) {
+        // the index of records with event data isn't fixed, so filter them by
+        // type
+        if (event.itemType !== 'TimelineTrend') {
+            break
+        }
+
+        const { name: title, trend_url: { url: uri } } = event
+        const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`)
+        console.debug('data (timeline event):', { title, url })
+        CACHE.set(title, url)
+    }
+}
+
+/*
  * linkify a video element ("Videos for you"): the target URL is derived from
  * the ID in the data-testid attribute, e.g.:
  *
@@ -208,27 +273,6 @@ function onVideoElement ($link: JQuery) {
     const id = $link.data('testid').split('-').at(-1)
     const url = `${location.origin}/i/web/status/${id}`
     $link.wrap(linkFor(url))
-}
-
-/*
- * process the events data (JSON): extract title/URL pairs for the event
- * elements and store them in a cache
- */
-function processEventData (json: string) {
-    const data = JSON.parse(json)
-    const events = exports.get<TimelineEvent[]>(data, EVENT_DATA, [])
-
-    for (const event of events) {
-        // the index of records with event data isn't fixed, so filter them by type
-        if (event.itemType !== 'TimelineTrend') {
-            break
-        }
-
-        const { name: title, trend_url: { url: uri } } = event
-        const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`)
-        console.debug('data (event):', { title, url })
-        CACHE.set(title, url)
-    }
 }
 
 /*
