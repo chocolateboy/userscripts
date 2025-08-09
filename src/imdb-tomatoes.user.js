@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.2.3
+// @version       7.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com/title/tt[0-9]+/([#?].*)?$/
@@ -1068,7 +1068,7 @@ async function getIMDbMetadata (imdbId, rtType) {
     const main = get(data, 'props.pageProps.mainColumnData')
     const extra = get(data, 'props.pageProps.aboveTheFoldData')
     const cast = get(main, 'cast.edges.*.node.name.nameText.text', [])
-    const mainCast = get(extra, 'castPageTitle.edges.*.node.name.nameText.text', [])
+    const mainCast = cast.slice(0, 3)
     const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', title)
