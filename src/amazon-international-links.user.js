@@ -3,7 +3,7 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.0
+// @version       4.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://smile.amazon.tld/*
@@ -41,6 +41,7 @@ const SITES = {
     'fr':     'FR', // France
     'de':     'DE', // Germany
     'in':     'IN', // India
+    'ie':     'IE', // Ireland
     'it':     'IT', // Italy
     'co.jp':  'JP', // Japan
     'com.mx': 'MX', // Mexico
