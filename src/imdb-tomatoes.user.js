@@ -3,10 +3,10 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.4.0
+// @version       7.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       /^https://www\.imdb\.com/title/tt[0-9]+(/([#?].*)?)?$/
+// @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/([#?].*)?)?$/
 // @require       https://code.jquery.com/jquery-3.7.1.min.js
 // @require       https://cdn.jsdelivr.net/gh/urin/jquery.balloon.js@8b79aab63b9ae34770bfa81c9bfe30019d9a13b0/jquery.balloon.js
 // @require       https://unpkg.com/dayjs@1.11.18/dayjs.min.js
@@ -1801,7 +1801,7 @@ async function run (imdbId) {
 
 {
     const start = Date.now()
-    const imdbId = location.pathname.split('/')[2]
+    const imdbId = location.pathname.split('/').filter(Boolean).at(-1)
 
     log('id:', imdbId)
 
