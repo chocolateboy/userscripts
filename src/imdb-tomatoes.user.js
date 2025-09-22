@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.4.1
+// @version       7.4.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/([#?].*)?)?$/
@@ -1677,7 +1677,7 @@ const { waitFor, TimeoutError } = (function () {
 /**
  * @param {string} imdbId
  */
-async function run (imdbId) {
+async function run (imdbId, options = {}) {
     const now = Date.now()
 
     // purgeCached(-1) // disable the cache
@@ -1704,7 +1704,7 @@ async function run (imdbId) {
     const script = await waitFor('json-ld', () => {
         return /** @type {HTMLScriptElement} */ (document.querySelector(LD_JSON))
     })
-    trace('got json-ld: ', script.textContent?.length)
+    trace('got json-ld:', script.textContent?.length)
 
     const ld = jsonLd(script, location.href)
     const imdbType = /** @type {keyof RT_TYPE} */ (ld['@type'])
@@ -1715,11 +1715,11 @@ async function run (imdbId) {
         return
     }
 
-    const name = htmlDecode(ld.name)
-    const alternateName = htmlDecode(ld.alternateName)
+    const name = htmlDecode(ld.name) // original name, e.g. "Le fabuleux destin d'Amélie Poulain"
+    const alternateName = htmlDecode(ld.alternateName) // localized name, e.g. "Amélie"
     trace('ld.name:', JSON.stringify(name))
     trace('ld.alternateName:', JSON.stringify(alternateName))
-    const title = alternateName || name
+    const title = options.localized ? name || alternateName : alternateName || name
 
     /**
      * add a { version, expires, data|error } entry to the cache
@@ -1801,11 +1801,14 @@ async function run (imdbId) {
 
 {
     const start = Date.now()
-    const imdbId = location.pathname.split('/').filter(Boolean).at(-1)
+    // /title/tt1234/ or /title/<lang>/tt1234/ (e.g. /title/pt/tt1234/)
+    const steps = location.pathname.split('/').filter(Boolean)
+    const imdbId = steps.at(-1)
+    const isLocalized = steps.length === 3
 
     log('id:', imdbId)
 
-    run(imdbId)
+    run(imdbId, { localized: isLocalized })
         .then(() => {
             const time = (Date.now() - start) / 1000
             debug(`completed in ${time}s`)
