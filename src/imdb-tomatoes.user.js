@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.4.2
+// @version       7.4.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/([#?].*)?)?$/
@@ -1073,7 +1073,7 @@ async function getIMDbMetadata (imdbId, rtType) {
     const title = get(main, 'titleText.text', '')
     const originalTitle = get(main, 'originalTitleText.text', title)
     const titles = title === originalTitle ? [title] : [title, originalTitle]
-    const genres = get(extra, 'genres.genres.*.text', [])
+    const genres = get(extra, 'genres.genres.*.id', [])
     const year = get(extra, 'releaseYear.year') || 0
     const $releaseDate = get(extra, 'releaseDate')
 
@@ -1327,6 +1327,11 @@ function pluck (array, path) {
 function purgeCached (date) {
     for (const key of GM_listValues()) {
         const json = GM_getValue(key, '{}')
+
+        if (typeof json !== 'string') {
+            continue
+        }
+
         const value = JSON.parse(json)
         const metadataVersion = METADATA_VERSION[key]
 
@@ -1801,7 +1806,7 @@ async function run (imdbId, options = {}) {
 
 {
     const start = Date.now()
-    // /title/tt1234/ or /title/<lang>/tt1234/ (e.g. /title/pt/tt1234/)
+    // /title/tt1234/ or /<lang>/title/tt1234/ (e.g. /pt/title/tt1234/)
     const steps = location.pathname.split('/').filter(Boolean)
     const imdbId = steps.at(-1)
     const isLocalized = steps.length === 3
