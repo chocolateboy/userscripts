@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.2.0
+// @version       3.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -85,10 +85,13 @@ const SIDEBAR_EVENT_DATA_ENDPOINT = '/useStoryTopicQuery' // e.g. /i/api/graphql
  */
 const TIMELINE_EVENT = '[data-testid="trend"]:has([data-testid^="UserAvatar-Container"])'
 const SIDEBAR_EVENT = '[data-testid^="news_sidebar_article_"]'
-const EVENT = `div[role="link"]:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT}):not([data-linked])`
-const TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])'
-const VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])'
-const SELECTOR = [EVENT, TREND, VIDEO].join(', ')
+const EVENT = `div[role="link"]:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT})`
+const TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"]))'
+const VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]'
+
+// any trend/event element (distinguished in the element handler (onElement)),
+// excluding the ones we've already processed ([data-linked="true"])
+const SELECTOR = [EVENT, TREND, VIDEO].map(it => `${it}:not([data-linked])`).join(', ')
 
 /*
  * remove the onclick interceptors from event elements
@@ -189,7 +192,7 @@ function onElement (el: HTMLElement) {
  * linkify an event element: the target URL is (was) extracted from the
  * intercepted JSON
  *
- * returns true if the link has been updated (i.e. the event data has been
+ * returns true if the link has been added (i.e. the event data has been
  * loaded), false otherwise (i.e. try again on the next DOM update)
  */
 function onEventElement ($event: JQuery): boolean {
