@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.2.0
+// @version       3.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -30,7 +30,7 @@
   var INIT = { childList: true, subtree: true };
   var done = constant(false);
   var resume = constant(true);
-  var observe = (...args) => {
+  var observe = ((...args) => {
     const [target, init, callback] = args.length === 3 ? args : args.length === 2 ? args[0] instanceof Element ? [args[0], INIT, args[1]] : [document.body, args[0], args[1]] : [document.body, INIT, args[0]];
     const onMutate = (mutations, observer2) => {
       observer2.disconnect();
@@ -42,43 +42,61 @@
     const observer = new MutationObserver(onMutate);
     queueMicrotask(() => onMutate([], observer));
     return observer;
-  };
+  });
 
   // src/twitter-linkify-trends.user.ts
   // @license       GPL
   var CACHE = exports.default(128);
   var DISABLED_EVENTS = "click touch";
-  var TIMELINE_EVENT_DATA = "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent";
-  var SIDEBAR_EVENT_DATA = "data.story_topic.stories.items.*.trend_results.result";
-  var TIMELINE_EVENT_DATA_ENDPOINT = "/ExplorePage";
-  var SIDEBAR_EVENT_DATA_ENDPOINT = "/useStoryTopicQuery";
-  var TIMELINE_EVENT = '[data-testid="trend"]:has([data-testid^="UserAvatar-Container"])';
+  var EVENT_DATA_HANDLERS = /* @__PURE__ */ new Map([
+    [
+      "ExplorePage",
+      "data.explore_page.body.initialTimeline.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent"
+    ],
+    [
+      "GenericTimelineById",
+      "data.timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent"
+    ],
+    [
+      "SearchTimeline",
+      "data.search_by_raw_query.search_timeline.timeline.instructions[-1].entries.*.content.items.*.item.itemContent"
+    ],
+    [
+      "useStoryTopicQuery",
+      {
+        path: "data.story_topic.stories.items.*.trend_results.result",
+        handler: onSidebarEventData
+      }
+    ]
+  ]);
+  var CARET = '[data-testid="caret"]';
+  var IS_TREND = '[data-testid="trend"]';
+  var HAS_MENU = `:has(${CARET})`;
+  var TIMELINE_EVENT = `${IS_TREND}:not(${HAS_MENU})`;
   var SIDEBAR_EVENT = '[data-testid^="news_sidebar_article_"]';
-  var EVENT = `div[role="link"]:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT}):not([data-linked])`;
-  var TREND = 'div[role="link"][data-testid="trend"]:not(:has([data-testid^="UserAvatar-Container"])):not([data-linked])';
-  var VIDEO = 'div[role="presentation"] div[role="link"][data-testid^="media-tweet-card-"]:not([data-linked])';
-  var SELECTOR = [EVENT, TREND, VIDEO].join(", ");
+  var EVENT = `:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT})`;
+  var TREND = `${IS_TREND}${HAS_MENU}`;
+  var SELECTOR = [EVENT, TREND].map((it) => `div[role="link"]${it}:not([data-linked])`).join(", ");
   function disableAll(e) {
     e.stopPropagation();
   }
   function disableSome(e) {
     const $target = $(e.target);
-    const $caret = $target.closest('[data-testid="caret"]', this);
+    const $caret = $target.closest(CARET, this);
     if (!$caret.length) {
       e.stopPropagation();
     }
   }
   function hookXHROpen(oldOpen) {
     return function open(_method, url) {
-      const { pathname } = URL.parse(url);
-      let onEventData;
-      if (pathname.endsWith(TIMELINE_EVENT_DATA_ENDPOINT)) {
-        onEventData = onTimelineEventData;
-      } else if (pathname.endsWith(SIDEBAR_EVENT_DATA_ENDPOINT)) {
-        onEventData = onSidebarEventData;
-      }
-      if (onEventData) {
-        this.addEventListener("load", () => onEventData(this.responseText));
+      const endpoint = URL.parse(url)?.pathname.split("/").at(-1);
+      for (const [$endpoint, $path] of EVENT_DATA_HANDLERS) {
+        if ($endpoint !== endpoint) {
+          continue;
+        }
+        const [path, handler] = typeof $path === "string" ? [$path, onTimelineEventData] : [$path.path, $path.handler];
+        this.addEventListener("load", () => handler(this.responseText, path));
+        break;
       }
       return GMCompat.apply(this, oldOpen, arguments);
     };
@@ -88,7 +106,6 @@
   }
   function onElement(el) {
     const $el = $(el);
-    let fixPointer = true;
     let linked = true;
     if ($el.is(EVENT)) {
       $el.on(DISABLED_EVENTS, disableAll);
@@ -96,16 +113,10 @@
     } else if ($el.is(TREND)) {
       $el.on(DISABLED_EVENTS, disableSome);
       onTrendElement($el);
-    } else if ($el.is(VIDEO)) {
-      fixPointer = false;
-      $el.on(DISABLED_EVENTS, disableAll);
-      onVideoElement($el);
     }
     if (linked) {
-      $el.attr("data-linked", "true");
-    }
-    if (fixPointer) {
       $el.css("cursor", "auto");
+      $el.attr("data-linked", "true");
     }
   }
   function onEventElement($event) {
@@ -119,9 +130,9 @@
     $(target).parent().wrap($link);
     return true;
   }
-  function onSidebarEventData(json) {
+  function onSidebarEventData(json, path) {
     const data = JSON.parse(json);
-    const events = exports.get(data, SIDEBAR_EVENT_DATA, []);
+    const events = exports.get(data, path, []);
     for (const event of events) {
       const { core: { name: title }, rest_id: id } = event;
       const url = `${location.origin}/i/trending/${id}`;
@@ -129,17 +140,9 @@
       CACHE.set(title, url);
     }
   }
-  function onTrendElement($trend) {
-    const { target, title } = targetFor($trend);
-    const trend = /\s/.test(title) ? `"${title.replace(/"/g, "")}"` : title;
-    console.debug("element (trend):", trend);
-    const query = encodeURIComponent(trend);
-    const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`;
-    $(target).wrap(linkFor(url));
-  }
-  function onTimelineEventData(json) {
+  function onTimelineEventData(json, path) {
     const data = JSON.parse(json);
-    const events = exports.get(data, TIMELINE_EVENT_DATA, []);
+    const events = exports.get(data, path, []);
     for (const event of events) {
       if (event.itemType !== "TimelineTrend") {
         break;
@@ -150,10 +153,13 @@
       CACHE.set(title, url);
     }
   }
-  function onVideoElement($link) {
-    const id = $link.data("testid").split("-").at(-1);
-    const url = `${location.origin}/i/web/status/${id}`;
-    $link.wrap(linkFor(url));
+  function onTrendElement($trend) {
+    const { target, title } = targetFor($trend);
+    const trend = /\s/.test(title) ? `"${title.replace(/"/g, "")}"` : title;
+    console.debug("element (trend):", trend);
+    const query = encodeURIComponent(trend);
+    const url = `${location.origin}/search?q=${query}&src=trend_click&vertical=trends`;
+    $(target).wrap(linkFor(url));
   }
   function targetFor($el) {
     const targets = $el.find('div[dir="ltr"] > span').filter((_, el) => {
