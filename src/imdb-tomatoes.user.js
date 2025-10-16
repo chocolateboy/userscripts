@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.4.3
+// @version       7.5.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/([#?].*)?)?$/
@@ -1067,7 +1067,7 @@ async function getIMDbMetadata (imdbId, rtType) {
     const data = JSON.parse(json)
     const main = get(data, 'props.pageProps.mainColumnData')
     const extra = get(data, 'props.pageProps.aboveTheFoldData')
-    const cast = get(main, 'cast.edges.*.node.name.nameText.text', [])
+    const cast = get(main, 'castV2.*.credits.*.name.nameText.text', [])
     const mainCast = cast.slice(0, 3)
     const type = get(main, 'titleType.id', '')
     const title = get(main, 'titleText.text', '')
@@ -1106,10 +1106,9 @@ async function getIMDbMetadata (imdbId, rtType) {
         meta.startYear = year
         meta.endYear = get(extra, 'releaseYear.endYear') || 0
         meta.seasons = get(main, 'episodes.seasons.length') || 0
-        meta.creators = get(main, 'creators.*.credits.*.name.nameText.text', [])
+        meta.creators = get(extra, 'creatorsPageTitle.*.credits.*.name.nameText.text', [])
     } else if (rtType === 'movie') {
-        meta.directors = get(main, 'directors.*.credits.*.name.nameText.text', [])
-        meta.writers = get(main, 'writers.*.credits.*.name.nameText.text', [])
+        meta.directors = get(extra, 'directorsPageTitle.*.credits.*.name.nameText.text', [])
         meta.year = year
     }
 
