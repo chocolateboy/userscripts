@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.3.0
+// @version       3.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -145,7 +145,7 @@
     const events = exports.get(data, path, []);
     for (const event of events) {
       if (event.itemType !== "TimelineTrend") {
-        break;
+        continue;
       }
       const { name: title, trend_url: { url: uri } } = event;
       const url = uri.replace(/^twitter:\/\//, `${location.origin}/i/`);

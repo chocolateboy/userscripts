@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.3.0
+// @version       3.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -241,12 +241,8 @@ function onTimelineEventData (json: string, path: string) {
     const events = exports.get<TimelineEvent[]>(data, path, [])
 
     for (const event of events) {
-        // although the number and indices of records with event data isn't
-        // fixed, they are the first items in the array of results selected by
-        // the path, so we're done after the last one (or immediately if there
-        // aren't any)
         if (event.itemType !== 'TimelineTrend') {
-            break
+            continue
         }
 
         const { name: title, trend_url: { url: uri } } = event
