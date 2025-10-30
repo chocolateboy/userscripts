@@ -3,11 +3,10 @@
 // @description   Add international links to Amazon product pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.1.0
+// @version       4.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://smile.amazon.tld/*
-// @include       https://www.amazon.com.be/*
 // @include       https://www.amazon.tld/*
 // @require       https://code.jquery.com/jquery-3.7.1.slim.min.js
 // @require       https://cdn.jsdelivr.net/gh/sizzlemctwizzle/GM_config@43fd0fe4de1166f343883511e53546e87840aeaf/gm_config.js
@@ -163,21 +162,23 @@ class Linker {
             .filter(([tld]) => GM_config.get(tld))
             .reduce((obj, [key, val]) => { return obj[key] = val, obj }, {})
 
-        if (!$.isEmptyObject(sites)) {
-            // sort the sites by the country code (e.g. AU) rather than the TLD
-            // (e.g. com.au)
-            // const tlds = sortBy(Object.keys(sites), tld => sites[tld])
-            const tlds = Object.keys(sites).sort((a, b) => sites[a].localeCompare(sites[b]))
-
-            // populate the `links` array with jQuery wrappers for each link
-            // element (e.g. <li>...</li>)
-            for (const tld of tlds) {
-                this.addLink(tld, sites[tld])
-            }
-
-            // prepend the cross-site links to the body of the navbar
-            this.navbar.prepend(...this.links)
+        if ($.isEmptyObject(sites)) {
+            return
         }
+
+        // sort the sites by the country code (e.g. AU) rather than the TLD
+        // (e.g. com.au)
+        // const tlds = sortBy(Object.keys(sites), tld => sites[tld])
+        const tlds = Object.keys(sites).sort((a, b) => sites[a].localeCompare(sites[b]))
+
+        // populate the `links` array with jQuery wrappers for each link
+        // element (e.g. <li>...</li>)
+        for (const tld of tlds) {
+            this.addLink(tld, sites[tld])
+        }
+
+        // prepend the cross-site links to the body of the navbar
+        this.navbar.prepend(...this.links)
     }
 
     /*
@@ -229,15 +230,17 @@ class Linker {
 const run = () => {
     const asin = Linker.getASIN()
 
-    if (asin) {
-        const showConfig = () => GM_config.open() // display the settings manager
-        const linker = new Linker(asin)
-
-        linker.initializeConfig()
-        linker.addLinks()
-
-        GM_registerMenuCommand('Configure Amazon International Links', showConfig)
+    if (!asin) {
+        return
     }
+
+    const showConfig = () => GM_config.open() // display the settings manager
+    const linker = new Linker(asin)
+
+    linker.initializeConfig()
+    linker.addLinks()
+
+    GM_registerMenuCommand('Configure Amazon International Links', showConfig)
 }
 
 run()
