@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.3.1
+// @version       3.3.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -63,7 +63,7 @@ const DISABLED_EVENTS = 'click touch'
  * A map from the basename (e.g. "ExplorePage") of endpoints which return JSON
  * documents with event data (e.g. /i/api/graphql/abc123/ExplorePage) to the
  * path within those documents containing the event data. each event record
- * includes a title and target URL
+ * includes a title and target URI
  */
 const EVENT_DATA_HANDLERS = new Map<string, EventDataHandlersValue>([
     [
@@ -136,21 +136,16 @@ function disableSome (this: HTMLElement, e: JQueryEventObject) {
  */
 function hookXHROpen (oldOpen: XMLHttpRequest['open']) {
     return function open (this: XMLHttpRequest, _method: string, url: string) { // preserve the arity
-        const endpoint = URL.parse(url)?.pathname.split('/').at(-1)
+        const endpoint = URL.parse(url)?.pathname.split('/').at(-1) ?? ''
+        const $path = EVENT_DATA_HANDLERS.get(endpoint)
 
-        for (const [$endpoint, $path] of EVENT_DATA_HANDLERS) {
-            if ($endpoint !== endpoint) {
-                continue
-            }
-
+        if ($path) {
             const [path, handler] = typeof $path === 'string'
                 ? [$path, onTimelineEventData]
                 : [$path.path, $path.handler]
 
             // register a new listener
             this.addEventListener('load', () => handler(this.responseText, path))
-
-            break
         }
 
         // delegate to the original XHR#open handler

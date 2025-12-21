@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.3.1
+// @version       3.3.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -89,14 +89,11 @@
   }
   function hookXHROpen(oldOpen) {
     return function open(_method, url) {
-      const endpoint = URL.parse(url)?.pathname.split("/").at(-1);
-      for (const [$endpoint, $path] of EVENT_DATA_HANDLERS) {
-        if ($endpoint !== endpoint) {
-          continue;
-        }
+      const endpoint = URL.parse(url)?.pathname.split("/").at(-1) ?? "";
+      const $path = EVENT_DATA_HANDLERS.get(endpoint);
+      if ($path) {
         const [path, handler] = typeof $path === "string" ? [$path, onTimelineEventData] : [$path.path, $path.handler];
         this.addEventListener("load", () => handler(this.responseText, path));
-        break;
       }
       return GMCompat.apply(this, oldOpen, arguments);
     };
