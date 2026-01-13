@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.1.1
+// @version       2.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -20,7 +20,7 @@
   // src/github-my-issues.user.ts
   // @license       GPL
   var ID = "my-issues-tab";
-  var ISSUES_LINK = "a#issues-tab";
+  var ISSUES_LINK = 'a[data-react-nav="issues-react"]';
   var MY_ISSUES = "My Issues";
   var MY_ISSUES_LINK = `li a#${ID}`;
   var run = () => {
@@ -74,5 +74,8 @@
         background: transparent !important;
     }
 `);
-  $(document).on("turbo:load", run);
+  $(document).one("turbo:load", () => {
+    $(document).on("soft-nav:end", run);
+    run();
+  });
 })();
