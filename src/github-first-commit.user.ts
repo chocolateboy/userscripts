@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.3
+// @version       4.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -32,7 +32,7 @@ const PATH = 'meta[name="analytics-location"][content]'
 const REPO_PAGE = '/<user-name>/<repo-name>'
 
 /* selector for the owner name/repo name, e.g. "chocolateboy/userscripts" */
-const USER_REPO = 'meta[name="octolytics-dimension-repository_network_root_nwo"][content]'
+const USER_REPO = 'link[rel="canonical"][href]'
 
 const $ = document
 
@@ -107,7 +107,10 @@ observe(() => {
     const label = firstCommit.querySelector(':scope [data-component="text"] > *')!
     const header = firstCommit.querySelector(':scope h2')!
     const link = firstCommit.querySelector(':scope a[href]')!
-    const [user, repo] = $.querySelector(USER_REPO)!.getAttribute('content')!.split('/')
+    const [user, repo] = URL.parse($.querySelector<HTMLAnchorElement>(USER_REPO)!.href)!
+        .pathname
+        .slice(1)
+        .split('/')
 
     firstCommit.id = ID
     header.textContent = label.textContent = '1st Commit'

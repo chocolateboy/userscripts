@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.3
+// @version       4.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -23,27 +23,26 @@
   var INIT = { childList: true, subtree: true };
   var done = constant(false);
   var resume = constant(true);
-  var observe = (...args) => {
-    const $2 = document;
-    const [target, init, callback] = args.length === 3 ? args : args.length === 2 ? args[0] instanceof Element ? [args[0], INIT, args[1]] : [$2.body, args[0], args[1]] : [$2.body, INIT, args[0]];
-    const $callback = (mutations, observer2) => {
+  var observe = ((...args) => {
+    const [target, init, callback] = args.length === 3 ? args : args.length === 2 ? args[0] instanceof Element ? [args[0], INIT, args[1]] : [document.body, args[0], args[1]] : [document.body, INIT, args[0]];
+    const onMutate = (mutations, observer2) => {
       observer2.disconnect();
-      const resume2 = callback({ mutations, observer: observer2, target, init });
+      const resume2 = callback({ mutations, observer: observer2, target });
       if (resume2 !== false) {
         observer2.observe(target, init);
       }
     };
-    const observer = new MutationObserver($callback);
-    queueMicrotask(() => $callback([], observer));
+    const observer = new MutationObserver(onMutate);
+    queueMicrotask(() => onMutate([], observer));
     return observer;
-  };
+  });
 
   // src/github-first-commit.user.ts
   // @license       GPL
   var ID = "first-commit";
   var PATH = 'meta[name="analytics-location"][content]';
   var REPO_PAGE = "/<user-name>/<repo-name>";
-  var USER_REPO = 'meta[name="octolytics-dimension-repository_network_root_nwo"][content]';
+  var USER_REPO = 'link[rel="canonical"][href]';
   var $ = document;
   var openFirstCommit = (user, repo) => {
     return fetch(`https://api.github.com/repos/${user}/${repo}/commits`).then((res) => Promise.all([res.headers.get("link"), res.json()])).then(([link, commits]) => {
@@ -76,7 +75,7 @@
     const label = firstCommit.querySelector(':scope [data-component="text"] > *');
     const header = firstCommit.querySelector(":scope h2");
     const link = firstCommit.querySelector(":scope a[href]");
-    const [user, repo] = $.querySelector(USER_REPO).getAttribute("content").split("/");
+    const [user, repo] = URL.parse($.querySelector(USER_REPO).href).pathname.slice(1).split("/");
     firstCommit.id = ID;
     header.textContent = label.textContent = "1st Commit";
     link.removeAttribute("href");
