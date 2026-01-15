@@ -3,20 +3,21 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.2.0
+// @version       2.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
 // @include       https://github.com/*
 // @require       https://cdn.jsdelivr.net/npm/cash-dom@8.1.5/dist/cash.min.js
 // @grant         GM_addStyle
-// @run-at        document-start
 // ==/UserScript==
 
+import { observe } from './lib/observer.js'
+
 /*
- * the ID of the "My Issues" link.
+ * unique ID for the My Issues link element
  */
-const ID = 'my-issues-tab'
+const ID = 'my-issues-link'
 
 /*
  * selector for the "Issues" link. we navigate up from this to its parent
@@ -31,60 +32,77 @@ const MY_ISSUES = 'My Issues'
 
 /*
  * selector for the added "My Issues" link. used to identify an existing link so
- * it can be removed on pjax page loads
+ * it can be reused for SPA navigation
  */
-const MY_ISSUES_LINK = `li a#${ID}`
+const MY_ISSUES_LINK = `a#${ID}`
 
 /*
  * add the "My Issues" link
  */
 const run = () => {
-    // if we're here via a pjax load, there may be an existing "My Issues" link
-    // from a previous page load. we can't reuse it as it may no longer be
-    // required or in a valid state, so we just replace it
-    $(MY_ISSUES_LINK).closest('li').remove()
-
     const $issuesLink = $(`li ${ISSUES_LINK}`)
     const $issues = $issuesLink.closest('li')
 
     if ($issues.length !== 1) {
+        console.warn('no issues tab:', $issues.length)
         return
     }
 
     const self = $('meta[name="user-login"]').attr('content')
-    const repo = $('[data-current-repository]').data('currentRepository')
-    const user = repo?.split('/')?.at(0)
 
-    if (!(self && repo && user)) {
+    if (!self) {
+        console.warn('no logged-in user')
         return
     }
 
-    const myIssues = `involves:${self}`
-    const subqueries = [myIssues, 'sort:updated-desc']
+    const [user, repo] = location.pathname.slice(1).split('/')
 
-    if (user === self) { // own repo
-        // is:open archived:false involves:<self> ...
-        subqueries.unshift('is:open', 'archived:false')
+    if (!(repo && user)) {
+        console.warn('no user/repo')
+        return
     }
 
-    const query = subqueries.join('+')
-    const path = `/${repo}/issues`
-    const href = `${path}?q=${escape(query)}`
-    const $myIssues = $issues.clone()
-    const $link = $myIssues
-        .find(`:scope ${ISSUES_LINK}`)
-        .removeClass('selected deselected')
-        .attr({
-            id: ID,
-            role: 'tab',
-            href,
-            'aria-current': null,
-            'data-hotkey': 'g I',
-            'data-selected-links': null,
-        })
+    let $myIssues = $(`li ${MY_ISSUES_LINK}`).closest('li')
+    let $link: JQuery<HTMLAnchorElement>
+    let created = false
 
-    $link.find(':scope [data-content="Issues"]').text(MY_ISSUES)
-    $link.find(':scope [id="issues-repo-tab-count"]').remove()
+    if ($myIssues.length) {
+        $link = $myIssues.find(`:scope ${MY_ISSUES_LINK}`)
+    } else {
+        $myIssues = $issues.clone()
+        $link = $myIssues.find(`:scope ${ISSUES_LINK}`)
+        created = true
+    }
+
+    const myIssues = `involves:${self}`
+    const path = `/${user}/${repo}/issues`
+
+    if (created) {
+        const subqueries = [myIssues, 'sort:updated-desc']
+
+        if (user === self) { // own repo
+            // is:open archived:false involves:<self> ...
+            subqueries.unshift('is:open', 'archived:false')
+        }
+
+        const query = subqueries.join('+')
+        const href = `${path}?q=${escape(query)}`
+
+        $link
+            .removeClass('deselected')
+            .attr({
+                id: ID,
+                role: 'tab',
+                href,
+                'aria-current': null,
+                'data-hotkey': 'g I',
+                'data-react-nav': null,
+                'data-selected-links': null,
+            })
+
+        $link.find(':scope [data-content="Issues"]').text(MY_ISSUES)
+        $link.find(':scope [data-component="counter"]').hide()
+    }
 
     let q: string | null = null
 
@@ -101,7 +119,9 @@ const run = () => {
         $issuesLink.removeClass('deselected')
     }
 
-    $issues.after($myIssues)
+    if (created) {
+        $issues.after($myIssues)
+    }
 }
 
 GM_addStyle(`
@@ -110,8 +130,4 @@ GM_addStyle(`
     }
 `)
 
-// run on navigation (including full page loads)
-$(document).one('turbo:load', () => {
-    $(document).on('soft-nav:end', run)
-    run()
-})
+observe(run)
