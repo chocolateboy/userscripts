@@ -259,9 +259,9 @@ const BaseMatcher = {
      * @return {DayJs | undefined}
      */
     lastModified ($rt) {
-        return $rt.find('.critics-reviews rt-text[slot="createDate"] span')
+        return $rt.find('.critics-reviews span[slot="timestamp"]')
             .get()
-            .map(el => dayjs($(el).text().trim()))
+            .map(el => parseRTDate($(el).text().trim()))
             .sort((a, b) => b.unix() - a.unix())
             .shift()
     },
@@ -1306,6 +1306,31 @@ function normalize (name) {
         .replace(/[^a-z0-9]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
+}
+
+/**
+ * parse an RT date into a DayJS date object
+ *
+ *   Jan 17     // The previous Jan 17 (a year ago if today is Jan 17)
+ *   3h         // 3 hours ago
+ *   2d         // 2 days ago
+ *   01/17/2023 // MM/DD/YYYY
+ *
+ * @param {string} name
+ * @return {DayJS}
+ */
+function parseRTDate (rtDate) {
+    const match = rtDate.match(/^(\d+)(\w+)$/)
+
+    if (match) { // e.g. "2d"
+        return dayjs().subtract(Number(match[1]), match[2])
+    } else if (rtDate.match(/^\w+\s+\d+$/)) { // e.g. "Jan 17"
+        const today = dayjs(dayjs().format('MMM DD YYYY'))
+        const date = dayjs(`${rtDate} ${today.year()}`)
+        return date.isBefore(today) ? date : date.subtract(1, 'year')
+    } else { // e.g. "01/17/2026"
+        return dayjs(rtDate, 'MM/DD/YYYY')
+    }
 }
 
 /**
