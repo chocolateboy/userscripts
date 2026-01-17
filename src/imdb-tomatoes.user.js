@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.7.0
+// @version       7.7.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/?([#?].*)?)?$/
@@ -1106,7 +1106,7 @@ async function getIMDbMetadata (imdbId, rtType, ld) {
         meta.startYear = year
         meta.endYear = get(extra, 'releaseYear.endYear') || 0
         meta.seasons = get(main, 'episodes.seasons.length') || 0
-        meta.creators = get(extra, 'creatorsPageTitle.*.credits.*.name.nameText.text', [])
+        meta.creators = get(ld, 'creator.*.name', [])
     } else if (rtType === 'movie') {
         meta.directors = get(ld, 'director.*.name', [])
         meta.year = year
@@ -1325,8 +1325,8 @@ function parseRTDate (rtDate) {
     if (match) { // e.g. "2d"
         return dayjs().subtract(Number(match[1]), match[2])
     } else if (rtDate.match(/^\w+\s+\d+$/)) { // e.g. "Jan 17"
-        const today = dayjs(dayjs().format('MMM DD YYYY'))
-        const date = dayjs(`${rtDate} ${today.year()}`)
+        const today = dayjs(dayjs().format('YYYY-MM-DD'))
+        const date = dayjs(`${rtDate} ${today.year()}`, 'MMM D YYYY')
         return date.isBefore(today) ? date : date.subtract(1, 'year')
     } else { // e.g. "01/17/2026"
         return dayjs(rtDate, 'MM/DD/YYYY')
