@@ -3,7 +3,7 @@
 // @description   Add Rotten Tomatoes ratings to IMDb movie and TV show pages
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       7.6.1
+// @version       7.7.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/?([#?].*)?)?$/
@@ -1057,7 +1057,7 @@ function checkOverrides (match, imdbId) {
  * @param {string} imdbId
  * @param {string} rtType
  */
-async function getIMDbMetadata (imdbId, rtType) {
+async function getIMDbMetadata (imdbId, rtType, ld) {
     trace('waiting for props')
     const json = await waitFor('props', () => {
         return document.getElementById('__NEXT_DATA__')?.textContent?.trim()
@@ -1108,7 +1108,7 @@ async function getIMDbMetadata (imdbId, rtType) {
         meta.seasons = get(main, 'episodes.seasons.length') || 0
         meta.creators = get(extra, 'creatorsPageTitle.*.credits.*.name.nameText.text', [])
     } else if (rtType === 'movie') {
-        meta.directors = get(extra, 'directorsPageTitle.*.credits.*.name.nameText.text', [])
+        meta.directors = get(ld, 'director.*.name', [])
         meta.year = year
     }
 
@@ -1124,8 +1124,9 @@ async function getIMDbMetadata (imdbId, rtType) {
  * @param {string} imdbId
  * @param {string} title
  * @param {keyof Matcher} rtType
+ * @param {any} ld
  */
-async function getRTData (imdbId, title, rtType) {
+async function getRTData (imdbId, title, rtType, ld) {
     const matcher = Matcher[rtType]
 
     // we preload the anticipated RT page URL at the same time as the API request.
@@ -1247,7 +1248,7 @@ async function getRTData (imdbId, title, rtType) {
 
     debug('results:', results)
 
-    const imdb = await getIMDbMetadata(imdbId, rtType)
+    const imdb = await getIMDbMetadata(imdbId, rtType, ld)
 
     // do a basic sanity check to make sure it's valid
     if (!imdb?.type) {
@@ -1755,7 +1756,7 @@ async function run (imdbId, options = {}) {
     }
 
     try {
-        const { data, preloaded, updated } = await getRTData(imdbId, title, rtType)
+        const { data, preloaded, updated } = await getRTData(imdbId, title, rtType, ld)
 
         log('RT data:', data)
         bump('hit')
