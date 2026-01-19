@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.0
+// @version       2.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -37,9 +37,28 @@ const MY_ISSUES = 'My Issues'
 const MY_ISSUES_LINK = `a#${ID}`
 
 /*
+ * the URL of the last visited tab
+ *
+ * keep track of the previous tab to debounce the MutationObserver callback
+ */
+let LAST_PAGE: string | undefined
+
+/*
  * add the "My Issues" link
  */
 const run = () => {
+    // bail quickly if we're a) still on the same page and b) the My Issues tab still exists
+    let $myIssues = $(`li ${MY_ISSUES_LINK}`).closest('li')
+
+    const create = $myIssues.length === 0
+    const currentPage = location.href
+
+    if (!create && currentPage === LAST_PAGE) {
+        return
+    } else {
+        LAST_PAGE = currentPage
+    }
+
     const $issuesLink = $(`li ${ISSUES_LINK}`)
     const $issues = $issuesLink.closest('li')
 
@@ -62,22 +81,19 @@ const run = () => {
         return
     }
 
-    let $myIssues = $(`li ${MY_ISSUES_LINK}`).closest('li')
     let $link: JQuery<HTMLAnchorElement>
-    let created = false
 
-    if ($myIssues.length) {
-        $link = $myIssues.find(`:scope ${MY_ISSUES_LINK}`)
-    } else {
+    if (create) {
         $myIssues = $issues.clone()
         $link = $myIssues.find(`:scope ${ISSUES_LINK}`)
-        created = true
+    } else {
+        $link = $myIssues.find(`:scope ${MY_ISSUES_LINK}`)
     }
 
     const myIssues = `involves:${self}`
-    const path = `/${user}/${repo}/issues`
+    const issuesPath = `/${user}/${repo}/issues`
 
-    if (created) {
+    if (create) {
         const subqueries = [myIssues, 'sort:updated-desc']
 
         if (user === self) { // own repo
@@ -86,7 +102,7 @@ const run = () => {
         }
 
         const query = subqueries.join('+')
-        const href = `${path}?q=${escape(query)}`
+        const href = `${issuesPath}?q=${escape(query)}`
 
         $link
             .removeClass('deselected')
@@ -104,22 +120,21 @@ const run = () => {
         $link.find(':scope [data-component="counter"]').hide()
     }
 
-    let q: string | null = null
+    if (location.pathname === issuesPath) { // Issues or My Issues
+        const q = URL.parse(location.href)!.searchParams.get('q')
 
-    if (location.pathname === path) {
-        const params = new URLSearchParams(location.search)
-        q = params.get('q')
-    }
-
-    if (q && q.trim().split(/\s+/).includes(myIssues)) {
-        $link.attr('aria-selected', 'true')
-        $issuesLink.addClass('deselected')
-    } else {
+        if (q && q.trim().split(/\s+/).includes(myIssues)) { // My Issues
+            $link.attr('aria-selected', 'true')
+            $issuesLink.addClass('deselected')
+        } else { // Issues
+            $link.attr('aria-selected', 'false')
+            $issuesLink.removeClass('deselected')
+        }
+    } else { // other tab, e.g. Pull requests
         $link.attr('aria-selected', 'false')
-        $issuesLink.removeClass('deselected')
     }
 
-    if (created) {
+    if (create) {
         $issues.after($myIssues)
     }
 }

@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.3.0
+// @version       2.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -43,7 +43,16 @@
   var ISSUES_LINK = 'a[data-react-nav="issues-react"]';
   var MY_ISSUES = "My Issues";
   var MY_ISSUES_LINK = `a#${ID}`;
+  var LAST_PAGE;
   var run = () => {
+    let $myIssues = $(`li ${MY_ISSUES_LINK}`).closest("li");
+    const create = $myIssues.length === 0;
+    const currentPage = location.href;
+    if (!create && currentPage === LAST_PAGE) {
+      return;
+    } else {
+      LAST_PAGE = currentPage;
+    }
     const $issuesLink = $(`li ${ISSUES_LINK}`);
     const $issues = $issuesLink.closest("li");
     if ($issues.length !== 1) {
@@ -60,25 +69,22 @@
       console.warn("no user/repo");
       return;
     }
-    let $myIssues = $(`li ${MY_ISSUES_LINK}`).closest("li");
     let $link;
-    let created = false;
-    if ($myIssues.length) {
-      $link = $myIssues.find(`:scope ${MY_ISSUES_LINK}`);
-    } else {
+    if (create) {
       $myIssues = $issues.clone();
       $link = $myIssues.find(`:scope ${ISSUES_LINK}`);
-      created = true;
+    } else {
+      $link = $myIssues.find(`:scope ${MY_ISSUES_LINK}`);
     }
     const myIssues = `involves:${self}`;
-    const path = `/${user}/${repo}/issues`;
-    if (created) {
+    const issuesPath = `/${user}/${repo}/issues`;
+    if (create) {
       const subqueries = [myIssues, "sort:updated-desc"];
       if (user === self) {
         subqueries.unshift("is:open", "archived:false");
       }
       const query = subqueries.join("+");
-      const href = `${path}?q=${escape(query)}`;
+      const href = `${issuesPath}?q=${escape(query)}`;
       $link.removeClass("deselected").attr({
         id: ID,
         role: "tab",
@@ -91,19 +97,19 @@
       $link.find(':scope [data-content="Issues"]').text(MY_ISSUES);
       $link.find(':scope [data-component="counter"]').hide();
     }
-    let q = null;
-    if (location.pathname === path) {
-      const params = new URLSearchParams(location.search);
-      q = params.get("q");
-    }
-    if (q && q.trim().split(/\s+/).includes(myIssues)) {
-      $link.attr("aria-selected", "true");
-      $issuesLink.addClass("deselected");
+    if (location.pathname === issuesPath) {
+      const q = URL.parse(location.href).searchParams.get("q");
+      if (q && q.trim().split(/\s+/).includes(myIssues)) {
+        $link.attr("aria-selected", "true");
+        $issuesLink.addClass("deselected");
+      } else {
+        $link.attr("aria-selected", "false");
+        $issuesLink.removeClass("deselected");
+      }
     } else {
       $link.attr("aria-selected", "false");
-      $issuesLink.removeClass("deselected");
     }
-    if (created) {
+    if (create) {
       $issues.after($myIssues);
     }
   };
