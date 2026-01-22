@@ -3,13 +3,13 @@
 // @description   Automatically show the full "Movie Info" plot synopsis on Rotten Tomatoes
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       2.0.0
+// @version       2.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
-// @include       http://rottentomatoes.com/m/*
-// @include       http://*.rottentomatoes.com/m/*
 // @include       https://rottentomatoes.com/m/*
 // @include       https://*.rottentomatoes.com/m/*
+// @include       https://rottentomatoes.com/tv/*
+// @include       https://*.rottentomatoes.com/tv/*
 // @run-at        document-start
 // @grant         none
 // ==/UserScript==
@@ -21,13 +21,13 @@ const run = () => {
         return
     }
 
-    const readLess = synopsis.querySelector<HTMLElement>('[slot="ctaClose"]')
+    const readLess = synopsis.querySelector<HTMLElement>(':scope [slot="cta-close"]')
 
     if (readLess) {
         readLess.style.display = 'none'
     }
 
-    const readMore = synopsis.querySelector<HTMLElement>('[slot="ctaOpen"]')
+    const readMore = synopsis.querySelector<HTMLElement>(':scope [slot="cta-open"]')
 
     if (readMore) {
         readMore.click()
