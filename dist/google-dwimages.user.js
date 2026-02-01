@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.0
+// @version       4.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -60,9 +60,7 @@
   };
   var extractImageUrls = (text) => {
     const imageUrls = text.matchAll(IMAGE_DATA).flatMap((it, i) => i % 2 ? [] : [JSON.parse(it[1])[0]]);
-    let count = 0;
     for (const url of imageUrls) {
-      ++count;
       CACHE.set(String(++DATA_ID), url);
     }
   };

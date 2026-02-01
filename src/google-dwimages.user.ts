@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.0
+// @version       4.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -34,7 +34,7 @@ const RESULT = ':scope > :is([data-lpage], [data-ri]):not([data-gd-status="done"
 // selector for the image result container
 const RESULTS = ':has(> :is([data-lpage], [data-ri]))'
 
-// the pattern used to scrape image URLs out of the page/pulled payloads
+// the pattern used to scrape image URLs out of the page and the pulled updates
 const IMAGE_DATA = /(\["[^"]+",\d+,\d+\]),[^,]+,[^,]+,"rgb\(\d+,\d+,\d+\)"/g
 
 // an index used to store a result's image URL until the element is displayed.
@@ -56,26 +56,19 @@ const stopPropagation = (e: Event): void => {
 }
 
 /*
- * extract (scrape) image URLs from the page (initial) or from an XHR request
- * for more. add each one to a cache to be looked up later when the result
- * element appears
+ * extract (scrape) image URLs from the page (initial) or from the data pulled
+ * for subsequent pages. add each one to a cache to be looked up later when the
+ * result element appears
  */
 const extractImageUrls = (text: string): void => {
-    // console.debug('extracting image URLs...')
-
     // deduplicate and extract the URLs (they come in pairs)
     const imageUrls = text
         .matchAll(IMAGE_DATA)
-        .flatMap((it, i) => i % 2 ? [] : [JSON.parse(it[1])[0]])
-
-    let count = 0
+        .flatMap<string>((it, i) => i % 2 ? [] : [JSON.parse(it[1])[0]])
 
     for (const url of imageUrls) {
-        ++count
         CACHE.set(String(++DATA_ID), url)
     }
-
-    // console.debug(`found ${count} image URLs`)
 }
 
 /*
@@ -128,7 +121,7 @@ const onResult = (result: HTMLElement): void => {
         id = result.dataset.gdRi = String(++RESULT_ID)
     }
 
-    // grab the link to the image (first link)
+    // grab the link to the image (the first link)
     const imageLink = result.querySelector<HTMLAnchorElement>(':scope a')
 
     if (!imageLink) {
@@ -136,6 +129,7 @@ const onResult = (result: HTMLElement): void => {
         return
     }
 
+    // grab the image
     const image = imageLink.querySelector<HTMLImageElement>(':scope img')
 
     if (!image) {
@@ -143,6 +137,7 @@ const onResult = (result: HTMLElement): void => {
         return
     }
 
+    // look up the stored image URL for this result
     const href = CACHE.get(id)
 
     if (!href) {
@@ -150,19 +145,19 @@ const onResult = (result: HTMLElement): void => {
         return
     }
 
-    // console.debug(`Found URL for result ${id}: ${href}`)
-
     // disable the click interceptors
     for (const event of EVENTS) {
         result.addEventListener(event, stopPropagation)
     }
 
+    // update the link
     Object.assign(imageLink, {
         href,
         title: image.alt,
         target: LINK_TARGET, // make it consistent with the page link
     })
 
+    // we're done with the URL, so release it
     CACHE.delete(id)
 
     // tag the result so we don't process it again
