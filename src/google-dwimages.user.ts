@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.3
+// @version       4.0.4
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -76,32 +76,27 @@ const stopPropagation = (e: Event): void => {
  */
 const extractImageUrls = (text: string): void => {
     // deduplicate and extract the URLs
-    const imageUrls = text
-        .matchAll(IMAGE_DATA)
-        .flatMap<string>((match, i) => {
-            // each link appears twice, one after the other: remove the 2nd one
-            if (i % 2) {
-                return []
-            }
+    text.matchAll(IMAGE_DATA).forEach((match, i) => {
+        // each link appears twice, one after the other: omit the second one
+        if (i % 2) {
+            return
+        }
 
-            // parse the JSON and extract the URL
-            //
-            // from: '"https://example.com/?foo\\u003dbar"'
-            //   to: 'https://example.com/?foo\u003dbar'
-            const $url = JSON.parse(match[1])
+        // parse the JSON string to extract the URL
+        //
+        // from: '"https://example.com/?foo\\u003dbar"'
+        //   to: 'https://example.com/?foo\u003dbar'
+        const $url = JSON.parse(match[1])
 
-            // decode the URL
-            //
-            // from: 'https://example.com/?foo\u003dbar'
-            //   to: 'https://example.com/?foo=bar'
-            const url = JSON.parse(`"${$url}"`)
+        // decode the URL
+        //
+        // from: 'https://example.com/?foo\u003dbar'
+        //   to: 'https://example.com/?foo=bar'
+        const url = JSON.parse(`"${$url}"`)
 
-            return [url]
-        })
-
-    for (const url of imageUrls) {
+        // add it to the cache
         SEEN.set(++DATA_ID, url)
-    }
+    })
 }
 
 /*
