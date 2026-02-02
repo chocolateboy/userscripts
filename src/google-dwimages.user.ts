@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.2
+// @version       4.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -37,7 +37,7 @@ const EVENTS = [
 ]
 
 // the pattern used to scrape image URLs out of the page and the pulled updates
-const IMAGE_DATA = /(\["[^"]+",\d+,\d+\]),[^,]+,[^,]+,"rgb\(\d+,\d+,\d+\)"/g
+const IMAGE_DATA = /\[("[^"]+"),\d+,\d+\],[^,]+,[^,]+,"rgb\(\d+,\d+,\d+\)"/g
 
 // the default target for image links (the same as page links)
 const LINK_TARGET = '_blank'
@@ -86,15 +86,15 @@ const extractImageUrls = (text: string): void => {
 
             // parse the JSON and extract the URL
             //
-            // from: '["https://example.com/?foo\\u003dbar",640,480]'
+            // from: '"https://example.com/?foo\\u003dbar"'
             //   to: 'https://example.com/?foo\u003dbar'
-            const $url = JSON.parse(match[1]).at(0)
+            const $url = JSON.parse(match[1])
 
             // decode the URL
             //
             // from: 'https://example.com/?foo\u003dbar'
             //   to: 'https://example.com/?foo=bar'
-            const url = JSON.parse('"' + $url + '"')
+            const url = JSON.parse(`"${$url}"`)
 
             return [url]
         })
@@ -170,7 +170,7 @@ const onResult = (result: Result): void => {
         target: LINK_TARGET, // make it consistent with the page link
     })
 
-    // we're done with the URL, so release it
+    // we're done with the stored URL, so remove it
     SEEN.delete(id)
 
     // tag the result so we don't process it again

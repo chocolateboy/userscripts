@@ -3,7 +3,7 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.2
+// @version       4.0.3
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
@@ -65,7 +65,7 @@
     "mousedown",
     "touchstart"
   ];
-  var IMAGE_DATA = /(\["[^"]+",\d+,\d+\]),[^,]+,[^,]+,"rgb\(\d+,\d+,\d+\)"/g;
+  var IMAGE_DATA = /\[("[^"]+"),\d+,\d+\],[^,]+,[^,]+,"rgb\(\d+,\d+,\d+\)"/g;
   var LINK_TARGET = "_blank";
   var RESULT = `:scope > :is([data-lpage], [data-ri]):not([data-gd-status="${"done" /* DONE */}"])`;
   var RESULTS = ":has(> :is([data-lpage], [data-ri]))";
@@ -81,8 +81,8 @@
       if (i % 2) {
         return [];
       }
-      const $url = JSON.parse(match[1]).at(0);
-      const url = JSON.parse('"' + $url + '"');
+      const $url = JSON.parse(match[1]);
+      const url = JSON.parse(`"${$url}"`);
       return [url];
     });
     for (const url of imageUrls) {
