@@ -3,17 +3,18 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.4
+// @version       4.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
 // @include       https://www.google.tld/search?*udm=2*
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @run-at        document-start
 // ==/UserScript==
 
-import { observe }     from './lib/observer'
-import { assign }      from './lib/util'
-import { hookXHRSend } from './lib/xhr'
+import { observe }      from './lib/observer'
+import { assign }       from './lib/util'
+import { hookResponse } from './lib/xhr'
 
 const enum Status { PENDING = 'pending', DONE = 'done' }
 
@@ -129,6 +130,14 @@ const onResult = (result: Result): void => {
     // initialize the element's result index, e.g, 'data-gd-id="1"'
     const id = Number(data.gdId ||= String(++RESULT_ID))
 
+    // look up the extracted image URL for this result
+    const href = SEEN.get(id)
+
+    if (!href) {
+        console.debug(`can't find URL for result ${id}`)
+        return
+    }
+
     // grab the link to the image (the first link)
     const imageLink = result.querySelector<HTMLAnchorElement>(':scope a')
 
@@ -145,24 +154,19 @@ const onResult = (result: Result): void => {
         return
     }
 
-    // look up the extracted image URL for this result
-    const href = SEEN.get(id)
-
-    if (!href) {
-        console.debug(`can't find URL for result ${id}`)
-        return
-    }
-
     // disable the click interceptors
     for (const event of EVENTS) {
         result.addEventListener(event, stopPropagation)
     }
 
-    // update the link
-    assign(imageLink, {
-        href,
-        title: image.alt,
-        target: LINK_TARGET, // make it consistent with the page link
+    // update the link and restore it if reverted
+    observe(imageLink, { attributes: true }, () => {
+        // update the link
+        assign(imageLink, {
+            href,
+            title: image.alt,
+            target: LINK_TARGET, // make it consistent with the page link
+        })
     })
 
     // we're done with the stored URL, so remove it
@@ -173,13 +177,6 @@ const onResult = (result: Result): void => {
 }
 
 const run = () => {
-    // replace the default XHR#send method with our custom version, which scans
-    // the response for image URLs and adds them to the cache
-    const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
-    const send = hookXHRSend(xhrProto.send, onResponse)
-
-    xhrProto.send = GMCompat.export(send)
-
     const results = document.querySelector<HTMLElement>(RESULTS)
 
     if (!results) {
@@ -203,4 +200,8 @@ const run = () => {
     })
 }
 
-run()
+// intercept XHR requests to scan responses for image URLs and add them to the
+// cache
+hookResponse(onResponse)
+
+document.addEventListener('DOMContentLoaded', run)

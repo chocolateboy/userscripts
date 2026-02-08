@@ -3,20 +3,23 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.0.4
+// @version       4.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
 // @include       https://www.google.tld/search?*udm=2*
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @run-at        document-start
 // ==/UserScript==
 
 // NOTE This file is generated from src/google-dwimages.user.ts and should not be edited directly.
 
 "use strict";
 (() => {
-  // src/lib/util.ts
+  // src/lib/util/assign.ts
   var { assign } = Object;
+
+  // src/lib/util/constant.ts
   var constant = (value) => (..._args) => value;
 
   // src/lib/observer.ts
@@ -38,11 +41,17 @@
   });
 
   // src/lib/xhr.ts
-  var hookXHRSend = (oldSend, onResponse2) => {
-    return function send(body = null) {
+  var $unsafeWindow = GMCompat.unsafeWindow;
+  var hookResponse = (onResponse2, onError) => {
+    const xhrProto = $unsafeWindow.XMLHttpRequest.prototype;
+    const oldSend = xhrProto.send;
+    function send(body = null) {
       const oldOnReadyStateChange = this.onreadystatechange;
+      if (onError) {
+        this.addEventListener("error", onError);
+      }
       this.onreadystatechange = function(event) {
-        if (this.readyState === this.DONE && this.responseURL && this.status === 200) {
+        if (this.readyState === this.DONE && this.status === 200) {
           onResponse2(this, this.responseURL);
         }
         if (oldOnReadyStateChange) {
@@ -50,6 +59,10 @@
         }
       };
       oldSend.call(this, body);
+    }
+    xhrProto.send = GMCompat.export(send);
+    return () => {
+      xhrProto.send = oldSend;
     };
   };
 
@@ -95,6 +108,11 @@
     const data = result.dataset;
     data.gdStatus ||= "pending" /* PENDING */;
     const id = Number(data.gdId ||= String(++RESULT_ID));
+    const href = SEEN.get(id);
+    if (!href) {
+      console.debug(`can't find URL for result ${id}`);
+      return;
+    }
     const imageLink = result.querySelector(":scope a");
     if (!imageLink) {
       console.warn("can't find image link in result:", result);
@@ -105,27 +123,21 @@
       console.warn("can't find image in result link:", { result, link: imageLink });
       return;
     }
-    const href = SEEN.get(id);
-    if (!href) {
-      console.debug(`can't find URL for result ${id}`);
-      return;
-    }
     for (const event of EVENTS) {
       result.addEventListener(event, stopPropagation);
     }
-    assign(imageLink, {
-      href,
-      title: image.alt,
-      target: LINK_TARGET
-      // make it consistent with the page link
+    observe(imageLink, { attributes: true }, () => {
+      assign(imageLink, {
+        href,
+        title: image.alt,
+        target: LINK_TARGET
+        // make it consistent with the page link
+      });
     });
     SEEN.delete(id);
     data.gdStatus = "done" /* DONE */;
   };
   var run = () => {
-    const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype;
-    const send = hookXHRSend(xhrProto.send, onResponse);
-    xhrProto.send = GMCompat.export(send);
     const results = document.querySelector(RESULTS);
     if (!results) {
       console.warn("can't find results container");
@@ -141,5 +153,6 @@
       results.querySelectorAll(RESULT).forEach(onResult);
     });
   };
-  run();
+  hookResponse(onResponse);
+  document.addEventListener("DOMContentLoaded", run);
 })();
