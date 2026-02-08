@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.3.2
+// @version       3.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -23,7 +23,7 @@
 
 "use strict";
 (() => {
-  // src/lib/util.ts
+  // src/lib/util/constant.ts
   var constant = (value) => (..._args) => value;
 
   // src/lib/observer.ts
@@ -43,6 +43,32 @@
     queueMicrotask(() => onMutate([], observer));
     return observer;
   });
+
+  // src/lib/xhr.ts
+  var $unsafeWindow = GMCompat.unsafeWindow;
+  var hookResponse = (onResponse2, onError) => {
+    const xhrProto = $unsafeWindow.XMLHttpRequest.prototype;
+    const oldSend = xhrProto.send;
+    function send(body = null) {
+      const oldOnReadyStateChange = this.onreadystatechange;
+      if (onError) {
+        this.addEventListener("error", onError);
+      }
+      this.onreadystatechange = function(event) {
+        if (this.readyState === this.DONE && this.status === 200) {
+          onResponse2(this, this.responseURL);
+        }
+        if (oldOnReadyStateChange) {
+          oldOnReadyStateChange.call(this, event);
+        }
+      };
+      oldSend.call(this, body);
+    }
+    xhrProto.send = GMCompat.export(send);
+    return () => {
+      xhrProto.send = oldSend;
+    };
+  };
 
   // src/twitter-linkify-trends.user.ts
   // @license       GPL
@@ -69,14 +95,15 @@
       }
     ]
   ]);
+  var LINKED = "data-linked";
   var CARET = '[data-testid="caret"]';
   var IS_TREND = '[data-testid="trend"]';
   var HAS_MENU = `:has(${CARET})`;
   var TIMELINE_EVENT = `${IS_TREND}:not(${HAS_MENU})`;
   var SIDEBAR_EVENT = '[data-testid^="news_sidebar_article_"]';
-  var EVENT = `:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT})`;
+  var NEWS = `:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT})`;
   var TREND = `${IS_TREND}${HAS_MENU}`;
-  var SELECTOR = [EVENT, TREND].map((it) => `div[role="link"]${it}:not([data-linked])`).join(", ");
+  var SELECTOR = [NEWS, TREND].map((it) => `div[role="link"]${it}:not([${LINKED}])`).join(", ");
   function disableAll(e) {
     e.stopPropagation();
   }
@@ -87,44 +114,44 @@
       e.stopPropagation();
     }
   }
-  function hookXHROpen(oldOpen) {
-    return function open(_method, url) {
-      const endpoint = URL.parse(url)?.pathname.split("/").at(-1) ?? "";
-      const $path = EVENT_DATA_HANDLERS.get(endpoint);
-      if ($path) {
-        const [path, handler] = typeof $path === "string" ? [$path, onTimelineEventData] : [$path.path, $path.handler];
-        this.addEventListener("load", () => handler(this.responseText, path));
-      }
-      return GMCompat.apply(this, oldOpen, arguments);
-    };
+  function onResponse(xhr, uri) {
+    const endpoint = URL.parse(uri)?.pathname.split("/").at(-1) ?? "";
+    const $path = EVENT_DATA_HANDLERS.get(endpoint);
+    if (!$path) {
+      return;
+    }
+    const [path, handler] = typeof $path === "string" ? [$path, onTimelineEventData] : [$path.path, $path.handler];
+    handler(xhr.responseText, path);
   }
   function linkFor(href) {
     return $("<a></a>").attr({ href, role: "link", "data-focusable": true }).css({ color: "inherit", textDecoration: "inherit" });
   }
   function onElement(el) {
     const $el = $(el);
+    let type;
     let linked = true;
-    if ($el.is(EVENT)) {
+    if ($el.is(NEWS)) {
+      type = "news" /* NEWS */;
       $el.on(DISABLED_EVENTS, disableAll);
-      linked = onEventElement($el);
-    } else if ($el.is(TREND)) {
+      linked = onNewsElement($el);
+    } else {
+      type = "trend" /* TREND */;
       $el.on(DISABLED_EVENTS, disableSome);
       onTrendElement($el);
     }
     if (linked) {
       $el.css("cursor", "auto");
-      $el.attr("data-linked", "true");
+      $el.attr(LINKED, type);
     }
   }
-  function onEventElement($event) {
+  function onNewsElement($event) {
     const { target, title } = targetFor($event);
     const url = CACHE.get(title);
     if (!url) {
       return false;
     }
-    console.debug(`element (event):`, JSON.stringify(title));
-    const $link = linkFor(url);
-    $(target).parent().wrap($link);
+    console.debug(`element (news):`, JSON.stringify(title));
+    $(target).parent().wrap(linkFor(url));
     return true;
   }
   function onSidebarEventData(json, path) {
@@ -179,7 +206,6 @@
       }
     });
   }
-  var xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype;
-  xhrProto.open = GMCompat.export(hookXHROpen(xhrProto.open));
+  hookResponse(onResponse);
   $(run);
 })();

@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.3.2
+// @version       3.4.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -25,7 +25,14 @@
 // XXX needed to appease esbuild
 export {}
 
-import { observe } from './lib/observer.js'
+import { observe }      from './lib/observer.js'
+import { hookResponse } from './lib/xhr.js'
+
+const enum EventType {
+    EVENT = 'event',
+    NEWS = 'news',
+    TREND = 'trend',
+}
 
 declare const exports: {
     default: typeof import('flru').default;
@@ -55,7 +62,7 @@ type TimelineEvent = {
 const CACHE = exports.default(128)
 
 /*
- * DOM events to disable (stop propagating) on event and trend elements
+ * DOM events to disable (stop propagating) on news and trend elements
  */
 const DISABLED_EVENTS = 'click touch'
 
@@ -88,22 +95,23 @@ const EVENT_DATA_HANDLERS = new Map<string, EventDataHandlersValue>([
 ])
 
 /*
- * selectors for trend elements and event elements (i.e. Twitter's AI-curated
- * news links). works for trends/events in the "What's happening" panel in the
- * sidebar, on the dedicated trends pages (https://x.com/explore/tabs/*) and in
+ * selectors for trend elements and news elements (i.e. Twitter's AI-curated
+ * news links). works for trends/news in the "What's happening" panel in the
+ * sidebar, on the dedicated event pages (https://x.com/explore/tabs/*) and in
  * search results (https://x.com/search?q=foo)
  */
+const LINKED = 'data-linked'
 const CARET = '[data-testid="caret"]'
 const IS_TREND = '[data-testid="trend"]'
 const HAS_MENU = `:has(${CARET})`
 const TIMELINE_EVENT = `${IS_TREND}:not(${HAS_MENU})`
 const SIDEBAR_EVENT = '[data-testid^="news_sidebar_article_"]'
-const EVENT = `:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT})`
+const NEWS = `:is(${TIMELINE_EVENT}, ${SIDEBAR_EVENT})`
 const TREND = `${IS_TREND}${HAS_MENU}`
 
-// any trend/event element (distinguished in the element handler (onElement)),
-// excluding the ones we've already processed ([data-linked="true"])
-const SELECTOR = [EVENT, TREND].map(it => `div[role="link"]${it}:not([data-linked])`).join(', ')
+// any trend/news element (distinguished in the element handler (onElement)),
+// excluding the ones we've already processed (tagged with LINKED)
+const SELECTOR = [NEWS, TREND].map(it => `div[role="link"]${it}:not([${LINKED}])`).join(', ')
 
 /*
  * remove the onclick interceptors from event elements
@@ -134,29 +142,30 @@ function disableSome (this: HTMLElement, e: JQueryEventObject) {
  * @param {XMLHttpRequest['open']} oldOpen
  * @returns {XMLHttpRequest['open']}
  */
-function hookXHROpen (oldOpen: XMLHttpRequest['open']) {
-    return function open (this: XMLHttpRequest, _method: string, url: string) { // preserve the arity
-        const endpoint = URL.parse(url)?.pathname.split('/').at(-1) ?? ''
-        const $path = EVENT_DATA_HANDLERS.get(endpoint)
 
-        if ($path) {
-            const [path, handler] = typeof $path === 'string'
-                ? [$path, onTimelineEventData]
-                : [$path.path, $path.handler]
+/*
+ * custom handler for XHR requests. intercept requests for event data
+ * and extract the URLs for event elements
+ */
+function onResponse (xhr: XMLHttpRequest, uri: string): void {
+    const endpoint = URL.parse(uri)?.pathname.split('/').at(-1) ?? ''
+    const $path = EVENT_DATA_HANDLERS.get(endpoint)
 
-            // register a new listener
-            this.addEventListener('load', () => handler(this.responseText, path))
-        }
-
-        // delegate to the original XHR#open handler
-        return GMCompat.apply(this, oldOpen, arguments)
+    if (!$path) {
+        return
     }
+
+    const [path, handler] = typeof $path === 'string'
+        ? [$path, onTimelineEventData]
+        : [$path.path, $path.handler]
+
+    handler(xhr.responseText, path)
 }
 
 /*
  * create a link (A) which targets the specified URL
  *
- * used to wrap the trend/event titles
+ * used to wrap the trend/news titles
  */
 function linkFor (href: string) {
     return $('<a></a>')
@@ -165,18 +174,21 @@ function linkFor (href: string) {
 }
 
 /*
- * process a newly-created trend or event element
+ * process a newly-created trend or news element
  */
 function onElement (el: HTMLElement) {
     const $el = $(el)
 
+    let type: EventType
     let linked = true
 
     // determine the element's type and pass it to the appropriate handler
-    if ($el.is(EVENT)) {
+    if ($el.is(NEWS)) {
+        type = EventType.NEWS
         $el.on(DISABLED_EVENTS, disableAll)
-        linked = onEventElement($el)
-    } else if ($el.is(TREND)) {
+        linked = onNewsElement($el)
+    } else { // $el.is(TREND)
+        type = EventType.TREND
         $el.on(DISABLED_EVENTS, disableSome)
         onTrendElement($el)
     }
@@ -184,18 +196,18 @@ function onElement (el: HTMLElement) {
     // a link was added: tag the element so we don't select it again
     if (linked) {
         $el.css('cursor', 'auto') // remove the fake pointer
-        $el.attr('data-linked', 'true')
+        $el.attr(LINKED, type)
     }
 }
 
 /*
- * linkify an event element: the target URL is (was) extracted from the
+ * linkify a news element: the target URL is (was) extracted from the
  * intercepted JSON
  *
  * returns true if the link has been added (i.e. the event data has been
  * loaded), false otherwise (i.e. try again on the next DOM update)
  */
-function onEventElement ($event: JQuery): boolean {
+function onNewsElement ($event: JQuery): boolean {
     const { target, title } = targetFor($event)
     const url = CACHE.get(title)
 
@@ -205,15 +217,14 @@ function onEventElement ($event: JQuery): boolean {
         return false
     }
 
-    console.debug(`element (event):`, JSON.stringify(title))
-    const $link = linkFor(url)
-    $(target).parent().wrap($link)
+    console.debug(`element (news):`, JSON.stringify(title))
+    $(target).parent().wrap(linkFor(url))
     return true
 }
 
 /*
  * process the (JSON) data for events in the "Today's News" sidebar: extract
- * title/URL pairs for the event elements and store them in a cache
+ * title/URL pairs for the elements and store them in a cache
  */
 function onSidebarEventData (json: string, path: string) {
     const data = JSON.parse(json)
@@ -229,7 +240,7 @@ function onSidebarEventData (json: string, path: string) {
 
 /*
  * process the (JSON) data for timeline events: extract title/URL pairs for the
- * event elements and store them in a cache
+ * elements and store them in a cache
  */
 function onTimelineEventData (json: string, path: string) {
     const data = JSON.parse(json)
@@ -265,7 +276,7 @@ function onTrendElement ($trend: JQuery) {
 }
 
 /*
- * given a trend or event element, return its target element (the SPAN
+ * given a trend or news element, return its target element (the SPAN
  * containing the element's title) along with its title text
  */
 function targetFor ($el: JQuery) {
@@ -287,7 +298,7 @@ function targetFor ($el: JQuery) {
 /******************************************************************************/
 
 /*
- * monitor the creation of trend/event elements
+ * monitor the creation of trend/news elements
  */
 function run () {
     const target = document.getElementById('react-root')
@@ -304,12 +315,11 @@ function run () {
     })
 }
 
-// hook HMLHTTPRequest#open so we can extract event data from the JSON
-const xhrProto = GMCompat.unsafeWindow.XMLHttpRequest.prototype
+// intercept XHR requests to scan responses for event data and add them to the
+// cache
+hookResponse(onResponse)
 
-xhrProto.open = GMCompat.export(hookXHROpen(xhrProto.open))
-
-// monitor the creation of trend/event elements after the page has loaded
+// monitor the creation of trend/news elements after the page has loaded
 //
 // this script needs to be loaded early enough to intercept the JSON
 // (document-start), but run after the page has loaded (DOMContentLoaded). this
