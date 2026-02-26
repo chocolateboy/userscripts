@@ -1,5 +1,3 @@
-/// <ref path="./types/gm-compat.d.ts" />
-
 import { assign, type Maybe } from './util.js'
 
 type XHR = XMLHttpRequest
