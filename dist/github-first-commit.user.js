@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.1.0
+// @version       4.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -16,7 +16,7 @@
 
 "use strict";
 (() => {
-  // src/lib/util.ts
+  // src/lib/util/constant.ts
   var constant = (value) => (..._args) => value;
 
   // src/lib/observer.ts
@@ -42,7 +42,6 @@
   var ID = "first-commit";
   var PATH = 'meta[name="analytics-location"][content]';
   var REPO_PAGE = "/<user-name>/<repo-name>";
-  var USER_REPO = 'link[rel="canonical"][href]';
   var $ = document;
   var openFirstCommit = (user, repo) => {
     return fetch(`https://api.github.com/repos/${user}/${repo}/commits`).then((res) => Promise.all([res.headers.get("link"), res.json()])).then(([link, commits]) => {
@@ -75,7 +74,7 @@
     const label = firstCommit.querySelector(':scope [data-component="text"] > *');
     const header = firstCommit.querySelector(":scope h2");
     const link = firstCommit.querySelector(":scope a[href]");
-    const [user, repo] = URL.parse($.querySelector(USER_REPO).href).pathname.slice(1).split("/");
+    const [user, repo] = location.pathname.slice(1).split("/");
     firstCommit.id = ID;
     header.textContent = label.textContent = "1st Commit";
     link.removeAttribute("href");
