@@ -3,7 +3,7 @@
 // @description   Remove t.co tracking links from Twitter
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.2
+// @version       3.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.twitter.com/
@@ -13,6 +13,7 @@
 // @include       https://x.com/
 // @include       https://x.com/*
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @grant         unsafeWindow
 // @run-at        document-start
 // ==/UserScript==
 
@@ -22,10 +23,10 @@
 (() => {
   // src/twitter-direct/util.ts
   var isObject = (value) => !!value && typeof value === "object";
-  var isPlainObject = function() {
+  var isPlainObject = (function() {
     const toString = {}.toString;
     return (value) => toString.call(value) === "[object Object]";
-  }();
+  })();
   var typeOf = (value) => value === null ? "null" : typeof value;
   var isType = (type) => {
     return (value) => {
@@ -74,14 +75,14 @@
     "user_mentions",
     "video_info"
   ]);
-  var checkUrl = /* @__PURE__ */ function() {
+  var checkUrl = /* @__PURE__ */ (function() {
     const urlPattern = /^https?:\/\/\w/i;
     return (value) => urlPattern.test(value) && value;
-  }();
-  var isTrackedUrl = /* @__PURE__ */ function() {
+  })();
+  var isTrackedUrl = /* @__PURE__ */ (function() {
     const urlPattern = /^https?:\/\/t\.co\/\w+$/;
     return (value) => urlPattern.test(value);
-  }();
+  })();
   var isURLData = (value) => {
     return isPlainObject(value) && isString(value.url) && isString(value.expanded_url) && Array.isArray(value.indices) && isNumber(value.indices[0]) && isNumber(value.indices[1]);
   };

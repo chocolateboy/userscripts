@@ -3,12 +3,13 @@
 // @description   Direct links to images and pages on Google Images
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.1.0
+// @version       4.1.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://www.google.tld/search?*tbm=isch*
 // @include       https://www.google.tld/search?*udm=2*
 // @require       https://unpkg.com/gm-compat@1.1.0/dist/index.iife.min.js
+// @grant         unsafeWindow
 // @run-at        document-start
 // ==/UserScript==
 

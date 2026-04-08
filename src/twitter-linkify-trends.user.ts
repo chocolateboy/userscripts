@@ -3,7 +3,7 @@
 // @description   Make Twitter trends links (again)
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.4.0
+// @version       3.4.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://mobile.x.com/
@@ -15,7 +15,7 @@
 // @require       https://unpkg.com/@chocolateboy/uncommonjs@3.2.1/dist/polyfill.iife.min.js
 // @require       https://unpkg.com/get-wild@3.0.2/dist/index.umd.min.js
 // @require       https://unpkg.com/flru@1.0.2/dist/flru.min.js
-// @grant         GM_log
+// @grant         unsafeWindow
 // @run-at        document-start
 // ==/UserScript==
 
