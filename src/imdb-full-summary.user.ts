@@ -3,7 +3,7 @@
 // @description   Automatically show the full plot summary on IMDb
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.2.0
+// @version       3.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/([#?].*)?)?$/
@@ -46,7 +46,7 @@ const run = () => {
 
     // scan the document for summary elements which haven't been expanded and
     // expand them.
-    observe(document.body, () => {
+    observe($.body, () => {
         for (const summary of $.querySelectorAll<HTMLElement>(SUMMARY)) {
             summary.textContent = $summary
             summary.dataset.expanded = 'true'
