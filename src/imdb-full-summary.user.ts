@@ -3,7 +3,7 @@
 // @description   Automatically show the full plot summary on IMDb
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       /^https://www\.imdb\.com(/[^/]+)?/title/tt[0-9]+(/([#?].*)?)?$/
@@ -18,41 +18,40 @@
  *  - TV show: https://www.imdb.com/title/tt0108983/
  */
 
+import { observe } from './lib/observer.js'
+
+// each child of the plot element is a summary element which is displayed
+// for a different display size, e.g. plot-xl for desktop, plot-l for
+// tablets, and plot-xs_to_m for mobile. changing the display size selects a
+// different summary element.
+const SUMMARY = '[data-testid="plot"] [data-testid^="plot-"]:not([data-expanded])'
+
 const $ = document
-const init: MutationObserverInit = { childList: true }
 
 const run = () => {
-    let summary = ''
+    let $summary = ''
 
     // get the summary from the props (JSON) embedded in the page
     try {
         const { textContent: metadata } = $.getElementById('__NEXT_DATA__')!
-        summary = JSON.parse(metadata!).props.pageProps.aboveTheFoldData.plot.plotText.plainText
+        $summary = JSON.parse(metadata!).props.pageProps.aboveTheFoldData.plot.plotText.plainText
     } catch (e: unknown) {
         console.warn("Can't extract summary from JSON metadata:", (e as Error).message)
     }
 
-    if (!summary) {
+    if (!$summary) {
+        console.log('no summary found')
         return
     }
 
-    // each child of the plot element is a summary element which is displayed
-    // for a different display size, e.g. plot-xl for desktop, plot-l for
-    // tablets, and plot-xs_to_m for mobile. changing the display size selects a
-    // different summary element.
-    for (const target of $.querySelectorAll<HTMLElement>('[data-testid="plot"] [data-testid^="plot-"]')) {
-        // replace the truncated summary with the full version and revert
-        // React's attempts to reinstate the original (reconciliation)
-        const callback = () => {
-            observer.disconnect()
-            target.textContent = summary
-            observer.observe(target, init)
+    // scan the document for summary elements which haven't been expanded and
+    // expand them.
+    observe(document.body, () => {
+        for (const summary of $.querySelectorAll<HTMLElement>(SUMMARY)) {
+            summary.textContent = $summary
+            summary.dataset.expanded = 'true'
         }
-
-        const observer = new MutationObserver(callback)
-
-        callback()
-    }
+    })
 }
 
 // the earliest event after the "static" parts of the page become visible.
