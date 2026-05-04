@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -43,6 +43,13 @@
   var ISSUES_LINK = 'a[data-react-nav="issues-react"]';
   var MY_ISSUES = "My Issues";
   var MY_ISSUES_LINK = `a#${ID}`;
+  var pageIsMyIssues = (issuesPath, myIssues) => {
+    if (location.pathname === issuesPath) {
+      const q = URL.parse(location.href).searchParams.get("q");
+      return !!q && q.trim().split(/\s+/).includes(myIssues);
+    }
+    return false;
+  };
   var addLink = () => {
     const $issuesLink = $(`li > ${ISSUES_LINK}`);
     if ($issuesLink.length !== 1) {
@@ -66,13 +73,13 @@
     if ($myIssuesLink.length === 0) {
       console.debug("adding My Issues tab");
       const $myIssuesTab = $issuesTab.clone();
-      $myIssuesLink = $myIssuesTab.find(`:scope ${ISSUES_LINK}`);
       const subqueries = [myIssues, "sort:updated-desc"];
       if (user === self) {
         subqueries.unshift("is:open", "archived:false");
       }
       const query = subqueries.join("+");
       const href = `${issuesPath}?q=${escape(query)}`;
+      $myIssuesLink = $myIssuesTab.find(`:scope ${ISSUES_LINK}`);
       $myIssuesLink.removeClass("deselected").attr({
         id: ID,
         role: "tab",
@@ -87,19 +94,16 @@
       $myIssuesLink.find(':scope [data-component="counter"]').hide();
       $issuesTab.after($myIssuesTab);
     }
-    updateLink(issuesPath, myIssues, $myIssuesLink, $issuesLink);
+    updateLink(issuesPath, myIssues, $issuesLink, $myIssuesLink);
   };
-  var updateLink = (issuesPath, myIssues, $myIssuesLink, $issuesLink) => {
-    if (location.pathname === issuesPath) {
-      const q = URL.parse(location.href).searchParams.get("q");
-      if (q && q.trim().split(/\s+/).includes(myIssues)) {
-        $myIssuesLink.attr("aria-selected", "true");
-        $issuesLink.addClass("deselected");
-        return;
-      }
+  var updateLink = (issuesPath, myIssues, $issuesLink, $myIssuesLink) => {
+    if (pageIsMyIssues(issuesPath, myIssues)) {
+      $myIssuesLink.attr("aria-selected", "true");
+      $issuesLink.addClass("deselected");
+    } else {
+      $myIssuesLink.attr("aria-selected", "false");
+      $issuesLink.removeClass("deselected");
     }
-    $myIssuesLink.attr("aria-selected", "false");
-    $issuesLink.removeClass("deselected");
   };
   GM_addStyle(`
     .deselected::after {

@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.1
+// @version       3.0.2
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -35,6 +35,18 @@ const MY_ISSUES = 'My Issues'
  * it can be reused for SPA navigation
  */
 const MY_ISSUES_LINK = `a#${ID}`
+
+/*
+ * return true if we're on the "My Issues" page, false otherwise.
+ */
+const pageIsMyIssues = (issuesPath: string, myIssues: string): boolean => {
+    if (location.pathname === issuesPath) { // "Issues" or "My Issues"
+        const q = URL.parse(location.href)!.searchParams.get('q')
+        return !!q && q.trim().split(/\s+/).includes(myIssues)
+    }
+
+    return false
+}
 
 /*
  * add/restore the "My Issues" link
@@ -72,8 +84,6 @@ const addLink = () => {
         console.debug('adding My Issues tab')
 
         const $myIssuesTab = $issuesTab.clone()
-        $myIssuesLink = $myIssuesTab.find<HTMLAnchorElement>(`:scope ${ISSUES_LINK}`)
-
         const subqueries = [myIssues, 'sort:updated-desc']
 
         if (user === self) { // own repo
@@ -83,6 +93,8 @@ const addLink = () => {
 
         const query = subqueries.join('+')
         const href = `${issuesPath}?q=${escape(query)}`
+
+        $myIssuesLink = $myIssuesTab.find<HTMLAnchorElement>(`:scope ${ISSUES_LINK}`)
 
         $myIssuesLink
             .removeClass('deselected')
@@ -103,7 +115,7 @@ const addLink = () => {
         $issuesTab.after($myIssuesTab)
     }
 
-    updateLink(issuesPath, myIssues, $myIssuesLink, $issuesLink)
+    updateLink(issuesPath, myIssues, $issuesLink, $myIssuesLink)
 }
 
 /*
@@ -112,22 +124,16 @@ const addLink = () => {
 const updateLink = (
     issuesPath: string,
     myIssues: string,
-    $myIssuesLink: JQuery<HTMLAnchorElement>,
     $issuesLink: JQuery<HTMLAnchorElement>,
+    $myIssuesLink: JQuery<HTMLAnchorElement>,
 ) => {
-    if (location.pathname === issuesPath) { // "Issues" or "My Issues"
-        const q = URL.parse(location.href)!.searchParams.get('q')
-
-        if (q && q.trim().split(/\s+/).includes(myIssues)) { // "My Issues"
-            $myIssuesLink.attr('aria-selected', 'true')
-            $issuesLink.addClass('deselected')
-            return
-        } // else fall through
+    if (pageIsMyIssues(issuesPath, myIssues)) { // "MyIssues"
+        $myIssuesLink.attr('aria-selected', 'true')
+        $issuesLink.addClass('deselected')
+    } else { // any other page, e.g. "Issues", "Pull requests", etc.
+        $myIssuesLink.attr('aria-selected', 'false')
+        $issuesLink.removeClass('deselected')
     }
-
-    // "Issues", or another tab, e.g. "Pull requests"
-    $myIssuesLink.attr('aria-selected', 'false')
-    $issuesLink.removeClass('deselected')
 }
 
 GM_addStyle(`
