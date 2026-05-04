@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -95,14 +95,11 @@
       if (q && q.trim().split(/\s+/).includes(myIssues)) {
         $myIssuesLink.attr("aria-selected", "true");
         $issuesLink.addClass("deselected");
-      } else {
-        $myIssuesLink.attr("aria-selected", "false");
-        $issuesLink.removeClass("deselected");
+        return;
       }
-    } else {
-      $myIssuesLink.attr("aria-selected", "false");
-      $issuesLink.removeClass("deselected");
     }
+    $myIssuesLink.attr("aria-selected", "false");
+    $issuesLink.removeClass("deselected");
   };
   GM_addStyle(`
     .deselected::after {

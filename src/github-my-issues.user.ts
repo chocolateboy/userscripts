@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.0
+// @version       3.0.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -15,7 +15,7 @@
 import { observe } from './lib/observer.js'
 
 /*
- * unique ID for the My Issues link element
+ * unique ID for the "My Issues" link element
  */
 const ID = 'my-issues-link'
 
@@ -37,7 +37,7 @@ const MY_ISSUES = 'My Issues'
 const MY_ISSUES_LINK = `a#${ID}`
 
 /*
- * add the "My Issues" link
+ * add/restore the "My Issues" link
  */
 const addLink = () => {
     const $issuesLink = $<HTMLAnchorElement>(`li > ${ISSUES_LINK}`)
@@ -106,26 +106,28 @@ const addLink = () => {
     updateLink(issuesPath, myIssues, $myIssuesLink, $issuesLink)
 }
 
+/*
+ * update the "Issues" and "My Issues" tabs to reflect the current page
+ */
 const updateLink = (
     issuesPath: string,
     myIssues: string,
     $myIssuesLink: JQuery<HTMLAnchorElement>,
     $issuesLink: JQuery<HTMLAnchorElement>,
 ) => {
-    if (location.pathname === issuesPath) { // Issues or My Issues
+    if (location.pathname === issuesPath) { // "Issues" or "My Issues"
         const q = URL.parse(location.href)!.searchParams.get('q')
 
-        if (q && q.trim().split(/\s+/).includes(myIssues)) { // My Issues
+        if (q && q.trim().split(/\s+/).includes(myIssues)) { // "My Issues"
             $myIssuesLink.attr('aria-selected', 'true')
             $issuesLink.addClass('deselected')
-        } else { // Issues
-            $myIssuesLink.attr('aria-selected', 'false')
-            $issuesLink.removeClass('deselected')
-        }
-    } else { // other tab, e.g. Pull requests
-        $myIssuesLink.attr('aria-selected', 'false')
-        $issuesLink.removeClass('deselected')
+            return
+        } // else fall through
     }
+
+    // "Issues", or another tab, e.g. "Pull requests"
+    $myIssuesLink.attr('aria-selected', 'false')
+    $issuesLink.removeClass('deselected')
 }
 
 GM_addStyle(`
