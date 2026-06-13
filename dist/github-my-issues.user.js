@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -75,7 +75,7 @@
       const $myIssuesTab = $issuesTab.clone();
       const subqueries = [myIssues, "sort:updated-desc"];
       if (user === self) {
-        subqueries.unshift("is:open", "archived:false");
+        subqueries.unshift("state:open", "archived:false");
       }
       const query = subqueries.join("+");
       const href = `${issuesPath}?q=${escape(query)}`;
@@ -110,5 +110,9 @@
         background: transparent !important;
     }
 `);
-  observe(document.documentElement, addLink);
+  observe(document.documentElement, () => {
+    if (document.querySelector('[partial-name="global-nav-bar"].loaded')) {
+      addLink();
+    }
+  });
 })();

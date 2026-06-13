@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.0.2
+// @version       3.1.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -87,8 +87,8 @@ const addLink = () => {
         const subqueries = [myIssues, 'sort:updated-desc']
 
         if (user === self) { // own repo
-            // is:open archived:false involves:<self> ...
-            subqueries.unshift('is:open', 'archived:false')
+            // state:open archived:false involves:<self> ...
+            subqueries.unshift('state:open', 'archived:false')
         }
 
         const query = subqueries.join('+')
@@ -142,4 +142,8 @@ GM_addStyle(`
     }
 `)
 
-observe(document.documentElement, addLink)
+observe(document.documentElement, () => {
+    if (document.querySelector('[partial-name="global-nav-bar"].loaded')) {
+        addLink()
+    }
+})
