@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.2.0
+// @version       4.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -58,7 +58,7 @@
       }
     });
   };
-  observe(() => {
+  observe($.documentElement, () => {
     const path = $.querySelector(PATH)?.content;
     if (path !== REPO_PAGE) {
       return;

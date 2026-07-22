@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.2.0
+// @version       4.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -79,7 +79,7 @@ const openFirstCommit = (user: string, repo: string) => {
         })
 }
 
-observe(() => {
+observe($.documentElement, () => {
     const path = $.querySelector<HTMLMetaElement>(PATH)?.content
 
     // bail if we're not on a repo page
