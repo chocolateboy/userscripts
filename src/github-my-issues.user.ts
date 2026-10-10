@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -23,7 +23,7 @@ const ID = 'my-issues-link'
  * selector for the "Issues" link. we navigate up from this to its parent
  * tab, which we clone the "My Issues" tab from and append to.
  */
-const ISSUES_LINK = 'a[data-react-nav="issues-react"]'
+const ISSUES_LINK = 'a[data-tab-item="issues"]'
 
 /*
  * text of the "My Issues" link

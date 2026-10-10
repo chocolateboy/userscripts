@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.1.0
+// @version       3.2.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -40,7 +40,7 @@
   // src/github-my-issues.user.ts
   // @license       GPL
   var ID = "my-issues-link";
-  var ISSUES_LINK = 'a[data-react-nav="issues-react"]';
+  var ISSUES_LINK = 'a[data-tab-item="issues"]';
   var MY_ISSUES = "My Issues";
   var MY_ISSUES_LINK = `a#${ID}`;
   var pageIsMyIssues = (issuesPath, myIssues) => {
