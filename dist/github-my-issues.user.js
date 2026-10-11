@@ -3,7 +3,7 @@
 // @description   Add a contextual link to issues you've contributed to on GitHub
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       3.2.0
+// @version       3.2.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -111,7 +111,12 @@
     }
 `);
   observe(document.documentElement, () => {
-    if (document.querySelector('[partial-name="global-nav-bar"].loaded')) {
+    const navBar = document.querySelector('[partial-name="global-nav-bar"]');
+    if (navBar) {
+      if (navBar.classList.contains("loaded")) {
+        addLink();
+      }
+    } else {
       addLink();
     }
   });
