@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.2.1
+// @version       4.3.0
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -20,16 +20,16 @@ type Commit = { html_url: string };
 const ID = 'first-commit'
 
 /*
- * selector for the page-type identifier, e.g. "/<user-name>/<repo-name>" or
- * "/<user-name>/<repo-name>/issues/index"
+ * selector for the page-type identifier, e.g. "/$owner/$repo/" or
+ * "/:user_id/:repository/issues(.:format)"
  */
-const PATH = 'meta[name="analytics-location"][content]'
+const PATH = 'meta[name="route-pattern"][content]'
 
 /*
  * the page-type identifier for repo pages, e.g.
  * https://github.com/chocolateboy/userscripts
  */
-const REPO_PAGE = '/<user-name>/<repo-name>'
+const REPO_PAGE = '/$owner/$repo/'
 
 const $ = document
 
