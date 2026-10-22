@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.3.0
+// @version       4.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -21,7 +21,7 @@ const ID = 'first-commit'
 
 /*
  * selector for the page-type identifier, e.g. "/$owner/$repo/" or
- * "/:user_id/:repository/issues(.:format)"
+ * "/:user_id/:repository"
  */
 const PATH = 'meta[name="route-pattern"][content]'
 
@@ -29,7 +29,7 @@ const PATH = 'meta[name="route-pattern"][content]'
  * the page-type identifier for repo pages, e.g.
  * https://github.com/chocolateboy/userscripts
  */
-const REPO_PAGE = '/$owner/$repo/'
+const REPO_PAGE = new Set(['/$owner/$repo/', '/:user_id/:repository'])
 
 const $ = document
 
@@ -83,7 +83,7 @@ observe($.documentElement, () => {
     const path = $.querySelector<HTMLMetaElement>(PATH)?.content
 
     // bail if we're not on a repo page
-    if (path !== REPO_PAGE) {
+    if (!REPO_PAGE.has(path!)) {
         return
     }
 

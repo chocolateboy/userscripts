@@ -3,7 +3,7 @@
 // @description   Add a link to a GitHub repo's first commit
 // @author        chocolateboy
 // @copyright     chocolateboy
-// @version       4.3.0
+// @version       4.3.1
 // @namespace     https://github.com/chocolateboy/userscripts
 // @license       GPL
 // @include       https://github.com/
@@ -41,7 +41,7 @@
   // @license       GPL
   var ID = "first-commit";
   var PATH = 'meta[name="route-pattern"][content]';
-  var REPO_PAGE = "/$owner/$repo/";
+  var REPO_PAGE = /* @__PURE__ */ new Set(["/$owner/$repo/", "/:user_id/:repository"]);
   var $ = document;
   var openFirstCommit = (user, repo) => {
     return fetch(`https://api.github.com/repos/${user}/${repo}/commits`).then((res) => Promise.all([res.headers.get("link"), res.json()])).then(([link, commits]) => {
@@ -60,7 +60,7 @@
   };
   observe($.documentElement, () => {
     const path = $.querySelector(PATH)?.content;
-    if (path !== REPO_PAGE) {
+    if (!REPO_PAGE.has(path)) {
       return;
     }
     if ($.getElementById(ID)) {
